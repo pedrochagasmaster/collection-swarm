@@ -169,7 +169,7 @@ def test_connection(ctx: click.Context) -> None:
     """Verify the default model path can produce a local completion."""
     config = load_app_config(ctx.obj["config_dir"])
     model = config.model(config.default_conversation_model)
-    if model.backend in {"nim", "acp"}:
+    if model.backend in {"nim", "cursor_sdk", "acp"}:
         console.print(f"Configured default backend is '{model.backend}'. Run a simulation to test live credentials.")
         return
     result = asyncio.run(

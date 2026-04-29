@@ -72,7 +72,8 @@ def _mentions_written_proof(text: str) -> bool:
 def _parse_judgment(content: str, turn_count: int) -> Judgment:
     try:
         data = json.loads(_extract_json(content))
-        data.setdefault("conversation_efficiency", turn_count)
+        _normalize_judgment_data(data)
+        data["conversation_efficiency"] = turn_count
         return Judgment.model_validate(data)
     except (json.JSONDecodeError, ValidationError, ValueError):
         return Judgment(
@@ -94,6 +95,39 @@ def _extract_json(content: str) -> str:
     if start == -1 or end == -1 or end < start:
         raise ValueError("no JSON object in judge response")
     return content[start : end + 1]
+
+
+def _normalize_judgment_data(data: dict) -> None:
+    outcome = data.get("payment_outcome")
+    if isinstance(outcome, str):
+        normalized = outcome.strip().lower().replace("-", "_").replace(" ", "_")
+        aliases = {
+            "payment_plan_agreed": PaymentOutcome.PAYMENT_PLAN,
+            "payment_plan_accepted": PaymentOutcome.PAYMENT_PLAN,
+            "payment_arrangement": PaymentOutcome.PAYMENT_PLAN,
+            "promise": PaymentOutcome.PROMISE_TO_PAY,
+            "promise_made": PaymentOutcome.PROMISE_TO_PAY,
+            "paid_in_full": PaymentOutcome.FULL_PAYMENT,
+            "settled_in_full": PaymentOutcome.FULL_PAYMENT,
+            "partial": PaymentOutcome.PARTIAL_PAYMENT,
+            "pending": PaymentOutcome.NO_COMMITMENT,
+            "in_progress": PaymentOutcome.NO_COMMITMENT,
+            "ongoing": PaymentOutcome.NO_COMMITMENT,
+            "no_resolution": PaymentOutcome.NO_COMMITMENT,
+            "none": PaymentOutcome.NO_COMMITMENT,
+            "refused": PaymentOutcome.REFUSAL,
+            "hangup": PaymentOutcome.HANG_UP,
+        }
+        if normalized in aliases:
+            data["payment_outcome"] = aliases[normalized]
+        elif any(marker in normalized for marker in ("pending", "ongoing", "negotiating", "negotiation")):
+            data["payment_outcome"] = PaymentOutcome.NO_COMMITMENT
+        elif "plan" in normalized:
+            data["payment_outcome"] = PaymentOutcome.PAYMENT_PLAN
+        elif "partial" in normalized or "settlement" in normalized:
+            data["payment_outcome"] = PaymentOutcome.PARTIAL_PAYMENT
+        else:
+            data["payment_outcome"] = normalized
 
 
 def _system_prompt() -> str:

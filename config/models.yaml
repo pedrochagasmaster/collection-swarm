@@ -6,10 +6,34 @@ tiers:
         provider: local
         input_cost_per_m: 0
         output_cost_per_m: 0
-      - id: mistral-large-3-675b
+      - id: cursor-gpt-5.5
+        backend: cursor_sdk
+        provider: openai
+        model_name: gpt-5.5
+        input_cost_per_m: 0
+        output_cost_per_m: 0
+      - id: cursor-gemini-3-flash
+        backend: cursor_sdk
+        provider: google
+        model_name: gemini-3-flash
+        input_cost_per_m: 0
+        output_cost_per_m: 0
+      - id: nim-mistral-large-3-675b
         backend: nim
         provider: mistral
-        model_name: openai/mistral-large-3-675b
+        model_name: openai/mistralai/mistral-large-3-675b-instruct-2512
+        input_cost_per_m: 0
+        output_cost_per_m: 0
+      - id: nim-llama-4-maverick
+        backend: nim
+        provider: meta
+        model_name: openai/meta/llama-4-maverick-17b-128e-instruct
+        input_cost_per_m: 0
+        output_cost_per_m: 0
+      - id: nim-minimax-m2.7
+        backend: nim
+        provider: minimax
+        model_name: openai/minimaxai/minimax-m2.7
         input_cost_per_m: 0
         output_cost_per_m: 0
   judge:
@@ -17,5 +41,23 @@ tiers:
       - id: local-judge
         backend: heuristic
         provider: local
+        input_cost_per_m: 0
+        output_cost_per_m: 0
+      - id: cursor-claude-opus-4.7
+        backend: cursor_sdk
+        provider: anthropic
+        model_name: claude-opus-4-7
+        input_cost_per_m: 0
+        output_cost_per_m: 0
+      - id: cursor-claude-sonnet-4.6
+        backend: cursor_sdk
+        provider: anthropic
+        model_name: claude-sonnet-4-6
+        input_cost_per_m: 0
+        output_cost_per_m: 0
+      - id: cursor-gemini-3.1-pro
+        backend: cursor_sdk
+        provider: google
+        model_name: gemini-3.1-pro
         input_cost_per_m: 0
         output_cost_per_m: 0

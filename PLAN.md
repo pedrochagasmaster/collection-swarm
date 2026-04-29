@@ -9,15 +9,15 @@ implementation blueprint. It supersedes any conflicting details in SPEC.md.
 
 ### Constraint
 No external LLM API keys available. All model access goes through:
-- **Cursor ACP** — Agent Client Protocol over stdio (JSON-RPC 2.0). Spawns `agent acp` as subprocess.
+- **Cursor SDK** — official `@cursor/sdk` agent API, invoked through the local Node bridge in `cursor_sdk_bridge/`.
 - **NVIDIA NIM** — Free tier, OpenAI-compatible API at `https://integrate.api.nvidia.com/v1`. Requires NVIDIA API key (free, phone-verified).
 
 ### Three-Tier Model Routing
 
 | Tier | Purpose | Backend | Models | Selection Logic |
 |------|---------|---------|--------|-----------------|
-| **Tier 1** | Judge Agent | Cursor ACP | Claude 4 Sonnet, Gemini 3 Pro, OpenAI frontier (GPT-4.1/o3/o4) | Rotate across runs. Always different provider than conversation model. |
-| **Tier 2** | Collector & Debtor Agents | Cursor ACP + NVIDIA NIM | **Cursor:** Gemini 3 Flash, Gemini 2.5 Flash, Auto. **NIM:** mistral-large-3-675b, llama-4-maverick-17b-128e, minimax-m2.7 | Both agents in a conversation always use the same model. Model tracked as experimental variable. |
+| **Tier 1** | Judge Agent | Cursor SDK | `claude-opus-4-7`, `claude-sonnet-4-6`, `gemini-3.1-pro` | Rotate across runs. Always different provider than conversation model. |
+| **Tier 2** | Collector & Debtor Agents | Cursor SDK + NVIDIA NIM | **Cursor:** `gpt-5.5`, `gemini-3-flash`. **NIM:** `mistralai/mistral-large-3-675b-instruct-2512`, `meta/llama-4-maverick-17b-128e-instruct`, `minimaxai/minimax-m2.7` | Both agents in a conversation always use the same model. Model tracked as experimental variable. |
 | **Tier 3** | Mechanical tasks | NVIDIA NIM (free) | nemotron-mini-4b, gemma-3-27b-it | JSON repair, objection extraction clustering. |
 
 ### Multi-Model Strategy: Full Matrix (Option D)
@@ -42,17 +42,17 @@ With 6 conversation models × 3 judge models minus same-provider pairs ≈ 15 va
 └──────┬──────────────┬───────────┘
        │              │
        ▼              ▼
-┌─────────────┐ ┌──────────────┐
-│  AcpBackend │ │  NimBackend  │
-│  (stdio     │ │  (LiteLLM +  │
-│   JSON-RPC) │ │   HTTP API)  │
-└─────────────┘ └──────────────┘
+┌──────────────────┐ ┌──────────────┐
+│ CursorSdkBackend │ │  NimBackend  │
+│ (@cursor/sdk via │ │  (LiteLLM +  │
+│  Node bridge)    │ │   HTTP API)  │
+└──────────────────┘ └──────────────┘
 ```
 
 - **NimBackend**: Uses LiteLLM with `base_url=https://integrate.api.nvidia.com/v1`.
   Standard async HTTP. Supports full parallel concurrency.
-- **AcpBackend**: Spawns `agent acp` subprocess, communicates via stdin/stdout JSON-RPC.
-  Uses "normal" mode (chat-only, no tool calls). Process pool of 2-3.
+- **CursorSdkBackend**: Invokes `@cursor/sdk` through `cursor_sdk_bridge/run.mjs`.
+  Uses a local agent configured with the selected Cursor model and workspace.
 - **LLMRouter**: Unified `async complete(model_id, messages) -> LLMResponse` interface.
   Looks up model_id in `models.yaml` to determine backend. Returns response text +
   token counts + estimated cost.
@@ -66,14 +66,14 @@ class LLMResponse:
     output_tokens: int
     estimated_cost_usd: float
     model_id: str
-    backend: str  # "acp" or "nim"
+    backend: str  # "cursor_sdk" or "nim"
 ```
 
 ### Concurrency Model
 - **NIM conversations**: Full async parallelism via asyncio + LiteLLM. Respect 40 req/min
   rate limit with a semaphore/rate limiter.
-- **ACP conversations**: Process pool of 2-3 `agent acp` subprocesses. Each handles one
-  conversation at a time. Limited parallelism to avoid Cursor throttling.
+- **Cursor SDK conversations**: Each completion invokes the Node bridge and Cursor SDK
+  local agent. Limited parallelism is recommended to avoid Cursor throttling.
 - **Batch runner**: Assigns conversations to backends based on model config. Manages both
   pools. NIM-model conversations naturally absorb more volume.
 
@@ -338,72 +338,77 @@ backends:
     # API key from NVIDIA_NIM_API_KEY env var
     max_concurrent_requests: 10
     rate_limit_rpm: 40
-  acp:
-    process_pool_size: 3
-    # Auth from CURSOR_API_KEY or CURSOR_AUTH_TOKEN env var
+  cursor_sdk:
+    # Auth from CURSOR_API_KEY env var
+    # Bridge deps live in cursor_sdk_bridge/
 
 tiers:
   judge:  # Tier 1
     models:
-      - id: claude-4-sonnet
-        backend: acp
+      - id: cursor-claude-opus-4.7
+        backend: cursor_sdk
         provider: anthropic
-        input_cost_per_m: 3.0
-        output_cost_per_m: 15.0
-      - id: gemini-3-pro
-        backend: acp
+        model_name: claude-opus-4-7
+        input_cost_per_m: 0
+        output_cost_per_m: 0
+      - id: cursor-claude-sonnet-4.6
+        backend: cursor_sdk
+        provider: anthropic
+        model_name: claude-sonnet-4-6
+        input_cost_per_m: 0
+        output_cost_per_m: 0
+      - id: cursor-gemini-3.1-pro
+        backend: cursor_sdk
         provider: google
-        input_cost_per_m: 1.25
-        output_cost_per_m: 10.0
-      - id: gpt-4.1
-        backend: acp
-        provider: openai
-        input_cost_per_m: 2.0
-        output_cost_per_m: 8.0
+        model_name: gemini-3.1-pro
+        input_cost_per_m: 0
+        output_cost_per_m: 0
 
   conversation:  # Tier 2
     models:
-      - id: gemini-3-flash
-        backend: acp
+      - id: cursor-gpt-5.5
+        backend: cursor_sdk
+        provider: openai
+        model_name: gpt-5.5
+        input_cost_per_m: 0
+        output_cost_per_m: 0
+      - id: cursor-gemini-3-flash
+        backend: cursor_sdk
         provider: google
-        input_cost_per_m: 0.5
-        output_cost_per_m: 3.0
-      - id: gemini-2.5-flash
-        backend: acp
-        provider: google
-        input_cost_per_m: 0.3
-        output_cost_per_m: 2.5
-      - id: auto
-        backend: acp
-        provider: cursor
-        input_cost_per_m: 1.25
-        output_cost_per_m: 6.0
-      - id: mistral-large-3-675b
+        model_name: gemini-3-flash
+        input_cost_per_m: 0
+        output_cost_per_m: 0
+      - id: nim-mistral-large-3-675b
         backend: nim
         provider: mistral
+        model_name: openai/mistralai/mistral-large-3-675b-instruct-2512
         input_cost_per_m: 0
         output_cost_per_m: 0
-      - id: llama-4-maverick
+      - id: nim-llama-4-maverick
         backend: nim
         provider: meta
+        model_name: openai/meta/llama-4-maverick-17b-128e-instruct
         input_cost_per_m: 0
         output_cost_per_m: 0
-      - id: minimax-m2.7
+      - id: nim-minimax-m2.7
         backend: nim
         provider: minimax
+        model_name: openai/minimaxai/minimax-m2.7
         input_cost_per_m: 0
         output_cost_per_m: 0
 
   mechanical:  # Tier 3
     models:
-      - id: nemotron-mini-4b
+      - id: nim-nemotron-3-super-120b
         backend: nim
         provider: nvidia
+        model_name: openai/nvidia/nemotron-3-super-120b-a12b
         input_cost_per_m: 0
         output_cost_per_m: 0
-      - id: gemma-3-27b-it
+      - id: nim-gemma-4-31b-it
         backend: nim
         provider: google
+        model_name: openai/google/gemma-4-31b-it
         input_cost_per_m: 0
         output_cost_per_m: 0
 ```
@@ -556,7 +561,7 @@ Strategies excluded from this playbook due to compliance risk:
 |-----------|---------|---------|--------|
 | NIM rate limit (429) | 3 | Exponential (2s, 4s, 8s) | Retry same call |
 | NIM timeout/network | 3 | Exponential | Retry same call |
-| ACP process crash | 2 | Restart process | Retry current turn |
+| Cursor SDK bridge failure | 2 | Exponential | Retry current turn |
 | Judge malformed JSON | 2 | None | Retry Judge call |
 | Judge repair fallback | 1 | None | Send to Tier 3 for JSON repair |
 
@@ -581,15 +586,15 @@ Strategies excluded from this playbook due to compliance risk:
 collection-swarm simulate \
     --profile cooperative_hardship \
     --strategy empathetic_payment_plan \
-    --conversation-model gemini-3-flash \
-    --judge-model claude-4-sonnet
+    --conversation-model cursor-gemini-3-flash \
+    --judge-model cursor-claude-sonnet-4.6
 
 # Batch run with matrix slicing
 collection-swarm run \
     --profiles cooperative_hardship,hostile_disputer \
     --strategies empathetic_payment_plan,assertive_settlement \
-    --conversation-models gemini-3-flash,mistral-large-3 \
-    --judge-models claude-4-sonnet,gemini-3-pro \
+    --conversation-models cursor-gemini-3-flash,nim-mistral-large-3-675b \
+    --judge-models cursor-claude-sonnet-4.6,cursor-gemini-3.1-pro \
     --reps 10 \
     --concurrency 4
 
@@ -635,7 +640,7 @@ collection-swarm/
 │       │   ├── __init__.py
 │       │   ├── base.py            # LLMResponse dataclass, Backend protocol
 │       │   ├── nim.py             # NimBackend (LiteLLM + NVIDIA NIM)
-│       │   ├── acp.py             # AcpBackend (stdio JSON-RPC)
+│       │   ├── cursor_sdk.py      # CursorSdkBackend (@cursor/sdk bridge)
 │       │   └── router.py          # LLMRouter (dispatches to backends)
 │       ├── agents/                    # Each agent owns its prompts (no prompts/ package)
 │       │   ├── __init__.py
@@ -703,7 +708,7 @@ analysis modules and making end-detection deterministic isolates the LLM boundar
 ### What We Don't Test in CI
 - LLM response quality (non-deterministic)
 - Judge scoring calibration (non-deterministic)
-- ACP process management (integration, manual)
+- Cursor SDK live agent behavior (integration, manual)
 
 ### Integration Testing
 - `collection-swarm test-connection` CLI command: one quick exchange against each
@@ -721,7 +726,7 @@ Build and test the entire core against NVIDIA NIM (free, HTTP, easy to test).
 2. **Config loading** — YAML parsing for profiles (including constraint rules),
    strategies, models, simulation settings
 3. **NimBackend** — LiteLLM + NVIDIA NIM integration, LLMResponse
-4. **LLMRouter** — dispatch to NimBackend (AcpBackend added in Phase 2)
+4. **LLMRouter** — dispatch to NimBackend (CursorSdkBackend added in Phase 2)
 5. **Agent modules** — Collector, Debtor, Judge (each owns its prompts internally;
    no separate prompts/ package)
 6. **Constraint verification** — deterministic verification step inside Judge module;
@@ -732,12 +737,12 @@ Build and test the entire core against NVIDIA NIM (free, HTTP, easy to test).
    coverage, best transcript, compliance summary, cost summary)
 9. **`simulate` CLI command** — single run, print transcript + scores
 
-### Phase 2 — ACP + Scale
+### Phase 2 — Cursor SDK + Scale
 Add Cursor model access and batch execution.
 
-10. **AcpBackend** — spawn `agent acp`, JSON-RPC session management, integrate into LLMRouter
+10. **CursorSdkBackend** — invoke `@cursor/sdk` through the Node bridge and integrate into LLMRouter
 11. **Batch runner** — matrix generation, CLI slicing filters, hybrid concurrency
-    (async NIM + ACP process pool). Uses store’s `get_backfill_needed()` for
+    (async NIM + Cursor SDK calls). Uses store’s `get_backfill_needed()` for
     replacement scheduling.
 12. **Retry/resilience** — exponential backoff, partial saves, continue-on-failure
 13. **`run` CLI command** — batch execution with Rich progress bars
@@ -762,7 +767,7 @@ Four focused modules instead of one monolithic analyzer.
 
 ## 15. Key Constraints & Principles
 
-- **No external API keys.** Cursor ACP and NVIDIA NIM free tier only.
+- **Minimal external API keys.** Cursor SDK uses `CURSOR_API_KEY`; NVIDIA NIM uses its free-tier API key.
 - **FDCPA compliance baked in.** All collector prompts include compliance guardrails.
   Non-compliant strategies are excluded from playbook output.
 - **No real consumer data.** All profiles are synthetic.

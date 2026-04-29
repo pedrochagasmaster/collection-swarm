@@ -7,3 +7,4 @@ build/
 output/
 *.db
 .env
+cursor_sdk_bridge/node_modules/

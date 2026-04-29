@@ -1,0 +1,12 @@
+{
+  "name": "collection-swarm-cursor-sdk-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@cursor/sdk": "^1.0.7"
+  }
+}
