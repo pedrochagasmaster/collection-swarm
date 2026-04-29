@@ -7,7 +7,7 @@ from enum import StrEnum
 from typing import Any, Literal
 from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class PaymentOutcome(StrEnum):
@@ -103,12 +103,17 @@ class LLMMessage(BaseModel):
 
 
 class ModelConfig(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     id: str
     backend: str
     provider: str = "local"
     input_cost_per_m: float = 0.0
     output_cost_per_m: float = 0.0
     model_name: str | None = None
+    acp_command: str = Field(default="agent", validation_alias=AliasChoices("acp_command", "command"))
+    acp_mode: str = Field(default="ask", validation_alias=AliasChoices("acp_mode", "mode"))
+    timeout_seconds: float = 120.0
 
     @property
     def litellm_model(self) -> str:

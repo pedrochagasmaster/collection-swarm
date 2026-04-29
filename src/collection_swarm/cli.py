@@ -18,6 +18,7 @@ from collection_swarm.analysis.statistics import compare_strategies
 from collection_swarm.backends.router import LLMRouter
 from collection_swarm.config import load_app_config
 from collection_swarm.engine import SimulationEngine
+from collection_swarm.models import LLMMessage
 from collection_swarm.runner import build_matrix, run_matrix
 from collection_swarm.store import SimulationStore
 
@@ -164,21 +165,27 @@ def analyze(ctx: click.Context, output_path: Path) -> None:
 
 
 @cli.command("test-connection")
+@click.option("--models", "model_ids", default=None, help="Comma-separated model IDs to test. Defaults to app defaults.")
 @click.pass_context
-def test_connection(ctx: click.Context) -> None:
-    """Verify the default model path can produce a local completion."""
+def test_connection(ctx: click.Context, model_ids: str | None) -> None:
+    """Verify configured model paths and credentials."""
     config = load_app_config(ctx.obj["config_dir"])
-    model = config.model(config.default_conversation_model)
-    if model.backend in {"nim", "acp"}:
-        console.print(f"Configured default backend is '{model.backend}'. Run a simulation to test live credentials.")
-        return
-    result = asyncio.run(
-        LLMRouter(config.models).complete(
-            config.default_conversation_model,
-            [],
-        )
-    )
-    console.print(f"Backend ready: {result.backend} ({result.model_id}), output_tokens={result.output_tokens}")
+    targets = _split_csv(model_ids) or [config.default_conversation_model, config.default_judge_model]
+    router = LLMRouter(config.models)
+    for model_id in dict.fromkeys(targets):
+        try:
+            result = asyncio.run(
+                router.complete(
+                    model_id,
+                    [
+                        LLMMessage(role="system", content="You are a concise test responder."),
+                        LLMMessage(role="user", content="Say 'connection ok' in one sentence."),
+                    ],
+                )
+            )
+            console.print(f"[green]OK[/green] {model_id}: {result.backend}, output_tokens={result.output_tokens}")
+        except Exception as exc:
+            console.print(f"[red]FAILED[/red] {model_id}: {exc}")
 
 
 def _print_result(result) -> None:

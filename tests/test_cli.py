@@ -26,3 +26,11 @@ def test_simulate_cli_offline_no_save() -> None:
     assert result.exit_code == 0
     assert "Simulation" in result.output
     assert "Payment probability" in result.output
+
+
+def test_connection_cli_reports_missing_live_prerequisites() -> None:
+    result = CliRunner().invoke(cli, ["test-connection", "--models", "cursor-auto,mistral-large-3-675b"])
+
+    assert result.exit_code == 0
+    assert "FAILED cursor-auto" in result.output
+    assert "FAILED mistral-large-3-675b" in result.output

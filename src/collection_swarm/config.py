@@ -48,7 +48,10 @@ class AppConfig(BaseModel):
     @property
     def default_judge_model(self) -> str:
         for model in self.models.values():
-            if model.backend in {"heuristic", "scripted"}:
+            if model.backend == "heuristic":
+                return model.id
+        for model in self.models.values():
+            if model.backend == "scripted":
                 return model.id
         return next(iter(self.models))
 

@@ -31,3 +31,6 @@ class LLMRouter:
         except KeyError as exc:
             raise KeyError(f"no backend configured for '{model.backend}'") from exc
         return await backend.complete(model, messages)
+
+    def configured_backends(self) -> dict[str, LLMBackend]:
+        return dict(self.backends)

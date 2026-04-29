@@ -6,10 +6,42 @@ tiers:
         provider: local
         input_cost_per_m: 0
         output_cost_per_m: 0
+      - id: cursor-auto
+        backend: acp
+        provider: cursor
+        acp_mode: ask
+        input_cost_per_m: 0
+        output_cost_per_m: 0
+      - id: cursor-gemini-3-flash
+        backend: acp
+        provider: google
+        model_name: gemini-3-flash
+        acp_mode: ask
+        input_cost_per_m: 0
+        output_cost_per_m: 0
+      - id: cursor-gemini-2.5-flash
+        backend: acp
+        provider: google
+        model_name: gemini-2.5-flash
+        acp_mode: ask
+        input_cost_per_m: 0
+        output_cost_per_m: 0
       - id: mistral-large-3-675b
         backend: nim
         provider: mistral
         model_name: openai/mistral-large-3-675b
+        input_cost_per_m: 0
+        output_cost_per_m: 0
+      - id: llama-4-maverick
+        backend: nim
+        provider: meta
+        model_name: openai/llama-4-maverick
+        input_cost_per_m: 0
+        output_cost_per_m: 0
+      - id: minimax-m2.7
+        backend: nim
+        provider: minimax
+        model_name: openai/minimax-m2.7
         input_cost_per_m: 0
         output_cost_per_m: 0
   judge:
@@ -17,5 +49,32 @@ tiers:
       - id: local-judge
         backend: heuristic
         provider: local
+        input_cost_per_m: 0
+        output_cost_per_m: 0
+      - id: cursor-claude-4-sonnet
+        backend: acp
+        provider: anthropic
+        model_name: claude-4-sonnet
+        acp_mode: ask
+        input_cost_per_m: 0
+        output_cost_per_m: 0
+      - id: cursor-gemini-3-pro
+        backend: acp
+        provider: google
+        model_name: gemini-3-pro
+        acp_mode: ask
+        input_cost_per_m: 0
+        output_cost_per_m: 0
+      - id: cursor-gpt-4.1
+        backend: acp
+        provider: openai
+        model_name: gpt-4.1
+        acp_mode: ask
+        input_cost_per_m: 0
+        output_cost_per_m: 0
+      - id: nemotron-mini-4b
+        backend: nim
+        provider: nvidia
+        model_name: openai/nemotron-mini-4b
         input_cost_per_m: 0
         output_cost_per_m: 0
