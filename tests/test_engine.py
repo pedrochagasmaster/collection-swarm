@@ -11,9 +11,6 @@ from collection_swarm.engine import SimulationEngine, stalemate_detected, strip_
 from collection_swarm.models import EndedBy, Message
 
 
-pytestmark = pytest.mark.asyncio
-
-
 def test_strip_end_signal_removes_marker() -> None:
     content, ended = strip_end_signal("Thanks [END_CONVERSATION]")
 
@@ -36,7 +33,6 @@ def test_stalemate_detected_for_repeated_pairs() -> None:
     assert stalemate_detected(transcript, window=3, threshold=0.9)
 
 
-@pytest.mark.asyncio
 async def test_engine_runs_scripted_simulation() -> None:
     config = load_app_config("config")
     router = LLMRouter(config.models)

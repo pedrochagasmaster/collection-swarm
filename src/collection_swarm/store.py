@@ -91,10 +91,10 @@ class SimulationStore:
                     result.started_at.isoformat(),
                     result.ended_at.isoformat() if result.ended_at else None,
                     result.turn_count,
-                    result.ended_by.value if result.ended_by else None,
+                    _enum_value(result.ended_by),
                     json.dumps([model_dump_jsonable(message) for message in result.transcript]),
                     judgment.reasoning if judgment else None,
-                    judgment.payment_outcome.value if judgment else None,
+                    _enum_value(judgment.payment_outcome) if judgment else None,
                     judgment.payment_probability if judgment else None,
                     judgment.debtor_satisfaction if judgment else None,
                     judgment.compliance_score if judgment else None,
@@ -239,6 +239,12 @@ class SimulationStore:
         return {str(row["status"]): int(row["count"]) for row in rows}
 
 
+def _enum_value(value: Any) -> str | None:
+    if value is None:
+        return None
+    return getattr(value, "value", value)
+
+
 def _result_from_row(row: sqlite3.Row) -> SimulationResult:
     judgment = None
     if row["payment_outcome"] is not None:
@@ -262,8 +268,6 @@ def _result_from_row(row: sqlite3.Row) -> SimulationResult:
         strategy_id=row["strategy_id"],
         conversation_model=row["conversation_model"],
         judge_model=row["judge_model"],
-        started_at=row["started_at"],
-        ended_at=row["ended_at"],
         turn_count=int(row["turn_count"] or 0),
         started_at=datetime.fromisoformat(row["started_at"]),
         ended_at=datetime.fromisoformat(row["ended_at"]) if row["ended_at"] else None,

@@ -44,13 +44,13 @@ class ScriptedBackend:
                 "Hello, this is Alex calling about your account. I want to understand your situation "
                 f"and see if we can {tactic} while keeping this affordable."
             )
+        if any(term in history for term in ["agree", "can do", "will pay", "plan works", "per month", "acceptable"]):
+            return "Thank you. I will document the arrangement and send confirmation. [END_CONVERSATION]"
         if any(term in history for term in ["can't", "hardship", "afford", "written proof", "verify"]):
             return (
                 "I understand. We can send written validation and discuss options after you review it. "
                 "If it helps, we can also look at a smaller first payment or a callback date."
             )
-        if any(term in history for term in ["agree", "can do", "will pay", "plan works"]):
-            return "Thank you. I will document the arrangement and send confirmation. [END_CONVERSATION]"
         return "What amount or date would feel realistic for you so we can keep the account moving forward?"
 
     def _debtor_response(self, system: str, history: str) -> str:

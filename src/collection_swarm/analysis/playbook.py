@@ -55,11 +55,11 @@ def generate_playbook(
                 f"{stat.mean_escalation_risk:.0%} |"
             )
 
-        objections = extract_objections(store.get_all_transcripts(ranking.profile_id, best.strategy_id))
-        if objections:
+        objection_report = extract_objections(store.get_all_transcripts(ranking.profile_id, best.strategy_id))
+        if objection_report.objections:
             lines.extend(["", "### Objection Playbook"])
-            for objection in objections:
-                lines.append(f"- **{objection.category}:** {objection.best_response}")
+            for category, count in sorted(objection_report.objections.items()):
+                lines.append(f"- **{category}:** observed in {count} transcript(s).")
 
         transcript = store.get_best_transcript(ranking.profile_id, best.strategy_id)
         if transcript:
