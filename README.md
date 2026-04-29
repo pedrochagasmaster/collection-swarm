@@ -1,5 +1,7 @@
 # Collection Swarm
 
+![Collection Swarm project infographic](assets/collection-swarm-infographic.png)
+
 Collection Swarm is an AI-driven simulator for testing debt-collection strategies before they ever touch a real customer.
 
 It runs synthetic conversations between three roles:
