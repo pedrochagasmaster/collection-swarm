@@ -16,6 +16,16 @@ class ComplianceExclusion:
     reason: str
 
 
+@dataclass(frozen=True)
+class ComplianceSummary:
+    exclusions: list[ComplianceExclusion]
+    checked_pairs: int
+
+    @property
+    def exclusion_rate(self) -> float:
+        return len(self.exclusions) / self.checked_pairs if self.checked_pairs else 0.0
+
+
 def check_exclusions(
     store: SimulationStore,
     profile_ids: list[str],
@@ -47,3 +57,22 @@ def check_exclusions(
                     )
                 )
     return exclusions
+
+
+def summarize_compliance(
+    store: SimulationStore,
+    profile_ids: list[str],
+    strategy_ids: list[str],
+    min_compliance_score: float = 0.8,
+    max_escalation_risk: float = 0.3,
+) -> ComplianceSummary:
+    return ComplianceSummary(
+        exclusions=check_exclusions(
+            store,
+            profile_ids,
+            strategy_ids,
+            min_compliance_score=min_compliance_score,
+            max_escalation_risk=max_escalation_risk,
+        ),
+        checked_pairs=len(profile_ids) * len(strategy_ids),
+    )

@@ -30,6 +30,10 @@ collection-swarm analyze --output output/playbook.md
 
 By default results are saved to `output/collection_swarm.sqlite`.
 
+The `run` command is backfill-aware by default: it only schedules simulations
+needed to reach the requested completed repetitions for each matrix cell. Use
+`--no-backfill` to force all requested cells to run again.
+
 ## Models
 
 `config/models.yaml` includes:
@@ -58,6 +62,20 @@ collection-swarm simulate \
 Cursor ACP uses `agent acp` over stdio. If your `agent` binary is not on `PATH`,
 set `CURSOR_AGENT_COMMAND=/path/to/agent`. You may pass extra startup arguments
 with `CURSOR_AGENT_ARGS`, for example `CURSOR_AGENT_ARGS="--api-key $CURSOR_API_KEY acp"`.
+
+## Analysis
+
+`collection-swarm analyze` writes a Markdown playbook with:
+
+- strategy rankings per Profile
+- payment-probability confidence intervals
+- pairwise significance/tie notes for top strategies
+- compliance exclusions per Profile/Strategy pair
+- observed objection categories and example Collector responses
+- the best-scoring example transcript for each Profile
+
+The default config includes 15 synthetic Profiles and 7 Strategies so local runs
+exercise a realistic matrix without using real consumer data.
 
 ## Development
 

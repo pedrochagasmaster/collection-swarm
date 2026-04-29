@@ -38,20 +38,27 @@ def generate_playbook(
             lines.append("No completed simulations.")
             continue
         best = ranking.strategies[0]
+        tied = "yes" if any(comparison.tied for comparison in ranking.comparisons) else "no"
+        needs_more = ", ".join(ranking.needs_more_data) if ranking.needs_more_data else "none"
         lines.extend(
             [
                 f"### Recommended Strategy: `{best.strategy_id}`",
-                f"**Payment Probability:** {best.mean_payment_probability:.0%}",
+                f"**Payment Probability:** {best.mean_payment_probability:.0%} "
+                f"(95% CI: {best.payment_probability_ci_low:.0%}-{best.payment_probability_ci_high:.0%})",
+                f"**Statistically tied top strategies:** {tied}",
+                f"**Needs more data:** {needs_more}",
                 "",
                 "### Strategy Ranking",
-                "| Strategy | Simulations | Payment Probability | Compliance | Escalation Risk |",
-                "|---|---:|---:|---:|---:|",
+                "| Strategy | Simulations | Payment Probability | 95% CI | Compliance | Escalation Risk |",
+                "|---|---:|---:|---:|---:|---:|",
             ]
         )
         for stat in ranking.strategies:
             lines.append(
                 f"| `{stat.strategy_id}` | {stat.simulation_count} | "
-                f"{stat.mean_payment_probability:.0%} | {stat.mean_compliance_score:.0%} | "
+                f"{stat.mean_payment_probability:.0%} | "
+                f"{stat.payment_probability_ci_low:.0%}-{stat.payment_probability_ci_high:.0%} | "
+                f"{stat.mean_compliance_score:.0%} | "
                 f"{stat.mean_escalation_risk:.0%} |"
             )
 
@@ -59,7 +66,11 @@ def generate_playbook(
         if objection_report.objections:
             lines.extend(["", "### Objection Playbook"])
             for category, count in sorted(objection_report.objections.items()):
-                lines.append(f"- **{category}:** observed in {count} transcript(s).")
+                response = next(iter(objection_report.responses.get(category, [])), "No collector response captured.")
+                lines.append(
+                    f"- **{category}:** observed {count} time(s). "
+                    f"Example response: \"{response}\""
+                )
 
         transcript = store.get_best_transcript(ranking.profile_id, best.strategy_id)
         if transcript:

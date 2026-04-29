@@ -8,6 +8,10 @@ conversation:
 matrix:
   default_repetitions: 1
 
+retry:
+  max_retries: 1
+  backoff_base_seconds: 0.1
+
 compliance:
   min_compliance_score: 0.8
   max_escalation_risk: 0.3

@@ -10,6 +10,15 @@ from collection_swarm.agents.debtor import DebtorAgent
 from collection_swarm.agents.judge import Judge
 from collection_swarm.models import EndedBy, Message, Profile, SimulationResult, Strategy, utc_now
 
+OFF_TOPIC_TERMS = {
+    "weather",
+    "sports",
+    "movie",
+    "recipe",
+    "politics",
+    "vacation",
+}
+
 
 class SimulationEngine:
     def __init__(
@@ -110,3 +119,11 @@ def stalemate_detected(transcript: list[Message], window: int = 3, threshold: fl
         if collector_ratio < threshold or debtor_ratio < threshold:
             return False
     return True
+
+
+def guardrail_response(content: Message | str) -> str | None:
+    text = content.content if isinstance(content, Message) else content
+    lower = text.lower()
+    if any(term in lower for term in OFF_TOPIC_TERMS):
+        return "off_topic"
+    return None

@@ -7,7 +7,8 @@ def test_list_profiles_cli() -> None:
     result = CliRunner().invoke(cli, ["list-profiles"])
 
     assert result.exit_code == 0
-    assert "cooperative_hardship" in result.output
+    assert "Profiles" in result.output
+    assert "cooperative" in result.output
 
 
 def test_simulate_cli_offline_no_save() -> None:

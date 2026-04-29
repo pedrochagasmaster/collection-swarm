@@ -115,6 +115,9 @@ def load_simulation_settings(path: Path) -> SimulationSettings:
         "default_repetitions": raw.get("matrix", {}).get("default_repetitions", raw.get("default_repetitions", 1)),
         "min_compliance_score": raw.get("compliance", {}).get("min_compliance_score", 0.8),
         "max_escalation_risk": raw.get("compliance", {}).get("max_escalation_risk", 0.3),
+        "max_retries": raw.get("retry", {}).get("max_retries", 0),
+        "backoff_base_seconds": raw.get("retry", {}).get("backoff_base_seconds", 0.0),
+        "judge_parse_retries": raw.get("retry", {}).get("judge_parse_retries", 0),
         "objection_taxonomy": raw.get("objection_taxonomy", []),
     }
     return SimulationSettings.model_validate(normalized)

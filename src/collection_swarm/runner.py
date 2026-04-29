@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+from typing import Callable
 
 from collection_swarm.agents.collector import CollectorAgent
 from collection_swarm.agents.debtor import DebtorAgent
@@ -21,6 +22,10 @@ class RunSummary:
     failed: int
     total: int
     results: list[SimulationResult]
+    skipped_existing: int = 0
+
+
+ProgressCallback = Callable[[SimulationResult], None]
 
 
 def build_matrix(
@@ -62,27 +67,56 @@ async def run_matrix(
     store: SimulationStore,
     cells: list[MatrixCell],
     concurrency: int = 2,
+    target_reps: int | None = None,
+    backfill: bool = True,
+    progress_callback: ProgressCallback | None = None,
 ) -> RunSummary:
     router = LLMRouter(config.models)
     semaphore = asyncio.Semaphore(concurrency)
+    scheduled_cells = cells
+    skipped_existing = 0
+    if backfill and target_reps is not None:
+        unique_cells = list(dict.fromkeys(cells))
+        scheduled_cells = store.get_backfill_needed(target_reps, unique_cells)
+        skipped_existing = sum(store.get_matrix_coverage().get(cell, 0) for cell in unique_cells)
 
     async def run_cell(cell: MatrixCell) -> SimulationResult:
         async with semaphore:
-            settings = config.simulation.conversation
-            engine = SimulationEngine(
-                collector=CollectorAgent(router, cell.conversation_model),
-                debtor=DebtorAgent(router, cell.conversation_model),
-                judge=Judge(router, cell.judge_model),
-                max_turns=settings.max_turns,
-                end_signal=settings.end_signal,
-                stalemate_window=settings.stalemate_window,
-                stalemate_similarity_threshold=settings.stalemate_similarity_threshold,
-            )
-            result = await engine.run_simulation(config.profile(cell.profile_id), config.strategy(cell.strategy_id))
+            result = await _run_cell_once(config, router, cell)
+            attempts_remaining = config.simulation.retry.max_retries
+            while result.status == "failed" and attempts_remaining > 0:
+                await asyncio.sleep(
+                    config.simulation.retry.backoff_base_seconds
+                    * 2 ** (config.simulation.retry.max_retries - attempts_remaining)
+                )
+                result = await _run_cell_once(config, router, cell)
+                attempts_remaining -= 1
             store.save_run(result)
+            if progress_callback:
+                progress_callback(result)
             return result
 
-    results = await asyncio.gather(*(run_cell(cell) for cell in cells))
+    results = await asyncio.gather(*(run_cell(cell) for cell in scheduled_cells))
     completed = sum(1 for result in results if result.status == "completed")
     failed = len(results) - completed
-    return RunSummary(completed=completed, failed=failed, total=len(results), results=list(results))
+    return RunSummary(
+        completed=completed,
+        failed=failed,
+        total=len(results),
+        results=list(results),
+        skipped_existing=skipped_existing,
+    )
+
+
+async def _run_cell_once(config: AppConfig, router: LLMRouter, cell: MatrixCell) -> SimulationResult:
+    settings = config.simulation.conversation
+    engine = SimulationEngine(
+        collector=CollectorAgent(router, cell.conversation_model),
+        debtor=DebtorAgent(router, cell.conversation_model),
+        judge=Judge(router, cell.judge_model),
+        max_turns=settings.max_turns,
+        end_signal=settings.end_signal,
+        stalemate_window=settings.stalemate_window,
+        stalemate_similarity_threshold=settings.stalemate_similarity_threshold,
+    )
+    return await engine.run_simulation(config.profile(cell.profile_id), config.strategy(cell.strategy_id))

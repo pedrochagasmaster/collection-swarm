@@ -38,3 +38,4 @@ def test_generate_playbook_includes_objections(tmp_path) -> None:
 
     assert "Recommended Strategy" in markdown
     assert "inability_to_pay" in markdown
+    assert "95% CI" in markdown

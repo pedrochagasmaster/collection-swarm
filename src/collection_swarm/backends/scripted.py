@@ -54,10 +54,18 @@ class ScriptedBackend:
         return "What amount or date would feel realistic for you so we can keep the account moving forward?"
 
     def _debtor_response(self, system: str, history: str) -> str:
+        if "insolvent" in system:
+            return "I do not have income available for payments right now. Please send options in writing. [END_CONVERSATION]"
         if "dispute" in system or "written proof" in system:
             if "written validation" not in history and "written proof" not in history:
                 return "Before I talk about payment, I need written proof that this debt is mine."
             return "Once I receive and review the proof, I can talk again, but I am not committing today. [END_CONVERSATION]"
+        if "already_paid" in system or "already paid" in system:
+            return "I believe I already paid this. I can send proof if you tell me where to upload it."
+        if "confused" in system or "senior" in system:
+            return "I am confused by this account. I need a clear written summary before I decide anything."
+        if "forgetfulness" in system or "forgot" in system:
+            return "I forgot about this bill. If you send confirmation, I can make a payment this week."
         if "hardship" in system or "can_pay_partial" in system:
             if "$150" in system or "150" in system:
                 return "I cannot pay the full balance, but I could manage $100 per month if that is acceptable."

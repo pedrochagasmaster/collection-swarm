@@ -7,7 +7,7 @@ from collection_swarm.agents.debtor import DebtorAgent
 from collection_swarm.agents.judge import Judge
 from collection_swarm.backends.router import LLMRouter
 from collection_swarm.config import load_app_config
-from collection_swarm.engine import SimulationEngine, stalemate_detected, strip_end_signal
+from collection_swarm.engine import SimulationEngine, guardrail_response, stalemate_detected, strip_end_signal
 from collection_swarm.models import EndedBy, Message
 
 
@@ -31,6 +31,12 @@ def test_stalemate_detected_for_repeated_pairs() -> None:
     ]
 
     assert stalemate_detected(transcript, window=3, threshold=0.9)
+
+
+def test_guardrail_response_catches_off_topic_content() -> None:
+    message = Message(role="collector", content="Let's talk about politics instead.")
+
+    assert guardrail_response(message) is not None
 
 
 async def test_engine_runs_scripted_simulation() -> None:

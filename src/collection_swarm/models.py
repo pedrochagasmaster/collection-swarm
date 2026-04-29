@@ -127,9 +127,18 @@ class ConversationSettings(BaseModel):
     stalemate_similarity_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
 
 
+class RetrySettings(BaseModel):
+    max_retries: int = Field(default=0, ge=0)
+    backoff_base_seconds: float = Field(default=0.25, ge=0.0)
+
+
 class SimulationSettings(BaseModel):
     conversation: ConversationSettings = Field(default_factory=ConversationSettings)
+    retry: RetrySettings = Field(default_factory=RetrySettings)
     default_repetitions: int = Field(default=1, ge=1)
+    adaptive_reps_enabled: bool = False
+    max_repetitions: int = Field(default=30, ge=1)
+    significance_level: float = Field(default=0.05, gt=0.0, lt=1.0)
     min_compliance_score: float = Field(default=0.8, ge=0.0, le=1.0)
     max_escalation_risk: float = Field(default=0.3, ge=0.0, le=1.0)
     objection_taxonomy: list[str] = Field(default_factory=list)
@@ -190,6 +199,18 @@ class StrategyStats(BaseModel):
     mean_payment_probability: float
     mean_compliance_score: float
     mean_escalation_risk: float
+    payment_probabilities: list[float] = Field(default_factory=list)
+    payment_probability_ci_low: float = 0.0
+    payment_probability_ci_high: float = 0.0
+
+
+class StrategyComparison(BaseModel):
+    profile_id: str
+    strategy_a: str
+    strategy_b: str
+    p_value: float = Field(ge=0.0, le=1.0)
+    significant: bool
+    tied: bool
 
 
 class MatrixCell(BaseModel, frozen=True):

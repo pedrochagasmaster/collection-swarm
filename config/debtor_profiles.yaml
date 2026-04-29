@@ -54,3 +54,258 @@ profiles:
       the call unless the collector is brief and respectful.
     constraints:
       - text: "Will not provide card or bank details during the call."
+  - id: forgetful_full_pay
+    archetype: cooperative
+    financial_situation: can_pay_full
+    debt_amount: 240
+    debt_age_days: 32
+    debt_type: utility
+    prior_contact_count: 0
+    emotional_state: calm
+    primary_objection: forgetfulness
+    responsiveness: high
+    demographics: young_professional
+    backstory: >
+      Missed the bill during a move and can resolve it if the collector makes the
+      next step simple and confirms the account details.
+    constraints:
+      - text: "Will only pay after receiving confirmation of the balance."
+  - id: senior_confused_medical
+    archetype: confused
+    financial_situation: can_pay_partial
+    debt_amount: 930
+    debt_age_days: 110
+    debt_type: medical
+    prior_contact_count: 2
+    emotional_state: anxious
+    primary_objection: needs_time
+    responsiveness: medium
+    demographics: senior
+    backstory: >
+      Wants to do the right thing but struggles with complex explanations and
+      needs a patient recap plus a mailed agreement.
+    constraints:
+      - text: "Will never agree to more than $75 per month."
+        rule:
+          type: max_payment
+          amount: 75
+          frequency: monthly
+  - id: insolvent_refusal
+    archetype: hostile
+    financial_situation: insolvent
+    debt_amount: 9200
+    debt_age_days: 390
+    debt_type: credit_card
+    prior_contact_count: 6
+    emotional_state: ashamed
+    primary_objection: inability_to_pay
+    responsiveness: low
+    demographics: family_provider
+    backstory: >
+      Recently unemployed and believes no payment is possible. Responds badly to
+      urgency but may accept a callback after stabilization.
+    constraints:
+      - text: "Will not agree to any payment today."
+  - id: identity_error_claim
+    archetype: disputer
+    financial_situation: can_pay_full
+    debt_amount: 620
+    debt_age_days: 95
+    debt_type: telecom
+    prior_contact_count: 1
+    emotional_state: guarded
+    primary_objection: claims_identity_error
+    responsiveness: medium
+    demographics: young_professional
+    backstory: >
+      Thinks the account belongs to someone with a similar name and wants identity
+      verification before discussing any payment.
+    constraints:
+      - text: "Will always demand written proof before discussing payment."
+        rule:
+          type: required_action
+          action: demand_written_proof
+  - id: spouse_decision_maker
+    archetype: cooperative
+    financial_situation: can_pay_partial
+    debt_amount: 1800
+    debt_age_days: 68
+    debt_type: auto_loan
+    prior_contact_count: 1
+    emotional_state: cautious
+    primary_objection: spouse_decision
+    responsiveness: high
+    demographics: family_provider
+    backstory: >
+      Shares finances with a spouse and will not finalize an agreement without
+      checking the household budget first.
+    constraints:
+      - text: "Will request time to discuss the plan with spouse before committing."
+  - id: legal_threat_disputer
+    archetype: disputer
+    financial_situation: can_pay_partial
+    debt_amount: 4100
+    debt_age_days: 250
+    debt_type: student
+    prior_contact_count: 4
+    emotional_state: angry
+    primary_objection: threatens_legal_action
+    responsiveness: low
+    demographics: young_professional
+    backstory: >
+      Believes collection activity has been unfair and may mention legal advice.
+      Calms down only if rights and validation are acknowledged.
+    constraints:
+      - text: "Will not agree to payment unless validation rights are acknowledged."
+  - id: already_paid_claim
+    archetype: disputer
+    financial_situation: can_pay_full
+    debt_amount: 510
+    debt_age_days: 45
+    debt_type: medical
+    prior_contact_count: 0
+    emotional_state: frustrated
+    primary_objection: already_paid
+    responsiveness: medium
+    demographics: senior
+    backstory: >
+      Says payment was sent through insurance or a prior portal and wants the
+      collector to investigate before any payment talk.
+    constraints:
+      - text: "Will insist the collector investigate the prior payment claim."
+  - id: gig_worker_variable_income
+    archetype: cooperative
+    financial_situation: hardship
+    debt_amount: 2600
+    debt_age_days: 160
+    debt_type: credit_card
+    prior_contact_count: 3
+    emotional_state: stressed
+    primary_objection: needs_time
+    responsiveness: medium
+    demographics: young_professional
+    backstory: >
+      Has irregular gig income and can make payments only after weekly payouts.
+      Appreciates flexible dates and small first payments.
+    constraints:
+      - text: "Will never agree to more than $125 per month."
+        rule:
+          type: max_payment
+          amount: 125
+          frequency: monthly
+  - id: medical_distress
+    archetype: avoidant
+    financial_situation: hardship
+    debt_amount: 15000
+    debt_age_days: 300
+    debt_type: medical
+    prior_contact_count: 2
+    emotional_state: distressed
+    primary_objection: emotional_distress
+    responsiveness: low
+    demographics: family_provider
+    backstory: >
+      The debt is tied to a traumatic medical event. Needs a gentle approach,
+      clear pauses, and written follow-up.
+    constraints:
+      - text: "Will end the call if pressured for immediate payment."
+  - id: requests_supervisor
+    archetype: hostile
+    financial_situation: can_pay_partial
+    debt_amount: 3200
+    debt_age_days: 185
+    debt_type: utility
+    prior_contact_count: 4
+    emotional_state: angry
+    primary_objection: requests_supervisor
+    responsiveness: medium
+    demographics: family_provider
+    backstory: >
+      Has had a poor prior experience and wants escalation to a supervisor before
+      trusting any arrangement.
+    constraints:
+      - text: "Will request a supervisor if the collector sounds scripted."
+  - id: callback_avoidant
+    archetype: avoidant
+    financial_situation: can_pay_partial
+    debt_amount: 980
+    debt_age_days: 70
+    debt_type: telecom
+    prior_contact_count: 2
+    emotional_state: indifferent
+    primary_objection: requests_callback
+    responsiveness: low
+    demographics: young_professional
+    backstory: >
+      Is busy and uses callback requests to defer the conversation. May engage if
+      the collector proposes a very specific short follow-up.
+    constraints:
+      - text: "Will not commit unless a specific callback time is set first."
+  - id: settlement_seeker
+    archetype: cooperative
+    financial_situation: can_pay_partial
+    debt_amount: 5400
+    debt_age_days: 210
+    debt_type: credit_card
+    prior_contact_count: 3
+    emotional_state: pragmatic
+    primary_objection: settlement_needed
+    responsiveness: high
+    demographics: family_provider
+    backstory: >
+      Can access a limited lump sum and is looking for a discount before agreeing
+      to resolve the account.
+    constraints:
+      - text: "Will not agree to pay more than 60 percent of the balance as settlement."
+  - id: student_low_income
+    archetype: confused
+    financial_situation: hardship
+    debt_amount: 2100
+    debt_age_days: 130
+    debt_type: student
+    prior_contact_count: 1
+    emotional_state: ashamed
+    primary_objection: inability_to_pay
+    responsiveness: medium
+    demographics: young_professional
+    backstory: >
+      Has entry-level income and is embarrassed. Needs reassurance and a very low
+      starting payment option.
+    constraints:
+      - text: "Will never agree to more than $50 per month."
+        rule:
+          type: max_payment
+          amount: 50
+          frequency: monthly
+  - id: business_owner_cashflow
+    archetype: cooperative
+    financial_situation: can_pay_partial
+    debt_amount: 7600
+    debt_age_days: 120
+    debt_type: auto_loan
+    prior_contact_count: 2
+    emotional_state: guarded
+    primary_objection: cashflow_timing
+    responsiveness: high
+    demographics: small_business_owner
+    backstory: >
+      Has seasonal cash flow and will negotiate if payment dates align with
+      receivables.
+    constraints:
+      - text: "Will only agree to dates after the fifteenth of the month."
+  - id: language_barrier_confused
+    archetype: confused
+    financial_situation: can_pay_partial
+    debt_amount: 430
+    debt_age_days: 55
+    debt_type: utility
+    prior_contact_count: 0
+    emotional_state: anxious
+    primary_objection: confusion
+    responsiveness: medium
+    demographics: senior
+    backstory: >
+      Understands simple language best and needs the collector to slow down,
+      avoid jargon, and confirm next steps in writing.
+    constraints:
+      - text: "Will not agree if terms are not repeated plainly."

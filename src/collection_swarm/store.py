@@ -19,9 +19,6 @@ from collection_swarm.models import (
     model_dump_jsonable,
 )
 
-from datetime import datetime
-
-
 class SimulationStore:
     def __init__(self, path: Path | str = "output/collection_swarm.sqlite") -> None:
         self.path = Path(path)
@@ -143,6 +140,22 @@ class SimulationStore:
                 (profile_id,),
             ).fetchall()
         return [StrategyStats.model_validate(dict(row)) for row in rows]
+
+    def get_payment_probability_samples(self, profile_id: str) -> dict[str, list[float]]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT strategy_id, payment_probability
+                FROM runs
+                WHERE status = 'completed' AND profile_id = ? AND payment_probability IS NOT NULL
+                ORDER BY strategy_id, started_at
+                """,
+                (profile_id,),
+            ).fetchall()
+        samples: dict[str, list[float]] = {}
+        for row in rows:
+            samples.setdefault(str(row["strategy_id"]), []).append(float(row["payment_probability"]))
+        return samples
 
     def get_matrix_coverage(self) -> dict[MatrixCell, int]:
         with self._connect() as connection:

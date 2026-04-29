@@ -7,6 +7,7 @@ from pathlib import Path
 
 import click
 from rich.console import Console
+from rich.progress import BarColumn, Progress, TaskProgressColumn, TextColumn, TimeElapsedColumn
 from rich.table import Table
 
 from collection_swarm.agents.collector import CollectorAgent
@@ -120,6 +121,7 @@ def simulate(
 @click.option("--judge-models", default=None, help="Comma-separated judge model IDs.")
 @click.option("--reps", default=None, type=int, help="Repetitions per matrix cell.")
 @click.option("--concurrency", default=2, show_default=True, type=int)
+@click.option("--no-backfill", is_flag=True, help="Run all requested cells even if completed results already exist.")
 @click.pass_context
 def run_command(
     ctx: click.Context,
@@ -129,6 +131,7 @@ def run_command(
     judge_models: str | None,
     reps: int | None,
     concurrency: int,
+    no_backfill: bool,
 ) -> None:
     """Run a matrix of Simulations."""
     config = load_app_config(ctx.obj["config_dir"])
@@ -140,8 +143,42 @@ def run_command(
         judge_models=_split_csv(judge_models),
         reps=reps or config.simulation.default_repetitions,
     )
-    summary = asyncio.run(run_matrix(config, SimulationStore(ctx.obj["db_path"]), cells, concurrency=concurrency))
-    console.print(f"Completed {summary.completed}/{summary.total} simulations; failed {summary.failed}.")
+    store = SimulationStore(ctx.obj["db_path"])
+    requested_reps = reps or config.simulation.default_repetitions
+    with Progress(
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        TimeElapsedColumn(),
+        console=console,
+    ) as progress:
+        task = progress.add_task("Running simulations", total=len(cells))
+        skipped_existing = 0
+
+        def advance(_result) -> None:
+            progress.advance(task)
+
+        if not no_backfill:
+            scheduled_count = len(store.get_backfill_needed(requested_reps, list(dict.fromkeys(cells))))
+            skipped_existing = max(0, len(cells) - scheduled_count)
+            if skipped_existing:
+                progress.advance(task, skipped_existing)
+
+        summary = asyncio.run(
+            run_matrix(
+                config,
+                store,
+                cells,
+                concurrency=concurrency,
+                target_reps=requested_reps,
+                backfill=not no_backfill,
+                progress_callback=advance,
+            )
+        )
+    console.print(
+        f"Completed {summary.completed}/{summary.total} scheduled simulations; "
+        f"failed {summary.failed}; skipped existing {summary.skipped_existing or skipped_existing}."
+    )
 
 
 @cli.command()
