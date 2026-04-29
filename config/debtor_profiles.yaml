@@ -1,0 +1,56 @@
+profiles:
+  - id: cooperative_hardship
+    archetype: cooperative
+    financial_situation: hardship
+    debt_amount: 1250
+    debt_age_days: 75
+    debt_type: medical
+    prior_contact_count: 1
+    emotional_state: anxious
+    primary_objection: inability_to_pay
+    responsiveness: high
+    demographics: family_provider
+    backstory: >
+      Recently had reduced work hours and wants to resolve the bill without falling
+      behind on rent. Responds well to empathy and specific, affordable options.
+    constraints:
+      - text: "Will never agree to more than $150 per month."
+        rule:
+          type: max_payment
+          amount: 150
+          frequency: monthly
+  - id: written_proof_disputer
+    archetype: disputer
+    financial_situation: can_pay_partial
+    debt_amount: 780
+    debt_age_days: 140
+    debt_type: credit_card
+    prior_contact_count: 3
+    emotional_state: guarded
+    primary_objection: wants_written_proof
+    responsiveness: medium
+    demographics: young_professional
+    backstory: >
+      Believes the balance may include fees they do not owe and is cautious about
+      discussing payment until documentation is provided.
+    constraints:
+      - text: "Will always demand written proof before discussing payment."
+        rule:
+          type: required_action
+          action: demand_written_proof
+  - id: hostile_avoidant
+    archetype: hostile
+    financial_situation: can_pay_partial
+    debt_amount: 3400
+    debt_age_days: 220
+    debt_type: utility
+    prior_contact_count: 5
+    emotional_state: angry
+    primary_objection: avoidance
+    responsiveness: low
+    demographics: family_provider
+    backstory: >
+      Feels overwhelmed by repeated calls and reacts poorly to pressure. May end
+      the call unless the collector is brief and respectful.
+    constraints:
+      - text: "Will not provide card or bank details during the call."

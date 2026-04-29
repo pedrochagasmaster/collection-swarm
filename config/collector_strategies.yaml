@@ -1,0 +1,33 @@
+strategies:
+  - id: empathetic_payment_plan
+    tone: empathetic
+    opening_approach: soft_intro
+    negotiation_tactic: payment_plan
+    escalation_style: none
+    concession_willingness: flexible
+    compliance_adherence: strict
+    follow_up_strategy: written_agreement
+  - id: assertive_settlement
+    tone: assertive
+    opening_approach: direct_ask
+    negotiation_tactic: settlement_offer
+    escalation_style: gradual
+    concession_willingness: moderate
+    compliance_adherence: strict
+    follow_up_strategy: immediate_payment
+  - id: neutral_reminder
+    tone: neutral
+    opening_approach: reminder
+    negotiation_tactic: payment_plan
+    escalation_style: none
+    concession_willingness: moderate
+    compliance_adherence: standard
+    follow_up_strategy: callback
+  - id: problem_solving_callback
+    tone: empathetic
+    opening_approach: problem_solving
+    negotiation_tactic: empathy
+    escalation_style: none
+    concession_willingness: flexible
+    compliance_adherence: strict
+    follow_up_strategy: callback
