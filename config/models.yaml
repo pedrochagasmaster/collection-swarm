@@ -1,0 +1,21 @@
+tiers:
+  conversation:
+    models:
+      - id: local-scripted
+        backend: scripted
+        provider: local
+        input_cost_per_m: 0
+        output_cost_per_m: 0
+      - id: mistral-large-3-675b
+        backend: nim
+        provider: mistral
+        model_name: openai/mistral-large-3-675b
+        input_cost_per_m: 0
+        output_cost_per_m: 0
+  judge:
+    models:
+      - id: local-judge
+        backend: heuristic
+        provider: local
+        input_cost_per_m: 0
+        output_cost_per_m: 0

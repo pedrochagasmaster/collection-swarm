@@ -1,0 +1,22 @@
+conversation:
+  max_turns: 12
+  end_signal: "[END_CONVERSATION]"
+  stalemate:
+    window: 3
+    similarity_threshold: 0.86
+
+matrix:
+  default_repetitions: 1
+
+compliance:
+  min_compliance_score: 0.8
+  max_escalation_risk: 0.3
+
+objection_taxonomy:
+  - inability_to_pay
+  - disputes_debt
+  - already_paid
+  - needs_time
+  - wants_written_proof
+  - avoidance
+  - requests_callback
