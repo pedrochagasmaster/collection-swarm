@@ -18,4 +18,7 @@ async def test_cursor_sdk_backend_requires_api_key(monkeypatch: pytest.MonkeyPat
     monkeypatch.setenv("CURSOR_API_KEY", "")
 
     with pytest.raises(RuntimeError, match="CURSOR_API_KEY is required"):
-        await CursorSdkBackend().complete(ModelConfig(id="cursor-gpt-5.5", backend="cursor_sdk", model_name="gpt-5.5"), [])
+        await CursorSdkBackend().complete(
+            ModelConfig(id="cursor-gpt-5.5-medium", backend="cursor_sdk", model_name="gpt-5.5-medium"),
+            [],
+        )

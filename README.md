@@ -34,7 +34,7 @@ The project is usable in two modes:
 The live path has been validated end-to-end with:
 
 - `nim-mistral-large-3-675b` as the conversation model.
-- `cursor-gemini-3.1-pro` as the judge model.
+- `cursor-claude-4.6-opus-high-thinking` as the judge model.
 - A full `collection-swarm simulate ... --no-save` run completing successfully with parsed judgment output.
 
 ## Quick Start
@@ -86,7 +86,7 @@ collection-swarm simulate \
   --profile cooperative_hardship \
   --strategy empathetic_payment_plan \
   --conversation-model nim-mistral-large-3-675b \
-  --judge-model cursor-gemini-3.1-pro \
+  --judge-model cursor-claude-4.6-opus-high-thinking \
   --no-save
 ```
 
@@ -143,8 +143,8 @@ Included collector strategies:
 collection-swarm simulate \
   --profile written_proof_disputer \
   --strategy problem_solving_callback \
-  --conversation-model cursor-gemini-3-flash \
-  --judge-model cursor-claude-sonnet-4.6
+  --conversation-model cursor-gpt-5.5-medium \
+  --judge-model cursor-claude-4.6-opus-high-thinking
 ```
 
 ### Run a Matrix
@@ -153,8 +153,8 @@ collection-swarm simulate \
 collection-swarm run \
   --profiles cooperative_hardship,written_proof_disputer \
   --strategies empathetic_payment_plan,problem_solving_callback \
-  --conversation-models nim-mistral-large-3-675b,cursor-gemini-3-flash \
-  --judge-models cursor-gemini-3.1-pro,cursor-claude-sonnet-4.6 \
+  --conversation-models nim-mistral-large-3-675b,cursor-gpt-5.5-medium \
+  --judge-models cursor-claude-4.6-opus-high-thinking,cursor-claude-opus-4-7-thinking-high \
   --reps 2 \
   --concurrency 2
 ```
@@ -173,17 +173,21 @@ Models live in `config/models.yaml`. The user-facing `id` is what you pass to th
 
 Current live conversation models:
 
-- `cursor-gpt-5.5` -> Cursor SDK `gpt-5.5`
-- `cursor-gemini-3-flash` -> Cursor SDK `gemini-3-flash`
+- `cursor-composer-2` -> Cursor SDK `composer-2`
+- `cursor-gpt-5.5-medium` -> Cursor SDK `gpt-5.5-medium`
+- `cursor-gpt-5.4-high` -> Cursor SDK `gpt-5.4-high`
+- `cursor-gpt-5.4-high-fast` -> Cursor SDK `gpt-5.4-high-fast`
+- `cursor-gpt-5.3-codex-high` -> Cursor SDK `gpt-5.3-codex-high`
+- `cursor-gpt-5.3-codex-high-fast` -> Cursor SDK `gpt-5.3-codex-high-fast`
 - `nim-mistral-large-3-675b` -> NVIDIA NIM `mistralai/mistral-large-3-675b-instruct-2512`
 - `nim-llama-4-maverick` -> NVIDIA NIM `meta/llama-4-maverick-17b-128e-instruct`
 - `nim-minimax-m2.7` -> NVIDIA NIM `minimaxai/minimax-m2.7`
 
 Current live judge models:
 
-- `cursor-claude-opus-4.7` -> Cursor SDK `claude-opus-4-7`
-- `cursor-claude-sonnet-4.6` -> Cursor SDK `claude-sonnet-4-6`
-- `cursor-gemini-3.1-pro` -> Cursor SDK `gemini-3.1-pro`
+- `cursor-claude-4.6-opus-high-thinking` -> Cursor SDK `claude-4.6-opus-high-thinking`
+- `cursor-claude-4.6-opus-high-thinking-fast` -> Cursor SDK `claude-4.6-opus-high-thinking-fast`
+- `cursor-claude-opus-4-7-thinking-high` -> Cursor SDK `claude-opus-4-7-thinking-high`
 
 Local defaults:
 

@@ -1,0 +1,27 @@
+Starting dashboard at http://127.0.0.1:8000
+INFO:     127.0.0.1:60062 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60061 - "GET /api/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55046 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55046 - "GET /api/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55046 - "GET /api/profiles/cooperative_hardship/strategies HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55046 - "GET /api/runs?status= HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52833 - "GET /api/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54328 - "GET /api/config/run-options HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54328 - "GET /api/config/run-options HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58429 - "POST /api/manual-sessions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49551 - "POST /api/manual-sessions/manual_2799e6c82b/turn HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59337 - "POST /api/manual-sessions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54061 - "POST /api/manual-sessions/manual_ed5efdd3e7/turn HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53881 - "GET /api/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53279 - "GET /api/config/run-options HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53994 - "GET /api/config/profiles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53994 - "GET /api/config/strategies HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53994 - "GET /api/compliance/exclusions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53994 - "GET /api/playbook?format=html HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53994 - "GET /api/config/run-options HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58372 - "GET /api/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53994 - "GET /api/config/run-options HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53994 - "GET /api/config/run-options HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53994 - "GET /api/runs?status= HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58372 - "GET /api/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64618 - "GET /api/config/run-options HTTP/1.1" 200 OK

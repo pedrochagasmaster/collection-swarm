@@ -6,16 +6,40 @@ tiers:
         provider: local
         input_cost_per_m: 0
         output_cost_per_m: 0
-      - id: cursor-gpt-5.5
+      - id: cursor-composer-2
         backend: cursor_sdk
-        provider: openai
-        model_name: gpt-5.5
+        provider: cursor
+        model_name: composer-2
         input_cost_per_m: 0
         output_cost_per_m: 0
-      - id: cursor-gemini-3-flash
+      - id: cursor-gpt-5.5-medium
         backend: cursor_sdk
-        provider: google
-        model_name: gemini-3-flash
+        provider: openai
+        model_name: gpt-5.5-medium
+        input_cost_per_m: 0
+        output_cost_per_m: 0
+      - id: cursor-gpt-5.4-high
+        backend: cursor_sdk
+        provider: openai
+        model_name: gpt-5.4-high
+        input_cost_per_m: 0
+        output_cost_per_m: 0
+      - id: cursor-gpt-5.4-high-fast
+        backend: cursor_sdk
+        provider: openai
+        model_name: gpt-5.4-high-fast
+        input_cost_per_m: 0
+        output_cost_per_m: 0
+      - id: cursor-gpt-5.3-codex-high
+        backend: cursor_sdk
+        provider: openai
+        model_name: gpt-5.3-codex-high
+        input_cost_per_m: 0
+        output_cost_per_m: 0
+      - id: cursor-gpt-5.3-codex-high-fast
+        backend: cursor_sdk
+        provider: openai
+        model_name: gpt-5.3-codex-high-fast
         input_cost_per_m: 0
         output_cost_per_m: 0
       - id: nim-mistral-large-3-675b
@@ -43,21 +67,21 @@ tiers:
         provider: local
         input_cost_per_m: 0
         output_cost_per_m: 0
-      - id: cursor-claude-opus-4.7
+      - id: cursor-claude-4.6-opus-high-thinking
         backend: cursor_sdk
         provider: anthropic
-        model_name: claude-opus-4-7
+        model_name: claude-4.6-opus-high-thinking
         input_cost_per_m: 0
         output_cost_per_m: 0
-      - id: cursor-claude-sonnet-4.6
+      - id: cursor-claude-4.6-opus-high-thinking-fast
         backend: cursor_sdk
         provider: anthropic
-        model_name: claude-sonnet-4-6
+        model_name: claude-4.6-opus-high-thinking-fast
         input_cost_per_m: 0
         output_cost_per_m: 0
-      - id: cursor-gemini-3.1-pro
+      - id: cursor-claude-opus-4-7-thinking-high
         backend: cursor_sdk
-        provider: google
-        model_name: gemini-3.1-pro
+        provider: anthropic
+        model_name: claude-opus-4-7-thinking-high
         input_cost_per_m: 0
         output_cost_per_m: 0
