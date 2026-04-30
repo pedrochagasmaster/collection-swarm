@@ -1,5 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════
    Collection Swarm — Single-Page Application
+   Impeccable edition: skeleton loading, overview strip (no hero-
+   metric template), capped stagger, ARIA management.
    ═══════════════════════════════════════════════════════════════ */
 
 const $ = (sel, ctx = document) => ctx.querySelector(sel);
@@ -12,7 +14,15 @@ let currentPage = 'dashboard';
 
 function navigateTo(page, params = {}) {
   currentPage = page;
-  $$('.nav-link').forEach(el => el.classList.toggle('active', el.dataset.page === page));
+  $$('.nav-link').forEach(el => {
+    const isActive = el.dataset.page === page;
+    el.classList.toggle('active', isActive);
+    if (isActive) {
+      el.setAttribute('aria-current', 'page');
+    } else {
+      el.removeAttribute('aria-current');
+    }
+  });
   window.history.pushState({ page, params }, '', `#${page}`);
   renderPage(page, params);
 }
@@ -20,7 +30,12 @@ function navigateTo(page, params = {}) {
 window.addEventListener('popstate', (e) => {
   const state = e.state || { page: 'dashboard', params: {} };
   currentPage = state.page;
-  $$('.nav-link').forEach(el => el.classList.toggle('active', el.dataset.page === state.page));
+  $$('.nav-link').forEach(el => {
+    const isActive = el.dataset.page === state.page;
+    el.classList.toggle('active', isActive);
+    if (isActive) el.setAttribute('aria-current', 'page');
+    else el.removeAttribute('aria-current');
+  });
   renderPage(state.page, state.params);
 });
 
@@ -54,7 +69,7 @@ function fmtId(id) { return id.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUppe
 function fmtMoney(v) { return `$${v.toFixed(4)}`; }
 function fmtNum(v) { return Number(v).toLocaleString(); }
 function relTime(iso) {
-  if (!iso) return '—';
+  if (!iso) return '\u2014';
   const d = new Date(iso);
   const now = new Date();
   const diff = now - d;
@@ -64,27 +79,39 @@ function relTime(iso) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-function loading() {
-  return `<div class="loading"><div class="spinner"></div><span class="loading-text">Loading data...</span></div>`;
+function skeleton() {
+  return `<div class="skeleton" aria-label="Loading content">
+    <div class="skeleton-row">
+      <div class="skeleton-block"></div>
+      <div class="skeleton-block"></div>
+      <div class="skeleton-block"></div>
+    </div>
+    <div class="skeleton-line"></div>
+    <div class="skeleton-line"></div>
+    <div class="skeleton-line"></div>
+    <div class="skeleton-line"></div>
+    <div class="skeleton-line"></div>
+  </div>`;
 }
 
 function emptyState(title, msg) {
   return `
-    <div class="empty-state">
-      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+    <div class="empty-state" role="status">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
       <h3>${title}</h3>
       <p>${msg}</p>
     </div>`;
 }
 
-function scoreBarHTML(label, value, color) {
-  const cls = color || scoreClass(value);
+function scoreBarHTML(label, value) {
+  const cls = scoreClass(value);
+  const colorVar = cls === 'score-good' ? '--success' : cls === 'score-mid' ? '--warning' : '--danger';
   return `
     <div class="judgment-score-item">
       <span class="judgment-score-label">${label}</span>
       <div class="score-bar-wrap">
-        <div class="score-bar">
-          <div class="score-bar-fill ${cls}" style="width:${value * 100}%;background:var(--${cls === 'score-good' ? 'success' : cls === 'score-mid' ? 'warning' : 'danger'})"></div>
+        <div class="score-bar" role="meter" aria-valuenow="${Math.round(value * 100)}" aria-valuemin="0" aria-valuemax="100" aria-label="${label}">
+          <div class="score-bar-fill" style="width:${value * 100}%;background:var(${colorVar})"></div>
         </div>
         <span class="score-bar-label ${cls}">${pct(value)}</span>
       </div>
@@ -104,8 +131,6 @@ function outcomeBadge(outcome) {
   return `<span class="badge ${map[outcome] || 'badge-neutral'}">${fmtId(outcome)}</span>`;
 }
 
-// ── Outcome chart colors ───────────────────────────────────────
-
 const OUTCOME_COLORS = {
   'full_payment': 'var(--chart-7)',
   'partial_payment': 'var(--chart-1)',
@@ -121,7 +146,7 @@ const OUTCOME_COLORS = {
 // ══════════════════════════════════════════════════════════════
 
 async function renderPage(page, params = {}) {
-  mainEl.innerHTML = loading();
+  mainEl.innerHTML = skeleton();
   try {
     switch (page) {
       case 'dashboard': await renderDashboard(); break;
@@ -134,7 +159,6 @@ async function renderPage(page, params = {}) {
     }
   } catch (err) {
     mainEl.innerHTML = emptyState('Error', err.message);
-    console.error(err);
   }
 }
 
@@ -164,14 +188,14 @@ async function renderDashboard() {
   let strategySection = '';
   if (data.profiles.length) {
     const tabs = data.profiles.map((p, i) =>
-      `<button class="tab-btn${i === 0 ? ' active' : ''}" onclick="switchProfileTab('${p}', this)">${fmtId(p)}</button>`
+      `<button class="tab-btn${i === 0 ? ' active' : ''}" onclick="switchProfileTab('${p}', this)" role="tab" aria-selected="${i === 0}">${fmtId(p)}</button>`
     ).join('');
     strategySection = `
-      <div class="card" style="margin-top:var(--space-6)">
+      <div class="card" style="margin-top:var(--space-8)">
         <div class="card-header"><h2>Strategy Rankings</h2></div>
         <div class="card-body">
-          <div class="tabs" id="profile-tabs">${tabs}</div>
-          <div id="strategy-comparison">${loading()}</div>
+          <div class="tabs" role="tablist" aria-label="Profile strategy rankings" id="profile-tabs">${tabs}</div>
+          <div id="strategy-comparison" role="tabpanel">${skeleton()}</div>
         </div>
       </div>`;
     setTimeout(() => loadStrategyComparison(data.profiles[0]), 0);
@@ -183,23 +207,30 @@ async function renderDashboard() {
       <p>Overview of simulation results and performance metrics</p>
     </div>
 
-    <div class="stats-grid">
-      <div class="stat-card accent">
-        <div class="stat-label">Total Runs</div>
-        <div class="stat-value">${fmtNum(total_runs)}</div>
+    <div class="overview-strip" role="status" aria-label="Simulation summary">
+      <div class="overview-item">
+        <span class="overview-label">Runs</span>
+        <span class="overview-value">${fmtNum(total_runs)}</span>
       </div>
-      <div class="stat-card success">
-        <div class="stat-label">Completed</div>
-        <div class="stat-value">${fmtNum(completed)}</div>
+      <div class="overview-sep" aria-hidden="true"></div>
+      <div class="overview-item">
+        <span class="overview-label">Completed</span>
+        <span class="overview-value">${fmtNum(completed)}</span>
       </div>
-      <div class="stat-card ${failed > 0 ? 'danger' : ''}">
-        <div class="stat-label">Failed</div>
-        <div class="stat-value">${fmtNum(failed)}</div>
+      <div class="overview-sep" aria-hidden="true"></div>
+      <div class="overview-item">
+        <span class="overview-label">Failed</span>
+        <span class="overview-value">${fmtNum(failed)}</span>
       </div>
-      <div class="stat-card">
-        <div class="stat-label">Total Cost</div>
-        <div class="stat-value">${fmtMoney(cost.estimated_cost_usd || 0)}</div>
-        <div class="stat-detail">${fmtNum(cost.input_tokens || 0)} in / ${fmtNum(cost.output_tokens || 0)} out tokens</div>
+      <div class="overview-sep" aria-hidden="true"></div>
+      <div class="overview-item">
+        <span class="overview-label">Cost</span>
+        <span class="overview-value">${fmtMoney(cost.estimated_cost_usd || 0)}</span>
+      </div>
+      <div class="overview-sep" aria-hidden="true"></div>
+      <div class="overview-item">
+        <span class="overview-label">Tokens</span>
+        <span class="overview-value">${fmtNum((cost.input_tokens || 0) + (cost.output_tokens || 0))}</span>
       </div>
     </div>
 
@@ -221,7 +252,7 @@ async function renderDashboard() {
         <div class="card-header"><h2>Outcome Distribution</h2></div>
         <div class="card-body">
           ${total_runs === 0 ? emptyState('No Data', 'Run simulations to see outcomes.') : `
-          <div class="dist-bars">${outcomeRows}</div>
+          <div class="dist-bars" role="img" aria-label="Outcome distribution chart">${outcomeRows}</div>
           `}
         </div>
       </div>
@@ -232,15 +263,19 @@ async function renderDashboard() {
 }
 
 window.switchProfileTab = async function(profileId, btn) {
-  $$('#profile-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+  $$('#profile-tabs .tab-btn').forEach(b => {
+    b.classList.remove('active');
+    b.setAttribute('aria-selected', 'false');
+  });
   btn.classList.add('active');
+  btn.setAttribute('aria-selected', 'true');
   await loadStrategyComparison(profileId);
 };
 
 async function loadStrategyComparison(profileId) {
   const container = $('#strategy-comparison');
   if (!container) return;
-  container.innerHTML = loading();
+  container.innerHTML = skeleton();
   try {
     const data = await api(`/profiles/${profileId}/strategies`);
     if (!data.strategies.length) {
@@ -249,7 +284,7 @@ async function loadStrategyComparison(profileId) {
     }
     container.innerHTML = data.strategies.map((s, i) => `
       <div class="comparison-row">
-        <div class="comparison-rank">${i + 1}</div>
+        <div class="comparison-rank" aria-label="Rank ${i + 1}">${i + 1}</div>
         <div class="comparison-name">${fmtId(s.strategy_id)}</div>
         <div class="comparison-scores">
           <div class="comparison-metric">
@@ -296,17 +331,20 @@ async function renderRuns() {
       <p>${runs.length} simulation${runs.length !== 1 ? 's' : ''} recorded</p>
     </div>
 
-    <div class="filter-bar">
-      <select class="filter-select" id="filter-status" onchange="filterRuns()">
+    <div class="filter-bar" role="search" aria-label="Filter simulations">
+      <label class="sr-only" for="filter-status">Status</label>
+      <select class="filter-select" id="filter-status" onchange="filterRuns()" aria-label="Filter by status">
         <option value="">All Status</option>
         <option value="completed">Completed</option>
         <option value="failed">Failed</option>
       </select>
-      <select class="filter-select" id="filter-profile" onchange="filterRuns()">
+      <label class="sr-only" for="filter-profile">Profile</label>
+      <select class="filter-select" id="filter-profile" onchange="filterRuns()" aria-label="Filter by profile">
         <option value="">All Profiles</option>
         ${profileOpts}
       </select>
-      <select class="filter-select" id="filter-strategy" onchange="filterRuns()">
+      <label class="sr-only" for="filter-strategy">Strategy</label>
+      <select class="filter-select" id="filter-strategy" onchange="filterRuns()" aria-label="Filter by strategy">
         <option value="">All Strategies</option>
         ${strategyOpts}
       </select>
@@ -315,19 +353,19 @@ async function renderRuns() {
     <div class="card">
       <div class="card-body no-padding">
         <div style="overflow-x:auto;max-height:calc(100vh - 280px)">
-          <table class="data-table" id="runs-table">
+          <table class="data-table" id="runs-table" aria-label="Simulation runs">
             <thead>
               <tr>
-                <th>ID</th>
-                <th>Status</th>
-                <th>Profile</th>
-                <th>Strategy</th>
-                <th>Outcome</th>
-                <th>Payment %</th>
-                <th>Compliance</th>
-                <th>Turns</th>
-                <th>Ended By</th>
-                <th>Time</th>
+                <th scope="col">ID</th>
+                <th scope="col">Status</th>
+                <th scope="col">Profile</th>
+                <th scope="col">Strategy</th>
+                <th scope="col">Outcome</th>
+                <th scope="col">Payment</th>
+                <th scope="col">Compliance</th>
+                <th scope="col">Turns</th>
+                <th scope="col">Ended By</th>
+                <th scope="col">Time</th>
               </tr>
             </thead>
             <tbody id="runs-tbody"></tbody>
@@ -359,19 +397,19 @@ window.filterRuns = function() {
     return;
   }
 
-  tbody.innerHTML = filtered.reverse().map(r => {
+  tbody.innerHTML = filtered.slice().reverse().map(r => {
     const j = r.judgment;
     return `
-      <tr onclick="openTranscript('${r.id}')">
+      <tr onclick="openTranscript('${r.id}')" tabindex="0" role="button" aria-label="View transcript for ${r.id}" onkeydown="if(event.key==='Enter')openTranscript('${r.id}')">
         <td>${r.id}</td>
         <td><span class="badge ${r.status === 'completed' ? 'badge-success' : 'badge-danger'}">${r.status}</span></td>
         <td>${fmtId(r.profile_id)}</td>
         <td>${fmtId(r.strategy_id)}</td>
-        <td>${j ? outcomeBadge(j.payment_outcome) : '—'}</td>
-        <td class="${j ? scoreClass(j.payment_probability) : ''}">${j ? pct(j.payment_probability) : '—'}</td>
-        <td class="${j ? scoreClass(j.compliance_score) : ''}">${j ? pct(j.compliance_score) : '—'}</td>
+        <td>${j ? outcomeBadge(j.payment_outcome) : '\u2014'}</td>
+        <td class="${j ? scoreClass(j.payment_probability) : ''}">${j ? pct(j.payment_probability) : '\u2014'}</td>
+        <td class="${j ? scoreClass(j.compliance_score) : ''}">${j ? pct(j.compliance_score) : '\u2014'}</td>
         <td>${r.turn_count}</td>
-        <td>${r.ended_by ? fmtId(r.ended_by) : '—'}</td>
+        <td>${r.ended_by ? fmtId(r.ended_by) : '\u2014'}</td>
         <td>${relTime(r.started_at)}</td>
       </tr>`;
   }).join('');
@@ -387,31 +425,34 @@ window.openTranscript = async function(runId) {
   const subtitle = $('#slideout-subtitle');
 
   overlay.classList.add('open');
+  overlay.removeAttribute('aria-hidden');
   panel.classList.add('open');
-  body.innerHTML = loading();
-  title.textContent = 'Loading...';
+  body.innerHTML = skeleton();
+  title.textContent = 'Loading\u2026';
   subtitle.textContent = '';
 
   try {
     const run = await api(`/runs/${runId}`);
     title.textContent = run.id;
-    subtitle.textContent = `${fmtId(run.profile_id)} × ${fmtId(run.strategy_id)}`;
+    subtitle.textContent = `${fmtId(run.profile_id)} \u00d7 ${fmtId(run.strategy_id)}`;
 
     const metaTags = `
       <div class="meta-tags">
         <span class="meta-tag"><strong>Status:</strong> ${run.status}</span>
         <span class="meta-tag"><strong>Model:</strong> ${run.conversation_model}</span>
         <span class="meta-tag"><strong>Turns:</strong> ${run.turn_count}</span>
-        <span class="meta-tag"><strong>Ended by:</strong> ${run.ended_by ? fmtId(run.ended_by) : '—'}</span>
+        <span class="meta-tag"><strong>Ended by:</strong> ${run.ended_by ? fmtId(run.ended_by) : '\u2014'}</span>
         <span class="meta-tag"><strong>Tokens:</strong> ${fmtNum(run.total_input_tokens + run.total_output_tokens)}</span>
         <span class="meta-tag"><strong>Cost:</strong> ${fmtMoney(run.estimated_cost_usd)}</span>
       </div>`;
 
+    const MAX_STAGGER = 10;
     const chatMsgs = (run.transcript || []).map((m, i) => {
       const avatarMap = { collector: 'C', debtor: 'D', system: 'S', judge: 'J' };
+      const delay = Math.min(i, MAX_STAGGER) * 40;
       return `
-        <div class="chat-msg ${m.role}" style="animation-delay:${i * 50}ms">
-          <div class="chat-avatar">${avatarMap[m.role] || '?'}</div>
+        <div class="chat-msg ${m.role}" style="animation-delay:${delay}ms" role="listitem">
+          <div class="chat-avatar" aria-hidden="true">${avatarMap[m.role] || '?'}</div>
           <div class="chat-bubble">
             <div class="chat-role">${m.role}</div>
             ${m.content}
@@ -426,8 +467,8 @@ window.openTranscript = async function(runId) {
       judgmentHTML = `
         <div class="judgment-panel">
           <h3>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-            Judgment — ${outcomeBadge(j.payment_outcome)}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            Judgment ${outcomeBadge(j.payment_outcome)}
           </h3>
           <div class="judgment-scores">
             ${scoreBarHTML('Payment Probability', j.payment_probability)}
@@ -438,22 +479,27 @@ window.openTranscript = async function(runId) {
             ${scoreBarHTML('Efficiency', Math.min(1, (j.conversation_efficiency || 0) / 20))}
           </div>
           ${violations.length ? `
-            <div class="judgment-violations">
+            <div class="judgment-violations" aria-label="Constraint violations">
               ${violations.map(v => `<span class="badge badge-danger">${v}</span>`).join('')}
             </div>` : ''}
           ${j.reasoning ? `<div class="judgment-reasoning">${j.reasoning}</div>` : ''}
         </div>`;
     }
 
-    body.innerHTML = metaTags + `<div class="chat-container">${chatMsgs}</div>` + judgmentHTML;
+    body.innerHTML = metaTags + `<div class="chat-container" role="list" aria-label="Conversation transcript">${chatMsgs}</div>` + judgmentHTML;
+
+    panel.querySelector('.slideout-close').focus();
   } catch (err) {
     body.innerHTML = emptyState('Error', err.message);
   }
 };
 
 window.closeTranscript = function() {
-  $('#slideout-overlay').classList.remove('open');
-  $('#slideout-panel').classList.remove('open');
+  const overlay = $('#slideout-overlay');
+  const panel = $('#slideout-panel');
+  overlay.classList.remove('open');
+  overlay.setAttribute('aria-hidden', 'true');
+  panel.classList.remove('open');
 };
 
 document.addEventListener('keydown', (e) => {
@@ -468,11 +514,11 @@ async function renderPlaybook() {
   mainEl.innerHTML = `
     <div class="page-header">
       <h1>Generated Playbook</h1>
-      <p>Auto-generated strategy recommendations based on simulation data</p>
+      <p>Strategy recommendations based on simulation data</p>
     </div>
     <div class="card">
       <div class="card-body">
-        <div class="playbook-content">${data.content || emptyState('No Playbook', 'Run simulations and analyze to generate a playbook.')}</div>
+        <article class="playbook-content">${data.content || emptyState('No Playbook', 'Run simulations and analyze to generate a playbook.')}</article>
       </div>
     </div>
   `;
@@ -488,8 +534,8 @@ async function renderCompliance() {
     content = `
       <div class="card">
         <div class="card-body">
-          <div class="empty-state">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4" stroke="var(--success)"/></svg>
+          <div class="empty-state" role="status">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4" stroke="var(--success)"/></svg>
             <h3>All Clear</h3>
             <p>No compliance exclusions detected. All strategy-profile combinations meet the configured thresholds.</p>
           </div>
@@ -497,8 +543,8 @@ async function renderCompliance() {
       </div>`;
   } else {
     const cards = exclusions.map(e => `
-      <div class="exclusion-card">
-        <h4>${fmtId(e.strategy_id)} &times; ${fmtId(e.profile_id)}</h4>
+      <div class="exclusion-card" role="alert">
+        <h4>${fmtId(e.strategy_id)} \u00d7 ${fmtId(e.profile_id)}</h4>
         <div class="exclusion-detail">
           <strong>Compliance:</strong> ${pct(e.compliance_score)} &nbsp;|&nbsp; <strong>Escalation Risk:</strong> ${pct(e.escalation_risk)}
         </div>
