@@ -1302,12 +1302,21 @@ window.updateMatrixCount = function() {
 
 window.updateBenchmarkCount = function() {
   const models = checkedValues('benchmark-models').length;
-  const roles = checkedValues('benchmark-roles').length;
-  const total = models * roles;
+  const roles = checkedValues('benchmark-roles');
+  const profiles = checkedValues('benchmark-profiles').length;
+  const strategies = checkedValues('benchmark-strategies').length;
+  const judgeProfiles = checkedValues('benchmark-judge-profiles').length;
+  const nonJudgeRoles = roles.filter(r => r !== 'judge').length;
+  const hasJudge = roles.includes('judge');
+  const convScenarios = profiles * strategies;
+  const total = models * (nonJudgeRoles * convScenarios + (hasJudge ? judgeProfiles : 0));
   const el = $('#benchmark-count');
   if (!el) return;
   el.classList.toggle('warning', total > 36);
-  el.textContent = `${models} models x ${roles} roles = ${total} live probes${total > 36 ? '. This is a production-sized benchmark and can take several minutes.' : ''}`;
+  const parts = [`${models} models`];
+  if (nonJudgeRoles > 0) parts.push(`${nonJudgeRoles} role${nonJudgeRoles !== 1 ? 's' : ''} x ${profiles} profile${profiles !== 1 ? 's' : ''} x ${strategies} strateg${strategies !== 1 ? 'ies' : 'y'}`);
+  if (hasJudge) parts.push(`judge x ${judgeProfiles} judge profile${judgeProfiles !== 1 ? 's' : ''}`);
+  el.textContent = `${parts.join(' + ')} = ${total} live probes${total > 36 ? '. This is a production-sized benchmark and can take several minutes.' : ''}`;
 };
 
 function checkedValues(name) {
@@ -1594,9 +1603,11 @@ async function renderBenchmarks() {
   const selectedModels = options.default_cursor_models || [];
   const modelEntries = (options.cursor_models || []).map(model => [model, model]);
   const roleEntries = (options.roles || []).map(role => [role, fmtId(role)]);
-  const profileOpts = runSelectOptions(options.profiles || [], defaults.profile_id);
-  const judgeProfileOpts = runSelectOptions(options.profiles || [], defaults.judge_profile_id);
-  const strategyOpts = runSelectOptions(options.strategies || [], defaults.strategy_id);
+  const profileEntries = (options.profiles || []).map(p => [p.id, fmtId(p.id)]);
+  const strategyEntries = (options.strategies || []).map(s => [s.id, fmtId(s.id)]);
+  const defaultProfiles = defaults.profile_ids || ['cooperative_hardship'];
+  const defaultStrategies = defaults.strategy_ids || ['empathetic_payment_plan'];
+  const defaultJudgeProfiles = defaults.judge_profile_ids || ['written_proof_disputer'];
   const benchmarkJobs = jobs.filter(job => job.kind === 'model_benchmark');
 
   mainEl.innerHTML = `
@@ -1634,9 +1645,21 @@ async function renderBenchmarks() {
               <label>Roles</label>
               <div class="checkbox-grid benchmark-role-grid">${benchmarkCheckboxList('benchmark-roles', roleEntries, options.roles || ['collector', 'debtor', 'judge'])}</div>
             </div>
-            ${selectField('benchmark-profile', 'Collector and Debtor profile', profileOpts)}
-            ${selectField('benchmark-strategy', 'Collector strategy', strategyOpts)}
-            ${selectField('benchmark-judge-profile', 'Judge scenario profile', judgeProfileOpts)}
+            <div class="form-field">
+              <label>Profiles</label>
+              <p class="field-summary">Each checked profile is used for Collector and Debtor probes.</p>
+              <div class="checkbox-grid" onchange="updateBenchmarkCount()">${benchmarkCheckboxList('benchmark-profiles', profileEntries, defaultProfiles)}</div>
+            </div>
+            <div class="form-field">
+              <label>Strategies</label>
+              <p class="field-summary">Each checked strategy is used for Collector probes.</p>
+              <div class="checkbox-grid" onchange="updateBenchmarkCount()">${benchmarkCheckboxList('benchmark-strategies', strategyEntries, defaultStrategies)}</div>
+            </div>
+            <div class="form-field">
+              <label>Judge profiles</label>
+              <p class="field-summary">Each checked profile is used as the Judge evaluation scenario.</p>
+              <div class="checkbox-grid" onchange="updateBenchmarkCount()">${benchmarkCheckboxList('benchmark-judge-profiles', profileEntries, defaultJudgeProfiles)}</div>
+            </div>
             ${inputField('benchmark-concurrency', 'Concurrency', defaults.concurrency || 1, 1, 4)}
             <div class="matrix-count" id="benchmark-count" aria-live="polite"></div>
             <div class="btn-row">
@@ -1689,9 +1712,9 @@ window.startModelBenchmark = async function(event) {
     const job = await apiPost('/jobs/model-benchmarks', {
       cursor_model_names: checkedValues('benchmark-models'),
       roles: checkedValues('benchmark-roles'),
-      profile_id: $('#benchmark-profile').value,
-      strategy_id: $('#benchmark-strategy').value,
-      judge_profile_id: $('#benchmark-judge-profile').value,
+      profile_ids: checkedValues('benchmark-profiles'),
+      strategy_ids: checkedValues('benchmark-strategies'),
+      judge_profile_ids: checkedValues('benchmark-judge-profiles'),
       concurrency: Number($('#benchmark-concurrency').value || 1),
     });
     status.innerHTML = statusBadge(job.status);

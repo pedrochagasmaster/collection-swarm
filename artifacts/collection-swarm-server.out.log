@@ -103,3 +103,31 @@ INFO:     127.0.0.1:51524 - "GET /static/styles.css HTTP/1.1" 200 OK
 INFO:     127.0.0.1:51524 - "GET /static/app.js?v=ux-fixes-20260430b HTTP/1.1" 200 OK
 INFO:     127.0.0.1:51524 - "GET /api/runs?status= HTTP/1.1" 200 OK
 INFO:     127.0.0.1:60999 - "GET /api/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57363 - "GET /?verify=runs-button-2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57363 - "GET /static/styles.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57363 - "GET /static/app.js?v=ux-fixes-20260430b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57363 - "GET /api/runs?status= HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57363 - "GET /api/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57363 - "GET /api/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53825 - "GET /api/compliance/exclusions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53825 - "GET /api/profiles/cooperative_hardship/strategies HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53825 - "GET /api/compliance/exclusions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53825 - "GET /api/playbook?format=html HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58258 - "GET /api/compliance/exclusions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58258 - "GET /api/config/run-options HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61303 - "GET /api/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58258 - "GET /api/config/run-options HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61303 - "GET /api/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61303 - "GET /api/model-benchmarks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58258 - "GET /api/model-benchmarks/options HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53332 - "GET /?verify=runs-button-2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53332 - "GET /static/styles.css HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:53332 - "GET /static/app.js?v=ux-fixes-20260430b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53332 - "GET /api/model-benchmarks/options HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53332 - "GET /api/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53332 - "GET /api/model-benchmarks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51241 - "GET /api/config/profiles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54165 - "GET /?verify=runs-button-2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54165 - "GET /static/styles.css HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:54165 - "GET /static/app.js?v=ux-fixes-20260430b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54165 - "GET /api/config/profiles HTTP/1.1" 200 OK

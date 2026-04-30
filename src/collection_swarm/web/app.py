@@ -31,6 +31,7 @@ from collection_swarm.model_evaluation import (
     DEFAULT_CURSOR_PROBE_MODELS,
     DEFAULT_CURSOR_SDK_MODEL_IDS,
     ProbeScenario,
+    RoleProbe,
     build_model_role_report,
     report_to_dict,
     run_live_role_probes,
@@ -62,9 +63,9 @@ class MatrixLaunchRequest(BaseModel):
 class BenchmarkLaunchRequest(BaseModel):
     cursor_model_names: list[str] | None = None
     roles: list[str] = Field(default_factory=lambda: ["collector", "debtor", "judge"])
-    profile_id: str = "cooperative_hardship"
-    strategy_id: str = "empathetic_payment_plan"
-    judge_profile_id: str = "written_proof_disputer"
+    profile_ids: list[str] = Field(default_factory=lambda: ["cooperative_hardship"])
+    strategy_ids: list[str] = Field(default_factory=lambda: ["empathetic_payment_plan"])
+    judge_profile_ids: list[str] = Field(default_factory=lambda: ["written_proof_disputer"])
     concurrency: int = Field(default=1, ge=1, le=4)
 
     @field_validator("roles")
@@ -454,9 +455,9 @@ def create_app(
             "profiles": [model_dump_jsonable(profile) for profile in config.profiles.values()],
             "strategies": [model_dump_jsonable(strategy) for strategy in config.strategies.values()],
             "defaults": {
-                "profile_id": "cooperative_hardship",
-                "strategy_id": "empathetic_payment_plan",
-                "judge_profile_id": "written_proof_disputer",
+                "profile_ids": ["cooperative_hardship"],
+                "strategy_ids": ["empathetic_payment_plan"],
+                "judge_profile_ids": ["written_proof_disputer"],
                 "concurrency": 1,
             },
         }
@@ -548,10 +549,19 @@ def create_app(
     @app.post("/api/jobs/model-benchmarks")
     async def launch_model_benchmark(payload: BenchmarkLaunchRequest) -> dict[str, Any]:
         config = _config()
+        if not payload.profile_ids:
+            raise HTTPException(status_code=400, detail="Select at least one profile")
+        if not payload.strategy_ids:
+            raise HTTPException(status_code=400, detail="Select at least one strategy")
+        if not payload.judge_profile_ids:
+            raise HTTPException(status_code=400, detail="Select at least one judge profile")
         try:
-            config.profile(payload.profile_id)
-            config.strategy(payload.strategy_id)
-            config.profile(payload.judge_profile_id)
+            for pid in payload.profile_ids:
+                config.profile(pid)
+            for sid in payload.strategy_ids:
+                config.strategy(sid)
+            for jpid in payload.judge_profile_ids:
+                config.profile(jpid)
         except KeyError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -560,12 +570,20 @@ def create_app(
         if not cursor_model_names:
             raise HTTPException(status_code=400, detail="Select at least one Cursor model")
 
+        non_judge_roles = [r for r in payload.roles if r != "judge"]
+        has_judge = "judge" in payload.roles
+        conv_scenarios = len(payload.profile_ids) * len(payload.strategy_ids)
+        judge_scenarios = len(payload.judge_profile_ids)
+        total_probes = len(cursor_model_names) * (
+            len(non_judge_roles) * conv_scenarios + (judge_scenarios if has_judge else 0)
+        )
+
         job = WebRunJob(
             id=f"bench_{uuid4().hex[:10]}",
             kind="model_benchmark",
             status="queued",
-            total=len(cursor_model_names) * len(payload.roles),
-            message=f"Queued {len(cursor_model_names)} model benchmark.",
+            total=total_probes,
+            message=f"Queued {len(cursor_model_names)} model benchmark across {conv_scenarios} conversation scenario{'s' if conv_scenarios != 1 else ''} and {judge_scenarios} judge scenario{'s' if judge_scenarios != 1 else ''}.",
         )
         app.state.jobs[job.id] = job
         app.state.tasks[job.id] = asyncio.create_task(
@@ -576,9 +594,9 @@ def create_app(
                 _benchmark_output_dir(),
                 cursor_model_names,
                 payload.roles,
-                payload.profile_id,
-                payload.strategy_id,
-                payload.judge_profile_id,
+                payload.profile_ids,
+                payload.strategy_ids,
+                payload.judge_profile_ids,
                 payload.concurrency,
             )
         )
@@ -835,32 +853,70 @@ async def _run_model_benchmark_job(
     output_dir: Path,
     cursor_model_names: list[str],
     roles: list[str],
-    profile_id: str,
-    strategy_id: str,
-    judge_profile_id: str,
+    profile_ids: list[str],
+    strategy_ids: list[str],
+    judge_profile_ids: list[str],
     concurrency: int,
 ) -> None:
     try:
         job.status = "running"
         job.message = "Benchmark probes running."
-        scenario = ProbeScenario(
-            profile_id=profile_id,
-            strategy_id=strategy_id,
-            judge_profile_id=judge_profile_id,
+        all_probes: list[RoleProbe] = []
+        non_judge_roles = tuple(r for r in roles if r != "judge")
+        has_judge = "judge" in roles
+        primary_scenario = ProbeScenario(
+            profile_id=profile_ids[0],
+            strategy_id=strategy_ids[0],
+            judge_profile_id=judge_profile_ids[0],
         )
-        probes = await run_live_role_probes(
-            config,
-            cursor_model_names=tuple(cursor_model_names),
-            roles=tuple(roles),  # type: ignore[arg-type]
-            scenario=scenario,
-            concurrency=concurrency,
-        )
-        ok_count = sum(1 for probe in probes if probe.status == "ok")
-        failed_count = len(probes) - ok_count
+
+        if has_judge:
+            for jpid in judge_profile_ids:
+                judge_scenario = ProbeScenario(
+                    profile_id=profile_ids[0],
+                    strategy_id=strategy_ids[0],
+                    judge_profile_id=jpid,
+                )
+                judge_probes = await run_live_role_probes(
+                    config,
+                    cursor_model_names=tuple(cursor_model_names),
+                    roles=("judge",),
+                    scenario=judge_scenario,
+                    concurrency=concurrency,
+                )
+                all_probes.extend(judge_probes)
+                ok = sum(1 for p in judge_probes if p.status == "ok")
+                job.completed += ok
+                job.failed += len(judge_probes) - ok
+            job.message = f"Judge probes done; running scenario probes ({len(profile_ids)} profiles x {len(strategy_ids)} strategies)."
+
+        if non_judge_roles:
+            for pid in profile_ids:
+                for sid in strategy_ids:
+                    scenario = ProbeScenario(
+                        profile_id=pid,
+                        strategy_id=sid,
+                        judge_profile_id=judge_profile_ids[0],
+                    )
+                    probes = await run_live_role_probes(
+                        config,
+                        cursor_model_names=tuple(cursor_model_names),
+                        roles=non_judge_roles,
+                        scenario=scenario,
+                        concurrency=concurrency,
+                    )
+                    all_probes.extend(probes)
+                    ok = sum(1 for p in probes if p.status == "ok")
+                    job.completed += ok
+                    job.failed += len(probes) - ok
+                    job.message = f"{job.completed + job.failed}/{job.total} probes finished."
+
+        ok_count = sum(1 for probe in all_probes if probe.status == "ok")
+        failed_count = len(all_probes) - ok_count
         report = build_model_role_report(
             config,
-            probes=probes,
-            scenario=scenario,
+            probes=tuple(all_probes),
+            scenario=primary_scenario,
             title="Production Cursor Model Role Benchmark",
         )
         stamp = utc_now().strftime("%Y%m%d-%H%M%S")
