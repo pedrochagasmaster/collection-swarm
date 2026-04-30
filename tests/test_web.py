@@ -118,6 +118,8 @@ class TestCompliance:
             exclusion = data["exclusions"][0]
             assert "simulation_count" in exclusion
             assert "run_ids" in exclusion
+            assert "model_pairs" in exclusion
+            assert all("conversation_model" in item for item in exclusion["model_pairs"])
 
 
 class TestPlaybook:
@@ -198,6 +200,21 @@ class TestRunJobs:
         assert job["total"] == 2
         assert job["completed"] == 2
         assert len(job["result_ids"]) == 2
+
+    def test_launch_matrix_job_multiplies_model_dimensions(self, empty_client: TestClient) -> None:
+        resp = empty_client.post(
+            "/api/jobs/matrix",
+            json={
+                "profile_ids": ["cooperative_hardship"],
+                "strategy_ids": ["empathetic_payment_plan"],
+                "conversation_models": ["local-scripted", "cursor-gemini-3-flash"],
+                "judge_models": ["local-judge", "cursor-gemini-3.1-pro"],
+                "reps": 1,
+                "concurrency": 2,
+            },
+        )
+        assert resp.status_code == 200
+        assert resp.json()["total"] == 4
 
     def test_matrix_requires_explicit_profile_and_strategy_selection(self, empty_client: TestClient) -> None:
         resp = empty_client.post(

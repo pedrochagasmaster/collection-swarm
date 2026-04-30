@@ -1344,6 +1344,10 @@ body {
   accent-color: var(--accent-primary);
 }
 
+.model-grid {
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+}
+
 .progress-wrap {
   height: 8px;
   background: var(--bg-active);

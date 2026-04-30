@@ -366,6 +366,15 @@ function advancedModelSettings(prefix, conversationOpts, judgeOpts, conversation
     </details>`;
 }
 
+function modelLabel(model) {
+  if (!model) return '';
+  return `${model.id}${model.provider ? ` (${model.provider})` : ''}`;
+}
+
+function modelShortLabel(id) {
+  return String(id || '').replace(/^cursor-/, '').replace(/^nim-/, '');
+}
+
 function linkButton(label, onclick, extraClass = '') {
   return `<button class="btn ${extraClass}" type="button" onclick="${escapeAttr(onclick)}">${escapeHTML(label)}</button>`;
 }
@@ -773,7 +782,7 @@ window.filterRuns = function() {
   if (!tbody) return;
 
   if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="10">${emptyState('No Runs', 'No simulations match the current filters.')}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="12">${emptyState('No Runs', 'No simulations match the current filters.')}</td></tr>`;
     return;
   }
 
@@ -785,6 +794,8 @@ window.filterRuns = function() {
         <td>${statusBadge(r.status)}</td>
         <td>${escapeHTML(fmtId(r.profile_id))}</td>
         <td>${escapeHTML(fmtId(r.strategy_id))}</td>
+        <td>${escapeHTML(r.conversation_model)}</td>
+        <td>${escapeHTML(r.judge_model)}</td>
         <td>${j ? outcomeBadge(j.payment_outcome) : '\u2014'}</td>
         <td class="${j ? scoreClass(j.payment_probability) : ''}">${j ? pct(j.payment_probability) : '\u2014'}</td>
         <td class="${j ? scoreClass(j.compliance_score) : ''}">${j ? pct(j.compliance_score) : '\u2014'}</td>
@@ -859,6 +870,8 @@ function sortValue(run, column) {
     status: run.status,
     profile_id: fmtId(run.profile_id),
     strategy_id: fmtId(run.strategy_id),
+    conversation_model: run.conversation_model || '',
+    judge_model: run.judge_model || '',
     payment_outcome: judgment.payment_outcome || '',
     payment_probability: Number(judgment.payment_probability || 0),
     compliance_score: Number(judgment.compliance_score || 0),
@@ -894,6 +907,8 @@ function renderRunHeaders() {
     ['Status', 'status'],
     ['Profile', 'profile_id'],
     ['Strategy', 'strategy_id'],
+    ['Conversation Model', 'conversation_model'],
+    ['Judge Model', 'judge_model'],
     ['Outcome', 'payment_outcome'],
     ['Payment', 'payment_probability'],
     ['Compliance', 'compliance_score'],
@@ -905,7 +920,7 @@ function renderRunHeaders() {
 
 function exportRunsCSV() {
   const rows = window._filteredRuns || [];
-  const headers = ['id', 'status', 'profile_id', 'strategy_id', 'outcome', 'payment_probability', 'compliance_score', 'debtor_satisfaction', 'escalation_risk', 'turn_count', 'ended_by', 'started_at'];
+  const headers = ['id', 'status', 'profile_id', 'strategy_id', 'conversation_model', 'judge_model', 'outcome', 'payment_probability', 'compliance_score', 'debtor_satisfaction', 'escalation_risk', 'turn_count', 'ended_by', 'started_at'];
   const csvRows = [headers.join(',')].concat(rows.map(run => {
     const j = run.judgment || {};
     return [
@@ -913,6 +928,8 @@ function exportRunsCSV() {
       run.status,
       run.profile_id,
       run.strategy_id,
+      run.conversation_model,
+      run.judge_model,
       j.payment_outcome || '',
       j.payment_probability ?? '',
       j.compliance_score ?? '',
@@ -1018,14 +1035,22 @@ async function renderMatrix(params = {}) {
   const [options, jobs] = await Promise.all([api('/config/run-options'), api('/jobs')]);
   const profiles = checkboxList('matrix-profiles', options.profiles.map(p => [p.id, fmtId(p.id)]), params.profile ? [params.profile] : null);
   const strategies = checkboxList('matrix-strategies', options.strategies.map(s => [s.id, fmtId(s.id)]));
-  const conversationOpts = modelSelectOptions(options.conversation_models, options.defaults.conversation_model);
-  const judgeOpts = modelSelectOptions(options.judge_models, options.defaults.judge_model);
+  const conversationModels = checkboxList(
+    'matrix-conversation-models',
+    options.conversation_models.map(m => [m.id, modelLabel(m)]),
+    [options.defaults.conversation_model]
+  );
+  const judgeModels = checkboxList(
+    'matrix-judge-models',
+    options.judge_models.map(m => [m.id, modelLabel(m)]),
+    [options.defaults.judge_model]
+  );
 
   window._runOptions = options;
   mainEl.innerHTML = `
     <div class="page-header">
       <h1>Batch Comparison</h1>
-      <p>Compare strategy performance across selected debtor profiles.</p>
+      <p>Compare strategies, debtor profiles, conversation models, and judge models in one run.</p>
     </div>
     <div class="grid-2">
       <div class="card">
@@ -1034,7 +1059,8 @@ async function renderMatrix(params = {}) {
           <form class="control-form" onsubmit="startMatrixRun(event)">
             <div class="form-field"><label>Profiles</label><div class="checkbox-grid" onchange="updateMatrixCount()">${profiles}</div></div>
             <div class="form-field"><label>Strategies</label><div class="checkbox-grid" onchange="updateMatrixCount()">${strategies}</div></div>
-            ${advancedModelSettings('matrix', conversationOpts, judgeOpts)}
+            <div class="form-field"><label>Conversation models</label><p class="field-summary">Each checked model role-plays both collector and debtor.</p><div class="checkbox-grid model-grid">${conversationModels}</div></div>
+            <div class="form-field"><label>Judge models</label><p class="field-summary">Each checked judge scores every generated transcript.</p><div class="checkbox-grid model-grid">${judgeModels}</div></div>
             <div class="btn-row">
               ${inputField('matrix-reps', 'Reps', options.defaults.reps || 1, 1, 100, "updateMatrixCount()")}
               ${inputField('matrix-concurrency', 'Concurrency', 2, 1, 10)}
@@ -1066,8 +1092,8 @@ window.startMatrixRun = async function(event) {
     const job = await apiPost('/jobs/matrix', {
       profile_ids: checkedValues('matrix-profiles'),
       strategy_ids: checkedValues('matrix-strategies'),
-      conversation_models: [$('#matrix-conversation-model').value],
-      judge_models: [$('#matrix-judge-model').value],
+      conversation_models: checkedValues('matrix-conversation-models'),
+      judge_models: checkedValues('matrix-judge-models'),
       reps: Number($('#matrix-reps').value || 1),
       concurrency: Number($('#matrix-concurrency').value || 1),
     });
@@ -1229,6 +1255,12 @@ function checkboxList(name, entries, selected = null) {
     </label>`).join('');
 }
 
+function modelDimensionSummary(conversationModels, judgeModels) {
+  const conversation = conversationModels.length === 1 ? conversationModels[0] : `${conversationModels.length} conversation models`;
+  const judge = judgeModels.length === 1 ? judgeModels[0] : `${judgeModels.length} judge models`;
+  return `${conversation} x ${judge}`;
+}
+
 function updateCheckboxSelection(name, selected) {
   $$(`input[name="${name}"]`).forEach(input => {
     input.checked = !selected || selected.includes(input.value);
@@ -1238,12 +1270,14 @@ function updateCheckboxSelection(name, selected) {
 window.updateMatrixCount = function() {
   const profiles = checkedValues('matrix-profiles').length;
   const strategies = checkedValues('matrix-strategies').length;
+  const conversationModels = checkedValues('matrix-conversation-models').length;
+  const judgeModels = checkedValues('matrix-judge-models').length;
   const reps = Number(($('#matrix-reps') || {}).value || 1);
-  const total = profiles * strategies * reps;
+  const total = profiles * strategies * conversationModels * judgeModels * reps;
   const el = $('#matrix-count');
   if (!el) return;
   el.classList.toggle('warning', total > 50);
-  el.textContent = `${profiles} profiles x ${strategies} strategies x ${reps} reps = ${total} total simulations${total > 50 ? '. Large batches take longer and cost more.' : ''}`;
+  el.textContent = `${profiles} profiles x ${strategies} strategies x ${conversationModels} conversation models x ${judgeModels} judge models x ${reps} reps = ${total} total simulations${total > 50 ? '. Large batches take longer and cost more.' : ''}`;
 };
 
 function checkedValues(name) {
@@ -1401,7 +1435,8 @@ function runMetaHTML(run) {
   return `
       <div class="meta-tags">
         <span class="meta-tag"><strong>Status:</strong> ${escapeHTML(run.status)}</span>
-        <span class="meta-tag"><strong>Model:</strong> ${escapeHTML(run.conversation_model)}</span>
+        <span class="meta-tag"><strong>Conversation model:</strong> ${escapeHTML(run.conversation_model)}</span>
+        <span class="meta-tag"><strong>Judge model:</strong> ${escapeHTML(run.judge_model)}</span>
         <span class="meta-tag"><strong>Turns:</strong> ${run.turn_count}</span>
         <span class="meta-tag"><strong>Ended by:</strong> ${run.ended_by ? escapeHTML(fmtId(run.ended_by)) : '\u2014'}</span>
         <span class="meta-tag"><strong>Tokens:</strong> ${fmtNum(run.total_input_tokens + run.total_output_tokens)}</span>
@@ -1564,7 +1599,8 @@ async function renderCompliance() {
             <span class="threshold-line">Max ${pct(thresholds.max_escalation_risk || 0)}</span>
           </div>
         </div>
-        <p class="status-line">Based on ${fmtNum(e.simulation_count || 0)} simulations</p>
+        <p class="status-line">Based on ${fmtNum(e.simulation_count || 0)} simulations across ${(e.models || []).length || 1} model pairing${((e.models || []).length || 1) !== 1 ? 's' : ''}</p>
+        ${(e.models || []).length ? `<div class="model-pairings">${e.models.map(model => `<span>${escapeHTML(model.conversation_model)} + ${escapeHTML(model.judge_model)}</span>`).join('')}</div>` : ''}
         ${(e.run_ids || []).length ? `<div class="evidence-links">${e.run_ids.map(id => `<button class="text-link" type="button" onclick="openTranscript(${jsArg(id)})">View evidence ${escapeHTML(id)}</button>`).join('')}</div>` : ''}
         <div class="exclusion-detail">${escapeHTML(e.reason)}</div>
       </div>

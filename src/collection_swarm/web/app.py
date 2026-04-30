@@ -297,6 +297,7 @@ def create_app(
         exclusion_items = []
         for exclusion in exclusions:
             combo_runs = store.get_combo_runs(exclusion.profile_id, exclusion.strategy_id)
+            model_pairs = sorted({(run.conversation_model, run.judge_model) for run in combo_runs})
             exclusion_items.append(
                 {
                     "profile_id": exclusion.profile_id,
@@ -306,6 +307,10 @@ def create_app(
                     "reason": exclusion.reason,
                     "simulation_count": len(combo_runs),
                     "run_ids": [run.id for run in combo_runs[:3]],
+                    "model_pairs": [
+                        {"conversation_model": conversation_model, "judge_model": judge_model}
+                        for conversation_model, judge_model in model_pairs
+                    ],
                 }
             )
         return {
@@ -432,6 +437,10 @@ def create_app(
             raise HTTPException(status_code=400, detail="Select at least one profile")
         if not strategy_ids:
             raise HTTPException(status_code=400, detail="Select at least one strategy")
+        if not conversation_models:
+            raise HTTPException(status_code=400, detail="Select at least one conversation model")
+        if not judge_models:
+            raise HTTPException(status_code=400, detail="Select at least one judge model")
         try:
             cells = build_matrix(
                 config,
