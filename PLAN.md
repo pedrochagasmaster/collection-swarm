@@ -16,8 +16,8 @@ No external LLM API keys available. All model access goes through:
 
 | Tier | Purpose | Backend | Models | Selection Logic |
 |------|---------|---------|--------|-----------------|
-| **Tier 1** | Judge Agent | Cursor SDK | `claude-opus-4-7`, `claude-sonnet-4-6`, `gemini-3.1-pro` | Rotate across runs. Always different provider than conversation model. |
-| **Tier 2** | Collector & Debtor Agents | Cursor SDK + NVIDIA NIM | **Cursor:** `gpt-5.5`, `gemini-3-flash`. **NIM:** `mistralai/mistral-large-3-675b-instruct-2512`, `meta/llama-4-maverick-17b-128e-instruct`, `minimaxai/minimax-m2.7` | Both agents in a conversation always use the same model. Model tracked as experimental variable. |
+| **Tier 1** | Judge Agent | Cursor SDK | `claude-4.6-opus-high-thinking`, `claude-4.6-opus-high-thinking-fast`, `claude-opus-4-7-thinking-high` | Rotate across runs. Always different provider than conversation model. |
+| **Tier 2** | Collector & Debtor Agents | Cursor SDK + NVIDIA NIM | **Cursor:** `composer-2`, `gpt-5.5-medium`, `gpt-5.4-high`, `gpt-5.4-high-fast`, `gpt-5.3-codex-high`, `gpt-5.3-codex-high-fast`. **NIM:** `mistralai/mistral-large-3-675b-instruct-2512`, `meta/llama-4-maverick-17b-128e-instruct`, `minimaxai/minimax-m2.7` | Both agents in a conversation always use the same model. Model tracked as experimental variable. |
 | **Tier 3** | Mechanical tasks | NVIDIA NIM (free) | nemotron-mini-4b, gemma-3-27b-it | JSON repair, objection extraction clustering. |
 
 ### Multi-Model Strategy: Full Matrix (Option D)
@@ -26,7 +26,7 @@ matrix is: `profile × strategy × model_combo × repetitions`. Each model combo
 (conversation_model, judge_model) pair where the judge is always a different provider
 than the conversation model.
 
-With 6 conversation models × 3 judge models minus same-provider pairs ≈ 15 valid combos.
+With 9 conversation models × 3 judge models minus same-provider pairs ≈ 27 valid combos.
 
 ---
 
@@ -345,37 +345,61 @@ backends:
 tiers:
   judge:  # Tier 1
     models:
-      - id: cursor-claude-opus-4.7
+      - id: cursor-claude-4.6-opus-high-thinking
         backend: cursor_sdk
         provider: anthropic
-        model_name: claude-opus-4-7
+        model_name: claude-4.6-opus-high-thinking
         input_cost_per_m: 0
         output_cost_per_m: 0
-      - id: cursor-claude-sonnet-4.6
+      - id: cursor-claude-4.6-opus-high-thinking-fast
         backend: cursor_sdk
         provider: anthropic
-        model_name: claude-sonnet-4-6
+        model_name: claude-4.6-opus-high-thinking-fast
         input_cost_per_m: 0
         output_cost_per_m: 0
-      - id: cursor-gemini-3.1-pro
+      - id: cursor-claude-opus-4-7-thinking-high
         backend: cursor_sdk
-        provider: google
-        model_name: gemini-3.1-pro
+        provider: anthropic
+        model_name: claude-opus-4-7-thinking-high
         input_cost_per_m: 0
         output_cost_per_m: 0
 
   conversation:  # Tier 2
     models:
-      - id: cursor-gpt-5.5
+      - id: cursor-composer-2
         backend: cursor_sdk
-        provider: openai
-        model_name: gpt-5.5
+        provider: cursor
+        model_name: composer-2
         input_cost_per_m: 0
         output_cost_per_m: 0
-      - id: cursor-gemini-3-flash
+      - id: cursor-gpt-5.5-medium
         backend: cursor_sdk
-        provider: google
-        model_name: gemini-3-flash
+        provider: openai
+        model_name: gpt-5.5-medium
+        input_cost_per_m: 0
+        output_cost_per_m: 0
+      - id: cursor-gpt-5.4-high
+        backend: cursor_sdk
+        provider: openai
+        model_name: gpt-5.4-high
+        input_cost_per_m: 0
+        output_cost_per_m: 0
+      - id: cursor-gpt-5.4-high-fast
+        backend: cursor_sdk
+        provider: openai
+        model_name: gpt-5.4-high-fast
+        input_cost_per_m: 0
+        output_cost_per_m: 0
+      - id: cursor-gpt-5.3-codex-high
+        backend: cursor_sdk
+        provider: openai
+        model_name: gpt-5.3-codex-high
+        input_cost_per_m: 0
+        output_cost_per_m: 0
+      - id: cursor-gpt-5.3-codex-high-fast
+        backend: cursor_sdk
+        provider: openai
+        model_name: gpt-5.3-codex-high-fast
         input_cost_per_m: 0
         output_cost_per_m: 0
       - id: nim-mistral-large-3-675b
@@ -586,15 +610,15 @@ Strategies excluded from this playbook due to compliance risk:
 collection-swarm simulate \
     --profile cooperative_hardship \
     --strategy empathetic_payment_plan \
-    --conversation-model cursor-gemini-3-flash \
-    --judge-model cursor-claude-sonnet-4.6
+    --conversation-model cursor-gpt-5.5-medium \
+    --judge-model cursor-claude-4.6-opus-high-thinking
 
 # Batch run with matrix slicing
 collection-swarm run \
     --profiles cooperative_hardship,hostile_disputer \
     --strategies empathetic_payment_plan,assertive_settlement \
-    --conversation-models cursor-gemini-3-flash,nim-mistral-large-3-675b \
-    --judge-models cursor-claude-sonnet-4.6,cursor-gemini-3.1-pro \
+    --conversation-models cursor-gpt-5.5-medium,nim-mistral-large-3-675b \
+    --judge-models cursor-claude-4.6-opus-high-thinking,cursor-claude-opus-4-7-thinking-high \
     --reps 10 \
     --concurrency 4
 

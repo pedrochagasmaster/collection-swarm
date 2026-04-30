@@ -207,8 +207,8 @@ class TestRunJobs:
             json={
                 "profile_ids": ["cooperative_hardship"],
                 "strategy_ids": ["empathetic_payment_plan"],
-                "conversation_models": ["local-scripted", "cursor-gemini-3-flash"],
-                "judge_models": ["local-judge", "cursor-gemini-3.1-pro"],
+                "conversation_models": ["local-scripted", "cursor-composer-2"],
+                "judge_models": ["local-judge", "cursor-claude-opus-4-7-thinking-high"],
                 "reps": 1,
                 "concurrency": 2,
             },
