@@ -1683,9 +1683,18 @@ body {
   display: flex;
   align-items: center;
   gap: var(--space-4);
+  flex-wrap: wrap;
   padding: var(--space-4) var(--space-5);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-default);
+}
+
+.compliance-strip > span {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
 }
 
 .compliance-strip.success {

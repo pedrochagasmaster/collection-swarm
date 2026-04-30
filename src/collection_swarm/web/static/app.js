@@ -585,7 +585,7 @@ function renderComplianceBanner(data) {
   const critical = exclusions.slice(0, 3).map(e =>
     `<span>${escapeHTML(fmtId(e.strategy_id))} x ${escapeHTML(fmtId(e.profile_id))}: ${pct(e.compliance_score)} compliance, ${pct(e.escalation_risk)} escalation</span>`
   ).join('');
-  return `<div class="compliance-strip danger"><strong>${exclusions.length} compliance exception${exclusions.length !== 1 ? 's' : ''}</strong><span>${critical}</span><button class="text-link" type="button" onclick="navigateTo('compliance')">View details</button></div>`;
+  return `<div class="compliance-strip danger"><strong>${exclusions.length} compliance exception${exclusions.length !== 1 ? 's' : ''}</strong><span class="compliance-strip-items">${critical}</span><button class="text-link" type="button" onclick="navigateTo('compliance')">View details</button></div>`;
 }
 
 window.switchProfileTab = async function(profileId, btn) {
