@@ -33,3 +33,13 @@ def test_serve_reload_reports_unsupported() -> None:
 
     assert result.exit_code != 0
     assert "--reload is not supported" in result.output
+
+
+def test_model_report_cli_writes_markdown(tmp_path) -> None:
+    output_path = tmp_path / "model-report.md"
+
+    result = CliRunner().invoke(cli, ["model-report", "--output", str(output_path)])
+
+    assert result.exit_code == 0
+    assert "Wrote model-role report" in result.output
+    assert "Cursor Model Role Evaluation" in output_path.read_text(encoding="utf-8")

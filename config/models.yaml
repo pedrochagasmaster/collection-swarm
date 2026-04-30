@@ -15,31 +15,31 @@ tiers:
       - id: cursor-gpt-5.5-medium
         backend: cursor_sdk
         provider: openai
-        model_name: gpt-5.5-medium
+        model_name: gpt-5.5
         input_cost_per_m: 0
         output_cost_per_m: 0
       - id: cursor-gpt-5.4-high
         backend: cursor_sdk
         provider: openai
-        model_name: gpt-5.4-high
+        model_name: gpt-5.4
         input_cost_per_m: 0
         output_cost_per_m: 0
       - id: cursor-gpt-5.4-high-fast
         backend: cursor_sdk
         provider: openai
-        model_name: gpt-5.4-high-fast
+        model_name: gpt-5.4-mini
         input_cost_per_m: 0
         output_cost_per_m: 0
       - id: cursor-gpt-5.3-codex-high
         backend: cursor_sdk
         provider: openai
-        model_name: gpt-5.3-codex-high
+        model_name: gpt-5.3-codex
         input_cost_per_m: 0
         output_cost_per_m: 0
       - id: cursor-gpt-5.3-codex-high-fast
         backend: cursor_sdk
         provider: openai
-        model_name: gpt-5.3-codex-high-fast
+        model_name: gpt-5.3-codex-spark
         input_cost_per_m: 0
         output_cost_per_m: 0
       - id: nim-mistral-large-3-675b
@@ -70,18 +70,18 @@ tiers:
       - id: cursor-claude-4.6-opus-high-thinking
         backend: cursor_sdk
         provider: anthropic
-        model_name: claude-4.6-opus-high-thinking
+        model_name: claude-opus-4-6
         input_cost_per_m: 0
         output_cost_per_m: 0
       - id: cursor-claude-4.6-opus-high-thinking-fast
         backend: cursor_sdk
         provider: anthropic
-        model_name: claude-4.6-opus-high-thinking-fast
+        model_name: claude-sonnet-4-6
         input_cost_per_m: 0
         output_cost_per_m: 0
       - id: cursor-claude-opus-4-7-thinking-high
         backend: cursor_sdk
         provider: anthropic
-        model_name: claude-opus-4-7-thinking-high
+        model_name: claude-opus-4-7
         input_cost_per_m: 0
         output_cost_per_m: 0

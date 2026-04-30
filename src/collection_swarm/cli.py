@@ -18,6 +18,13 @@ from collection_swarm.analysis.statistics import compare_strategies
 from collection_swarm.backends.router import LLMRouter
 from collection_swarm.config import load_app_config
 from collection_swarm.engine import SimulationEngine
+from collection_swarm.model_evaluation import (
+    DEFAULT_CURSOR_PROBE_MODELS,
+    ProbeScenario,
+    build_model_role_report,
+    run_live_role_probes,
+    write_report,
+)
 from collection_swarm.runner import build_matrix, run_matrix
 from collection_swarm.store import SimulationStore
 
@@ -161,6 +168,63 @@ def analyze(ctx: click.Context, output_path: Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(generate_playbook(rankings, exclusions, store), encoding="utf-8")
     console.print(f"Wrote playbook to {output_path}")
+
+
+@cli.command("model-report")
+@click.option(
+    "--output",
+    "output_path",
+    type=click.Path(path_type=Path),
+    default=Path("docs/cursor-model-role-report.md"),
+    show_default=True,
+    help="Report destination.",
+)
+@click.option("--format", "report_format", type=click.Choice(["markdown", "json"]), default="markdown", show_default=True)
+@click.option("--live-probes", is_flag=True, help="Run live Cursor SDK probes instead of using the checked-in baseline.")
+@click.option(
+    "--cursor-models",
+    default=None,
+    help="Comma-separated provider-facing Cursor SDK model IDs for live probes, e.g. gpt-5.5,claude-opus-4-7.",
+)
+@click.option("--roles", default=None, help="Comma-separated roles to probe: collector,debtor,judge.")
+@click.option("--profile", "profile_id", default="cooperative_hardship", show_default=True)
+@click.option("--strategy", "strategy_id", default="empathetic_payment_plan", show_default=True)
+@click.option("--judge-profile", "judge_profile_id", default="written_proof_disputer", show_default=True)
+@click.option("--concurrency", default=1, show_default=True, type=int)
+@click.pass_context
+def model_report(
+    ctx: click.Context,
+    output_path: Path,
+    report_format: str,
+    live_probes: bool,
+    cursor_models: str | None,
+    roles: str | None,
+    profile_id: str,
+    strategy_id: str,
+    judge_profile_id: str,
+    concurrency: int,
+) -> None:
+    """Generate a parameterized Cursor model-role evaluation report."""
+    config = load_app_config(ctx.obj["config_dir"])
+    scenario = ProbeScenario(profile_id=profile_id, strategy_id=strategy_id, judge_profile_id=judge_profile_id)
+    probes = None
+    if live_probes:
+        selected_roles = tuple(_split_csv(roles) or ("collector", "debtor", "judge"))
+        invalid_roles = [role for role in selected_roles if role not in {"collector", "debtor", "judge"}]
+        if invalid_roles:
+            raise click.ClickException(f"unknown model-report role(s): {', '.join(invalid_roles)}")
+        probes = asyncio.run(
+            run_live_role_probes(
+                config,
+                cursor_model_names=tuple(_split_csv(cursor_models) or DEFAULT_CURSOR_PROBE_MODELS),
+                roles=selected_roles,  # type: ignore[arg-type]
+                scenario=scenario,
+                concurrency=concurrency,
+            )
+        )
+    report = build_model_role_report(config, probes=probes, scenario=scenario)
+    write_report(report, output_path, report_format=report_format)  # type: ignore[arg-type]
+    console.print(f"Wrote model-role report to {output_path}")
 
 
 @cli.command("test-connection")

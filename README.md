@@ -167,6 +167,14 @@ collection-swarm analyze --output output/playbook.md
 
 The playbook summarizes strategy performance and excludes risky combinations using the configured compliance thresholds.
 
+### Generate a Model-Role Report
+
+```bash
+collection-swarm model-report --output docs/cursor-model-role-report.md
+```
+
+Use `--live-probes` to run parameterized Cursor SDK probes across Collector, Debtor, and Judge roles. See `docs/model-evaluation.md` for the full module API, CLI parameters, and production guidance.
+
 ## Model Configuration
 
 Models live in `config/models.yaml`. The user-facing `id` is what you pass to the CLI. The provider-facing `model_name` is the exact string sent to the backend.
