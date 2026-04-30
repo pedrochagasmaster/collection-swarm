@@ -192,6 +192,31 @@ class TestRunJobs:
         assert job["completed"] == 2
         assert len(job["result_ids"]) == 2
 
+    def test_matrix_requires_explicit_profile_and_strategy_selection(self, empty_client: TestClient) -> None:
+        resp = empty_client.post(
+            "/api/jobs/matrix",
+            json={
+                "profile_ids": [],
+                "strategy_ids": ["empathetic_payment_plan"],
+                "conversation_models": ["local-scripted"],
+                "judge_models": ["local-judge"],
+            },
+        )
+        assert resp.status_code == 400
+        assert "profile" in resp.json()["detail"]
+
+        resp = empty_client.post(
+            "/api/jobs/matrix",
+            json={
+                "profile_ids": ["cooperative_hardship"],
+                "strategy_ids": [],
+                "conversation_models": ["local-scripted"],
+                "judge_models": ["local-judge"],
+            },
+        )
+        assert resp.status_code == 400
+        assert "strategy" in resp.json()["detail"]
+
 
 class TestManualSessions:
     def test_manual_debtor_session_completes_and_saves(self, empty_client: TestClient) -> None:
@@ -222,6 +247,46 @@ class TestManualSessions:
         assert run["judgment"] is not None
         saved = empty_client.get(f"/api/runs/{run['id']}").json()
         assert saved["id"] == run["id"]
+
+    def test_manual_finish_rejects_empty_session(self, empty_client: TestClient) -> None:
+        resp = empty_client.post(
+            "/api/manual-sessions",
+            json={
+                "profile_id": "cooperative_hardship",
+                "strategy_id": "empathetic_payment_plan",
+                "human_role": "collector",
+                "conversation_model": "local-scripted",
+                "judge_model": "local-judge",
+            },
+        )
+        assert resp.status_code == 200
+        session = resp.json()
+        assert session["run"]["transcript"] == []
+
+        resp = empty_client.post(f"/api/manual-sessions/{session['id']}/finish", json={})
+        assert resp.status_code == 400
+        assert "no turns" in resp.json()["detail"]
+
+    def test_manual_turn_rejects_non_waiting_state(self, empty_client: TestClient) -> None:
+        resp = empty_client.post(
+            "/api/manual-sessions",
+            json={
+                "profile_id": "cooperative_hardship",
+                "strategy_id": "empathetic_payment_plan",
+                "human_role": "debtor",
+                "conversation_model": "local-scripted",
+                "judge_model": "local-judge",
+            },
+        )
+        session_id = resp.json()["id"]
+        empty_client.app.state.manual_sessions[session_id].status = "ai_thinking"
+
+        resp = empty_client.post(
+            f"/api/manual-sessions/{session_id}/turn",
+            json={"content": "Duplicate turn"},
+        )
+        assert resp.status_code == 409
+        assert "ai_thinking" in resp.json()["detail"]
 
 
 class TestSPA:

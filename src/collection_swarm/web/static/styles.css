@@ -1195,6 +1195,16 @@ body {
   color: var(--text-secondary);
 }
 
+.form-error {
+  padding: var(--space-3) var(--space-4);
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius-md);
+  color: var(--danger);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
 .status-card {
   display: flex;
   flex-direction: column;

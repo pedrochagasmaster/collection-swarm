@@ -80,11 +80,29 @@ async function apiPost(path, body = {}) {
 
 // ── Helpers ────────────────────────────────────────────────────
 
+function escapeHTML(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[ch]));
+}
+function escapeAttr(value) { return escapeHTML(value); }
+function jsArg(value) { return escapeAttr(JSON.stringify(String(value ?? ''))); }
+function pathPart(value) { return encodeURIComponent(String(value ?? '')); }
+function safePctInput(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0;
+}
 function pct(v) { return `${Math.round(v * 100)}%`; }
 function scoreClass(v) { return v >= 0.7 ? 'score-good' : v >= 0.4 ? 'score-mid' : 'score-bad'; }
-function fmtId(id) { return id.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); }
-function fmtMoney(v) { return `$${v.toFixed(4)}`; }
+function fmtId(id) { return String(id ?? '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); }
+function fmtMoney(v) { return `$${(Number(v) || 0).toFixed(4)}`; }
 function fmtNum(v) { return Number(v).toLocaleString(); }
+function pctSafe(v) { return pct(safePctInput(v)); }
+function scoreClassSafe(v) { return scoreClass(safePctInput(v)); }
 function relTime(iso) {
   if (!iso) return '\u2014';
   const d = new Date(iso);
@@ -115,19 +133,21 @@ function emptyState(title, msg) {
   return `
     <div class="empty-state" role="status">
       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
-      <h3>${title}</h3>
-      <p>${msg}</p>
+      <h3>${escapeHTML(title)}</h3>
+      <p>${escapeHTML(msg)}</p>
     </div>`;
 }
 
 function scoreBarHTML(label, value) {
+  value = safePctInput(value);
   const cls = scoreClass(value);
   const colorVar = cls === 'score-good' ? '--success' : cls === 'score-mid' ? '--warning' : '--danger';
+  const safeLabel = escapeHTML(label);
   return `
     <div class="judgment-score-item">
-      <span class="judgment-score-label">${label}</span>
+      <span class="judgment-score-label">${safeLabel}</span>
       <div class="score-bar-wrap">
-        <div class="score-bar" role="meter" aria-valuenow="${Math.round(value * 100)}" aria-valuemin="0" aria-valuemax="100" aria-label="${label}">
+        <div class="score-bar" role="meter" aria-valuenow="${Math.round(value * 100)}" aria-valuemin="0" aria-valuemax="100" aria-label="${escapeAttr(label)}">
           <div class="score-bar-fill" style="width:${value * 100}%;background:var(${colorVar})"></div>
         </div>
         <span class="score-bar-label ${cls}">${pct(value)}</span>
@@ -145,7 +165,7 @@ function outcomeBadge(outcome) {
     'refusal': 'badge-danger',
     'hang_up': 'badge-danger',
   };
-  return `<span class="badge ${map[outcome] || 'badge-neutral'}">${fmtId(outcome)}</span>`;
+  return `<span class="badge ${map[outcome] || 'badge-neutral'}">${escapeHTML(fmtId(outcome))}</span>`;
 }
 
 function statusBadge(status) {
@@ -158,26 +178,30 @@ function statusBadge(status) {
     ai_thinking: 'badge-info',
     judging: 'badge-info',
   };
-  return `<span class="badge ${map[status] || 'badge-neutral'}">${fmtId(status)}</span>`;
+  return `<span class="badge ${map[status] || 'badge-neutral'}">${escapeHTML(fmtId(status))}</span>`;
 }
 
 function chatHTML(transcript = []) {
   const MAX_STAGGER = 10;
   return transcript.map((m, i) => {
     const avatarMap = { collector: 'C', debtor: 'D', system: 'S', judge: 'J' };
+    const role = avatarMap[m.role] ? m.role : 'system';
     const delay = Math.min(i, MAX_STAGGER) * 40;
     return `
-      <div class="chat-msg ${m.role}" style="animation-delay:${delay}ms" role="listitem">
-        <div class="chat-avatar" aria-hidden="true">${avatarMap[m.role] || '?'}</div>
+      <div class="chat-msg ${role}" style="animation-delay:${delay}ms" role="listitem">
+        <div class="chat-avatar" aria-hidden="true">${avatarMap[role] || '?'}</div>
         <div class="chat-bubble">
-          <div class="chat-role">${m.role}</div>
-          ${m.content || ''}
+          <div class="chat-role">${escapeHTML(m.role)}</div>
+          ${escapeHTML(m.content || '')}
         </div>
       </div>`;
   }).join('');
 }
 
 function progressHTML(completed, failed, total) {
+  completed = Number(completed) || 0;
+  failed = Number(failed) || 0;
+  total = Number(total) || 0;
   const done = completed + failed;
   const pctDone = total ? Math.round((done / total) * 100) : 0;
   return `
@@ -188,18 +212,22 @@ function progressHTML(completed, failed, total) {
 }
 
 function runSelectOptions(items, selectedId) {
-  return items.map(item => `<option value="${item.id}" ${item.id === selectedId ? 'selected' : ''}>${fmtId(item.id)}</option>`).join('');
+  return items.map(item => `<option value="${escapeAttr(item.id)}" ${item.id === selectedId ? 'selected' : ''}>${escapeHTML(fmtId(item.id))}</option>`).join('');
 }
 
 function modelSelectOptions(items, selectedId) {
-  return items.map(item => `<option value="${item.id}" ${item.id === selectedId ? 'selected' : ''}>${item.id}</option>`).join('');
+  return items.map(item => `<option value="${escapeAttr(item.id)}" ${item.id === selectedId ? 'selected' : ''}>${escapeHTML(item.id)}</option>`).join('');
+}
+
+function linkButton(label, onclick, extraClass = '') {
+  return `<button class="btn ${extraClass}" type="button" onclick="${escapeAttr(onclick)}">${escapeHTML(label)}</button>`;
 }
 
 function checkedBoxes(items, name) {
   return items.map(item => `
     <label class="check-row">
-      <input type="checkbox" name="${name}" value="${item.id}" checked>
-      <span>${fmtId(item.id)}</span>
+      <input type="checkbox" name="${escapeAttr(name)}" value="${escapeAttr(item.id)}" checked>
+      <span>${escapeHTML(fmtId(item.id))}</span>
     </label>`).join('');
 }
 
@@ -256,7 +284,7 @@ async function renderDashboard() {
     const color = OUTCOME_COLORS[outcome] || 'var(--chart-1)';
     outcomeRows += `
       <div class="dist-row">
-        <span class="dist-label">${fmtId(outcome)}</span>
+        <span class="dist-label">${escapeHTML(fmtId(outcome))}</span>
         <div class="dist-bar-track">
           <div class="dist-bar-fill" style="width:${Math.max(w, 6)}%;background:${color}"><span>${pct(count/totalOutcomes)}</span></div>
         </div>
@@ -267,7 +295,7 @@ async function renderDashboard() {
   let strategySection = '';
   if (data.profiles.length) {
     const tabs = data.profiles.map((p, i) =>
-      `<button class="tab-btn${i === 0 ? ' active' : ''}" onclick="switchProfileTab('${p}', this)" role="tab" aria-selected="${i === 0}">${fmtId(p)}</button>`
+      `<button class="tab-btn${i === 0 ? ' active' : ''}" onclick="switchProfileTab(${jsArg(p)}, this)" role="tab" aria-selected="${i === 0}">${escapeHTML(fmtId(p))}</button>`
     ).join('');
     strategySection = `
       <div class="card" style="margin-top:var(--space-8)">
@@ -356,7 +384,7 @@ async function loadStrategyComparison(profileId) {
   if (!container) return;
   container.innerHTML = skeleton();
   try {
-    const data = await api(`/profiles/${profileId}/strategies`);
+    const data = await api(`/profiles/${pathPart(profileId)}/strategies`);
     if (!data.strategies.length) {
       container.innerHTML = emptyState('No Data', `No completed simulations for ${fmtId(profileId)}.`);
       return;
@@ -364,7 +392,7 @@ async function loadStrategyComparison(profileId) {
     container.innerHTML = data.strategies.map((s, i) => `
       <div class="comparison-row">
         <div class="comparison-rank" aria-label="Rank ${i + 1}">${i + 1}</div>
-        <div class="comparison-name">${fmtId(s.strategy_id)}</div>
+        <div class="comparison-name">${escapeHTML(fmtId(s.strategy_id))}</div>
         <div class="comparison-scores">
           <div class="comparison-metric">
             <span class="comparison-metric-value ${scoreClass(s.mean_payment_probability)}">${pct(s.mean_payment_probability)}</span>
@@ -401,8 +429,8 @@ async function renderRuns() {
   const profiles = dashboard.profiles || [];
   const strategies = dashboard.strategies || [];
 
-  const profileOpts = profiles.map(p => `<option value="${p}">${fmtId(p)}</option>`).join('');
-  const strategyOpts = strategies.map(s => `<option value="${s}">${fmtId(s)}</option>`).join('');
+  const profileOpts = profiles.map(p => `<option value="${escapeAttr(p)}">${escapeHTML(fmtId(p))}</option>`).join('');
+  const strategyOpts = strategies.map(s => `<option value="${escapeAttr(s)}">${escapeHTML(fmtId(s))}</option>`).join('');
 
   mainEl.innerHTML = `
     <div class="page-header">
@@ -479,16 +507,16 @@ window.filterRuns = function() {
   tbody.innerHTML = filtered.slice().reverse().map(r => {
     const j = r.judgment;
     return `
-      <tr onclick="openTranscript('${r.id}')" tabindex="0" role="button" aria-label="View transcript for ${r.id}" onkeydown="if(event.key==='Enter')openTranscript('${r.id}')">
-        <td>${r.id}</td>
+      <tr onclick="openTranscript(${jsArg(r.id)})" tabindex="0" role="button" aria-label="View transcript for ${escapeAttr(r.id)}" onkeydown="if(event.key==='Enter')openTranscript(${jsArg(r.id)})">
+        <td>${escapeHTML(r.id)}</td>
         <td>${statusBadge(r.status)}</td>
-        <td>${fmtId(r.profile_id)}</td>
-        <td>${fmtId(r.strategy_id)}</td>
+        <td>${escapeHTML(fmtId(r.profile_id))}</td>
+        <td>${escapeHTML(fmtId(r.strategy_id))}</td>
         <td>${j ? outcomeBadge(j.payment_outcome) : '\u2014'}</td>
         <td class="${j ? scoreClass(j.payment_probability) : ''}">${j ? pct(j.payment_probability) : '\u2014'}</td>
         <td class="${j ? scoreClass(j.compliance_score) : ''}">${j ? pct(j.compliance_score) : '\u2014'}</td>
         <td>${r.turn_count}</td>
-        <td>${r.ended_by ? fmtId(r.ended_by) : '\u2014'}</td>
+        <td>${r.ended_by ? escapeHTML(fmtId(r.ended_by)) : '\u2014'}</td>
         <td>${relTime(r.started_at)}</td>
       </tr>`;
   }).join('');
@@ -498,14 +526,10 @@ window.filterRuns = function() {
 
 async function renderLaunch() {
   const options = await api('/config/run-options');
-  const profileOpts = options.profiles.map(p => `<option value="${p.id}">${fmtId(p.id)}</option>`).join('');
-  const strategyOpts = options.strategies.map(s => `<option value="${s.id}">${fmtId(s.id)}</option>`).join('');
-  const conversationOpts = options.conversation_models.map(m =>
-    `<option value="${m.id}" ${m.id === options.defaults.conversation_model ? 'selected' : ''}>${m.id}</option>`
-  ).join('');
-  const judgeOpts = options.judge_models.map(m =>
-    `<option value="${m.id}" ${m.id === options.defaults.judge_model ? 'selected' : ''}>${m.id}</option>`
-  ).join('');
+  const profileOpts = runSelectOptions(options.profiles, '');
+  const strategyOpts = runSelectOptions(options.strategies, '');
+  const conversationOpts = modelSelectOptions(options.conversation_models, options.defaults.conversation_model);
+  const judgeOpts = modelSelectOptions(options.judge_models, options.defaults.judge_model);
 
   mainEl.innerHTML = `
     <div class="page-header">
@@ -516,16 +540,16 @@ async function renderLaunch() {
       <div class="card">
         <div class="card-header"><h2>Single Simulation</h2></div>
         <div class="card-body">
-          <form class="run-form" onsubmit="startSingleRun(event)">
+          <form class="control-form" onsubmit="startSingleRun(event)">
             ${selectField('launch-profile', 'Profile', profileOpts)}
             ${selectField('launch-strategy', 'Strategy', strategyOpts)}
             ${selectField('launch-conversation-model', 'Conversation model', conversationOpts)}
             ${selectField('launch-judge-model', 'Judge model', judgeOpts)}
-            <button class="primary-btn" type="submit">Start run</button>
+            <button class="btn btn-primary" type="submit">Start run</button>
           </form>
         </div>
       </div>
-      <div class="card live-card">
+      <div class="card">
         <div class="card-header"><h2>Live Progress</h2><div id="single-job-status">${statusBadge('queued')}</div></div>
         <div class="card-body" id="single-job-panel">
           ${emptyState('Ready', 'Start a simulation to see turns, status, and judgment here.')}
@@ -561,12 +585,8 @@ async function renderMatrix() {
   const [options, jobs] = await Promise.all([api('/config/run-options'), api('/jobs')]);
   const profiles = checkboxList('matrix-profiles', options.profiles.map(p => [p.id, fmtId(p.id)]));
   const strategies = checkboxList('matrix-strategies', options.strategies.map(s => [s.id, fmtId(s.id)]));
-  const conversationOpts = options.conversation_models.map(m =>
-    `<option value="${m.id}" ${m.id === options.defaults.conversation_model ? 'selected' : ''}>${m.id}</option>`
-  ).join('');
-  const judgeOpts = options.judge_models.map(m =>
-    `<option value="${m.id}" ${m.id === options.defaults.judge_model ? 'selected' : ''}>${m.id}</option>`
-  ).join('');
+  const conversationOpts = modelSelectOptions(options.conversation_models, options.defaults.conversation_model);
+  const judgeOpts = modelSelectOptions(options.judge_models, options.defaults.judge_model);
 
   mainEl.innerHTML = `
     <div class="page-header">
@@ -577,20 +597,20 @@ async function renderMatrix() {
       <div class="card">
         <div class="card-header"><h2>Matrix Setup</h2></div>
         <div class="card-body">
-          <form class="run-form" onsubmit="startMatrixRun(event)">
-            <div class="form-field"><label>Profiles</label><div class="check-grid">${profiles}</div></div>
-            <div class="form-field"><label>Strategies</label><div class="check-grid">${strategies}</div></div>
+          <form class="control-form" onsubmit="startMatrixRun(event)">
+            <div class="form-field"><label>Profiles</label><div class="checkbox-grid">${profiles}</div></div>
+            <div class="form-field"><label>Strategies</label><div class="checkbox-grid">${strategies}</div></div>
             ${selectField('matrix-conversation-model', 'Conversation model', conversationOpts)}
             ${selectField('matrix-judge-model', 'Judge model', judgeOpts)}
-            <div class="form-row">
+            <div class="btn-row">
               ${inputField('matrix-reps', 'Reps', options.defaults.reps || 1, 1, 100)}
               ${inputField('matrix-concurrency', 'Concurrency', 2, 1, 10)}
             </div>
-            <button class="primary-btn" type="submit">Start matrix</button>
+            <button class="btn btn-primary" type="submit">Start matrix</button>
           </form>
         </div>
       </div>
-      <div class="card live-card">
+      <div class="card">
         <div class="card-header"><h2>Background Progress</h2><div id="matrix-job-status">${statusBadge('queued')}</div></div>
         <div class="card-body" id="matrix-job-panel">
           ${jobs.length ? jobs.map(jobSummaryHTML).join('') : emptyState('No Matrix Active', 'Start a matrix to watch completion counts and current cells.')}
@@ -626,14 +646,10 @@ window.startMatrixRun = async function(event) {
 
 async function renderManual() {
   const options = await api('/config/run-options');
-  const profileOpts = options.profiles.map(p => `<option value="${p.id}">${fmtId(p.id)}</option>`).join('');
-  const strategyOpts = options.strategies.map(s => `<option value="${s.id}">${fmtId(s.id)}</option>`).join('');
-  const conversationOpts = options.conversation_models.map(m =>
-    `<option value="${m.id}" ${m.id === options.defaults.conversation_model ? 'selected' : ''}>${m.id}</option>`
-  ).join('');
-  const judgeOpts = options.judge_models.map(m =>
-    `<option value="${m.id}" ${m.id === options.defaults.judge_model ? 'selected' : ''}>${m.id}</option>`
-  ).join('');
+  const profileOpts = runSelectOptions(options.profiles, '');
+  const strategyOpts = runSelectOptions(options.strategies, '');
+  const conversationOpts = modelSelectOptions(options.conversation_models, options.defaults.conversation_model);
+  const judgeOpts = modelSelectOptions(options.judge_models, options.defaults.judge_model);
 
   mainEl.innerHTML = `
     <div class="page-header">
@@ -644,17 +660,17 @@ async function renderManual() {
       <div class="card">
         <div class="card-header"><h2>Session Setup</h2></div>
         <div class="card-body">
-          <form class="run-form" onsubmit="startManualSession(event)">
+          <form class="control-form" onsubmit="startManualSession(event)">
             ${selectField('manual-profile', 'Profile', profileOpts)}
             ${selectField('manual-strategy', 'Strategy', strategyOpts)}
             ${selectField('manual-role', 'You play', '<option value="debtor">Debtor</option><option value="collector">Collector</option>')}
             ${selectField('manual-conversation-model', 'AI model', conversationOpts)}
             ${selectField('manual-judge-model', 'Judge model', judgeOpts)}
-            <button class="primary-btn" type="submit">Start manual run</button>
+            <button class="btn btn-primary" type="submit">Start manual run</button>
           </form>
         </div>
       </div>
-      <div class="card live-card">
+      <div class="card">
         <div class="card-header"><h2>Role-play Transcript</h2><div id="manual-status">${statusBadge('waiting_for_human')}</div></div>
         <div class="card-body" id="manual-panel">${emptyState('No Session', 'Start a manual run to enter turns.')}</div>
       </div>
@@ -692,7 +708,7 @@ window.submitManualTurn = async function(event) {
     const session = await apiPost(`/manual-sessions/${window._manualSessionId}/turn`, { content });
     renderManualSession(session);
   } catch (err) {
-    panel.innerHTML += `<div class="form-error">${err.message}</div>`;
+    appendFormError(panel, err.message);
   } finally {
     panel.classList.remove('is-loading');
   }
@@ -700,8 +716,13 @@ window.submitManualTurn = async function(event) {
 
 window.finishManualSession = async function() {
   if (!window._manualSessionId) return;
-  const session = await apiPost(`/manual-sessions/${window._manualSessionId}/finish`, {});
-  renderManualSession(session);
+  const panel = $('#manual-panel');
+  try {
+    const session = await apiPost(`/manual-sessions/${window._manualSessionId}/finish`, {});
+    renderManualSession(session);
+  } catch (err) {
+    appendFormError(panel, err.message);
+  }
 };
 
 function renderManualSession(session) {
@@ -713,18 +734,18 @@ function renderManualSession(session) {
     ${transcriptHTML(run)}
     ${judgmentHTML(run)}
     ${session.status === 'completed' ? `
-      <div class="action-row">
-        <button class="secondary-btn" onclick="openTranscript('${run.id}')">Open saved run</button>
+      <div class="btn-row">
+        ${linkButton('Open saved run', `openTranscript(${jsArg(run.id)})`)}
       </div>` : `
-      <form class="manual-turn-form" onsubmit="submitManualTurn(event)">
-        <label for="manual-turn-content">Your ${session.human_role} turn</label>
-        <textarea id="manual-turn-content" rows="4" ${disabled} placeholder="Type the next line. Add [END_CONVERSATION] to stop."></textarea>
-        <div class="action-row">
-          <button class="primary-btn" type="submit" ${disabled}>Send turn</button>
-          <button class="secondary-btn" type="button" onclick="finishManualSession()">Finish and judge</button>
+      <form class="control-form" onsubmit="submitManualTurn(event)">
+        <label for="manual-turn-content">Your ${escapeHTML(session.human_role)} turn</label>
+        <textarea class="form-textarea" id="manual-turn-content" rows="4" ${disabled} placeholder="Type the next line. Add [END_CONVERSATION] to stop."></textarea>
+        <div class="btn-row">
+          <button class="btn btn-primary" type="submit" ${disabled}>Send turn</button>
+          <button class="btn" type="button" onclick="finishManualSession()">Finish and judge</button>
         </div>
       </form>`}
-    <p class="status-note">${session.message || ''}</p>`;
+    <p class="status-line">${escapeHTML(session.message || '')}</p>`;
 }
 
 // ── Launch form helpers ─────────────────────────────────────────
@@ -734,29 +755,37 @@ window._pollers = {};
 function selectField(id, label, optionsHTML) {
   return `
     <div class="form-field">
-      <label for="${id}">${label}</label>
-      <select class="filter-select" id="${id}">${optionsHTML}</select>
+      <label for="${escapeAttr(id)}">${escapeHTML(label)}</label>
+      <select class="filter-select" id="${escapeAttr(id)}">${optionsHTML}</select>
     </div>`;
 }
 
 function inputField(id, label, value, min, max) {
   return `
     <div class="form-field">
-      <label for="${id}">${label}</label>
-      <input class="text-input" id="${id}" type="number" value="${value}" min="${min}" max="${max}">
+      <label for="${escapeAttr(id)}">${escapeHTML(label)}</label>
+      <input class="form-input" id="${escapeAttr(id)}" type="number" value="${escapeAttr(value)}" min="${escapeAttr(min)}" max="${escapeAttr(max)}">
     </div>`;
 }
 
 function checkboxList(name, entries) {
   return entries.map(([value, label]) => `
     <label class="check-option">
-      <input type="checkbox" name="${name}" value="${value}" checked>
-      <span>${label}</span>
+      <input type="checkbox" name="${escapeAttr(name)}" value="${escapeAttr(value)}" checked>
+      <span>${escapeHTML(label)}</span>
     </label>`).join('');
 }
 
 function checkedValues(name) {
   return $$(`input[name="${name}"]:checked`).map(input => input.value);
+}
+
+function appendFormError(container, message) {
+  if (!container) return;
+  const existing = $('.form-error', container);
+  if (existing) existing.remove();
+  $$('.status-line', container).forEach(status => status.remove());
+  container.insertAdjacentHTML('beforeend', `<div class="form-error" role="alert">${escapeHTML(message)}</div>`);
 }
 
 function clearPoll(key) {
@@ -765,7 +794,7 @@ function clearPoll(key) {
 }
 
 async function pollJob(jobId, panelId, statusId, pollKey) {
-  const job = await api(`/jobs/${jobId}`);
+  const job = await api(`/jobs/${pathPart(jobId)}`);
   const panel = $(`#${panelId}`);
   const status = $(`#${statusId}`);
   if (status) status.innerHTML = statusBadge(job.status);
@@ -775,11 +804,11 @@ async function pollJob(jobId, panelId, statusId, pollKey) {
 
 function renderJobPanel(job, panel) {
   panel.innerHTML = `
-    <div class="job-panel">
-      <div class="job-header-row">
+    <div class="status-card">
+      <div class="job-item-head">
         <div>
-          <div class="job-id">${job.id}</div>
-          <div class="status-note">${job.message || ''}</div>
+          <div class="job-id">${escapeHTML(job.id)}</div>
+          <div class="status-line">${escapeHTML(job.message || '')}</div>
         </div>
         ${statusBadge(job.status)}
       </div>
@@ -791,25 +820,25 @@ function renderJobPanel(job, panel) {
           ${judgmentHTML(job.current_run)}
         </div>` : ''}
       ${job.result_ids && job.result_ids.length ? `
-        <div class="action-row">
-          <button class="secondary-btn" type="button" onclick="openTranscript('${job.result_ids[job.result_ids.length - 1]}')">Open latest saved run</button>
-          <button class="secondary-btn" type="button" onclick="navigateTo('runs')">View all runs</button>
+        <div class="btn-row">
+          ${linkButton('Open latest saved run', `openTranscript(${jsArg(job.result_ids[job.result_ids.length - 1])})`)}
+          ${linkButton('View all runs', "navigateTo('runs')")}
         </div>` : ''}
-      ${(job.errors || []).length ? `<div class="form-error">${job.errors.join('<br>')}</div>` : ''}
+      ${(job.errors || []).length ? `<div class="form-error">${job.errors.map(escapeHTML).join('<br>')}</div>` : ''}
     </div>`;
 }
 
 function jobSummaryHTML(job) {
   return `
-    <button class="job-summary" type="button" onclick="showJob('${job.id}', 'matrix-job-panel', 'matrix-job-status')">
-      <span>${job.kind}, ${job.id}</span>
+    <button class="job-item" type="button" onclick="showJob(${jsArg(job.id)}, 'matrix-job-panel', 'matrix-job-status')">
+      <span>${escapeHTML(job.kind)}, ${escapeHTML(job.id)}</span>
       <span>${statusBadge(job.status)}</span>
       <span>${job.completed + job.failed}/${job.total}</span>
     </button>`;
 }
 
 window.showJob = async function(jobId, panelId, statusId) {
-  const job = await api(`/jobs/${jobId}`);
+  const job = await api(`/jobs/${pathPart(jobId)}`);
   const panel = $(`#${panelId}`);
   const status = $(`#${statusId}`);
   if (status) status.innerHTML = statusBadge(job.status);
@@ -833,7 +862,7 @@ window.openTranscript = async function(runId) {
   subtitle.textContent = '';
 
   try {
-    const run = await api(`/runs/${runId}`);
+    const run = await api(`/runs/${pathPart(runId)}`);
     title.textContent = run.id;
     subtitle.textContent = `${fmtId(run.profile_id)} \u00d7 ${fmtId(run.strategy_id)}`;
 
@@ -850,10 +879,10 @@ window.openTranscript = async function(runId) {
 function runMetaHTML(run) {
   return `
       <div class="meta-tags">
-        <span class="meta-tag"><strong>Status:</strong> ${run.status}</span>
-        <span class="meta-tag"><strong>Model:</strong> ${run.conversation_model}</span>
+        <span class="meta-tag"><strong>Status:</strong> ${escapeHTML(run.status)}</span>
+        <span class="meta-tag"><strong>Model:</strong> ${escapeHTML(run.conversation_model)}</span>
         <span class="meta-tag"><strong>Turns:</strong> ${run.turn_count}</span>
-        <span class="meta-tag"><strong>Ended by:</strong> ${run.ended_by ? fmtId(run.ended_by) : '\u2014'}</span>
+        <span class="meta-tag"><strong>Ended by:</strong> ${run.ended_by ? escapeHTML(fmtId(run.ended_by)) : '\u2014'}</span>
         <span class="meta-tag"><strong>Tokens:</strong> ${fmtNum(run.total_input_tokens + run.total_output_tokens)}</span>
         <span class="meta-tag"><strong>Cost:</strong> ${fmtMoney(run.estimated_cost_usd)}</span>
       </div>`;
@@ -885,9 +914,9 @@ function judgmentHTML(run) {
           </div>
           ${violations.length ? `
             <div class="judgment-violations" aria-label="Constraint violations">
-              ${violations.map(v => `<span class="badge badge-danger">${v}</span>`).join('')}
+              ${violations.map(v => `<span class="badge badge-danger">${escapeHTML(v)}</span>`).join('')}
             </div>` : ''}
-          ${j.reasoning ? `<div class="judgment-reasoning">${j.reasoning}</div>` : ''}
+          ${j.reasoning ? `<div class="judgment-reasoning">${escapeHTML(j.reasoning)}</div>` : ''}
         </div>`;
 }
 
@@ -941,11 +970,11 @@ async function renderCompliance() {
   } else {
     const cards = exclusions.map(e => `
       <div class="exclusion-card" role="alert">
-        <h4>${fmtId(e.strategy_id)} \u00d7 ${fmtId(e.profile_id)}</h4>
+        <h4>${escapeHTML(fmtId(e.strategy_id))} \u00d7 ${escapeHTML(fmtId(e.profile_id))}</h4>
         <div class="exclusion-detail">
           <strong>Compliance:</strong> ${pct(e.compliance_score)} &nbsp;|&nbsp; <strong>Escalation Risk:</strong> ${pct(e.escalation_risk)}
         </div>
-        <div class="exclusion-detail">${e.reason}</div>
+        <div class="exclusion-detail">${escapeHTML(e.reason)}</div>
       </div>
     `).join('');
     content = `<div class="grid-2">${cards}</div>`;
@@ -967,19 +996,19 @@ async function renderProfiles() {
 
   const cards = profiles.map(p => `
     <div class="config-card">
-      <h3>${fmtId(p.id)}</h3>
-      <div class="config-field"><span class="config-field-key">Archetype</span><span class="config-field-value">${fmtId(p.archetype)}</span></div>
-      <div class="config-field"><span class="config-field-key">Debt</span><span class="config-field-value">$${p.debt_amount.toLocaleString()} ${p.debt_type}</span></div>
+      <h3>${escapeHTML(fmtId(p.id))}</h3>
+      <div class="config-field"><span class="config-field-key">Archetype</span><span class="config-field-value">${escapeHTML(fmtId(p.archetype))}</span></div>
+      <div class="config-field"><span class="config-field-key">Debt</span><span class="config-field-value">$${p.debt_amount.toLocaleString()} ${escapeHTML(p.debt_type)}</span></div>
       <div class="config-field"><span class="config-field-key">Age</span><span class="config-field-value">${p.debt_age_days} days</span></div>
       <div class="config-field"><span class="config-field-key">Prior Contacts</span><span class="config-field-value">${p.prior_contact_count}</span></div>
-      <div class="config-field"><span class="config-field-key">Emotional State</span><span class="config-field-value">${fmtId(p.emotional_state)}</span></div>
-      <div class="config-field"><span class="config-field-key">Objection</span><span class="config-field-value">${fmtId(p.primary_objection)}</span></div>
-      <div class="config-field"><span class="config-field-key">Responsiveness</span><span class="config-field-value">${fmtId(p.responsiveness)}</span></div>
-      <div class="config-field"><span class="config-field-key">Demographics</span><span class="config-field-value">${fmtId(p.demographics)}</span></div>
-      ${p.backstory ? `<div class="config-backstory">${p.backstory.trim()}</div>` : ''}
+      <div class="config-field"><span class="config-field-key">Emotional State</span><span class="config-field-value">${escapeHTML(fmtId(p.emotional_state))}</span></div>
+      <div class="config-field"><span class="config-field-key">Objection</span><span class="config-field-value">${escapeHTML(fmtId(p.primary_objection))}</span></div>
+      <div class="config-field"><span class="config-field-key">Responsiveness</span><span class="config-field-value">${escapeHTML(fmtId(p.responsiveness))}</span></div>
+      <div class="config-field"><span class="config-field-key">Demographics</span><span class="config-field-value">${escapeHTML(fmtId(p.demographics))}</span></div>
+      ${p.backstory ? `<div class="config-backstory">${escapeHTML(p.backstory.trim())}</div>` : ''}
       ${p.constraints && p.constraints.length ? `
         <div class="config-constraints">
-          ${p.constraints.map(c => `<div class="config-constraint">${c.text}</div>`).join('')}
+          ${p.constraints.map(c => `<div class="config-constraint">${escapeHTML(c.text)}</div>`).join('')}
         </div>` : ''}
     </div>
   `).join('');
@@ -1000,14 +1029,14 @@ async function renderStrategies() {
 
   const cards = strategies.map(s => `
     <div class="config-card">
-      <h3>${fmtId(s.id)}</h3>
-      <div class="config-field"><span class="config-field-key">Tone</span><span class="config-field-value">${fmtId(s.tone)}</span></div>
-      <div class="config-field"><span class="config-field-key">Opening</span><span class="config-field-value">${fmtId(s.opening_approach)}</span></div>
-      <div class="config-field"><span class="config-field-key">Negotiation</span><span class="config-field-value">${fmtId(s.negotiation_tactic)}</span></div>
-      <div class="config-field"><span class="config-field-key">Escalation</span><span class="config-field-value">${fmtId(s.escalation_style)}</span></div>
-      <div class="config-field"><span class="config-field-key">Concessions</span><span class="config-field-value">${fmtId(s.concession_willingness)}</span></div>
-      <div class="config-field"><span class="config-field-key">Compliance</span><span class="config-field-value">${fmtId(s.compliance_adherence)}</span></div>
-      <div class="config-field"><span class="config-field-key">Follow-up</span><span class="config-field-value">${fmtId(s.follow_up_strategy)}</span></div>
+      <h3>${escapeHTML(fmtId(s.id))}</h3>
+      <div class="config-field"><span class="config-field-key">Tone</span><span class="config-field-value">${escapeHTML(fmtId(s.tone))}</span></div>
+      <div class="config-field"><span class="config-field-key">Opening</span><span class="config-field-value">${escapeHTML(fmtId(s.opening_approach))}</span></div>
+      <div class="config-field"><span class="config-field-key">Negotiation</span><span class="config-field-value">${escapeHTML(fmtId(s.negotiation_tactic))}</span></div>
+      <div class="config-field"><span class="config-field-key">Escalation</span><span class="config-field-value">${escapeHTML(fmtId(s.escalation_style))}</span></div>
+      <div class="config-field"><span class="config-field-key">Concessions</span><span class="config-field-value">${escapeHTML(fmtId(s.concession_willingness))}</span></div>
+      <div class="config-field"><span class="config-field-key">Compliance</span><span class="config-field-value">${escapeHTML(fmtId(s.compliance_adherence))}</span></div>
+      <div class="config-field"><span class="config-field-key">Follow-up</span><span class="config-field-value">${escapeHTML(fmtId(s.follow_up_strategy))}</span></div>
     </div>
   `).join('');
 

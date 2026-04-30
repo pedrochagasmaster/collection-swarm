@@ -188,13 +188,15 @@ def test_connection(ctx: click.Context) -> None:
 @click.pass_context
 def serve(ctx: click.Context, host: str, port: int, auto_reload: bool) -> None:
     """Launch the web dashboard."""
+    if auto_reload:
+        raise click.ClickException("--reload is not supported when serving a configured dashboard app")
     import uvicorn
 
     from collection_swarm.web.app import create_app
 
     app = create_app(config_dir=ctx.obj["config_dir"], db_path=ctx.obj["db_path"])
     console.print(f"Starting dashboard at http://{host}:{port}")
-    uvicorn.run(app, host=host, port=port, reload=auto_reload)
+    uvicorn.run(app, host=host, port=port)
 
 
 @cli.command("seed")

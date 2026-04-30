@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -41,10 +42,10 @@ class SimulationLaunchRequest(BaseModel):
 
 
 class MatrixLaunchRequest(BaseModel):
-    profile_ids: list[str] = Field(default_factory=list)
-    strategy_ids: list[str] = Field(default_factory=list)
-    conversation_models: list[str] = Field(default_factory=list)
-    judge_models: list[str] = Field(default_factory=list)
+    profile_ids: list[str] | None = None
+    strategy_ids: list[str] | None = None
+    conversation_models: list[str] | None = None
+    judge_models: list[str] | None = None
     reps: int = Field(default=1, ge=1, le=100)
     concurrency: int = Field(default=2, ge=1, le=10)
 
@@ -105,6 +106,7 @@ class ManualSession:
     id: str
     result: SimulationResult
     human_role: str
+    lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     status: str = "waiting_for_human"
     message: str = ""
     ended_at: str | None = None
@@ -390,10 +392,14 @@ def create_app(
     @app.post("/api/jobs/matrix")
     async def launch_matrix(payload: MatrixLaunchRequest) -> dict[str, Any]:
         config = _config()
-        profile_ids = payload.profile_ids or list(config.profiles)
-        strategy_ids = payload.strategy_ids or list(config.strategies)
+        profile_ids = payload.profile_ids if payload.profile_ids is not None else list(config.profiles)
+        strategy_ids = payload.strategy_ids if payload.strategy_ids is not None else list(config.strategies)
         conversation_models = payload.conversation_models or [config.default_conversation_model]
         judge_models = payload.judge_models or [config.default_judge_model]
+        if not profile_ids:
+            raise HTTPException(status_code=400, detail="Select at least one profile")
+        if not strategy_ids:
+            raise HTTPException(status_code=400, detail="Select at least one strategy")
         try:
             cells = build_matrix(
                 config,
@@ -470,49 +476,58 @@ def create_app(
         session = app.state.manual_sessions.get(session_id)
         if not session:
             raise HTTPException(status_code=404, detail=f"Manual session '{session_id}' not found")
-        if session.status == "completed":
-            raise HTTPException(status_code=400, detail="Manual session is already completed")
+        async with session.lock:
+            if session.status == "completed":
+                raise HTTPException(status_code=400, detail="Manual session is already completed")
+            if session.status != "waiting_for_human":
+                raise HTTPException(status_code=409, detail=f"Manual session is {session.status}")
 
-        config = _config()
-        settings = config.simulation.conversation
-        content, ended = strip_end_signal(payload.content, settings.end_signal)
-        session.result.transcript.append(Message(role=session.human_role, content=content))
-        session.result.turn_count = len(session.result.transcript)
-        if ended:
-            session.result.ended_by = EndedBy(session.human_role)
-            await _finish_manual_session(session, config, _store())
-            return session.snapshot()
-        if len(session.result.transcript) >= settings.max_turns:
-            session.result.ended_by = EndedBy.TURN_LIMIT
-            await _finish_manual_session(session, config, _store())
-            return session.snapshot()
+            config = _config()
+            settings = config.simulation.conversation
+            content, ended = strip_end_signal(payload.content, settings.end_signal)
+            session.result.transcript.append(Message(role=session.human_role, content=content))
+            session.result.turn_count = len(session.result.transcript)
+            if ended:
+                session.result.ended_by = EndedBy(session.human_role)
+                await _finish_manual_session(session, config, _store())
+                return session.snapshot()
+            if len(session.result.transcript) >= settings.max_turns:
+                session.result.ended_by = EndedBy.TURN_LIMIT
+                await _finish_manual_session(session, config, _store())
+                return session.snapshot()
 
-        ai_role = "debtor" if session.human_role == "collector" else "collector"
-        await _append_ai_turn(session, config, ai_role)
-        if session.result.ended_by or len(session.result.transcript) >= settings.max_turns:
-            session.result.ended_by = session.result.ended_by or EndedBy.TURN_LIMIT
-            await _finish_manual_session(session, config, _store())
-        elif stalemate_detected(
-            session.result.transcript,
-            settings.stalemate_window,
-            settings.stalemate_similarity_threshold,
-        ):
-            session.result.ended_by = EndedBy.STALEMATE
-            await _finish_manual_session(session, config, _store())
-        else:
-            session.status = "waiting_for_human"
-            session.message = f"Waiting for human {session.human_role} turn."
-        return session.snapshot()
+            ai_role = "debtor" if session.human_role == "collector" else "collector"
+            await _append_ai_turn(session, config, ai_role)
+            if session.result.ended_by or len(session.result.transcript) >= settings.max_turns:
+                session.result.ended_by = session.result.ended_by or EndedBy.TURN_LIMIT
+                await _finish_manual_session(session, config, _store())
+            elif stalemate_detected(
+                session.result.transcript,
+                settings.stalemate_window,
+                settings.stalemate_similarity_threshold,
+            ):
+                session.result.ended_by = EndedBy.STALEMATE
+                await _finish_manual_session(session, config, _store())
+            else:
+                session.status = "waiting_for_human"
+                session.message = f"Waiting for human {session.human_role} turn."
+            return session.snapshot()
 
     @app.post("/api/manual-sessions/{session_id}/finish")
     async def finish_manual_session(session_id: str) -> dict[str, Any]:
         session = app.state.manual_sessions.get(session_id)
         if not session:
             raise HTTPException(status_code=404, detail=f"Manual session '{session_id}' not found")
-        if session.status != "completed":
+        async with session.lock:
+            if session.status == "completed":
+                return session.snapshot()
+            if session.status != "waiting_for_human":
+                raise HTTPException(status_code=409, detail=f"Manual session is {session.status}")
+            if not session.result.transcript:
+                raise HTTPException(status_code=400, detail="Manual session has no turns to judge")
             session.result.ended_by = session.result.ended_by or EndedBy.TURN_LIMIT
             await _finish_manual_session(session, _config(), _store())
-        return session.snapshot()
+            return session.snapshot()
 
     # ── SPA entry point ─────────────────────────────────────────────
 
@@ -522,6 +537,14 @@ def create_app(
         return index_path.read_text(encoding="utf-8")
 
     return app
+
+
+def create_app_from_env() -> FastAPI:
+    """Factory used by uvicorn reload, which requires an import string."""
+    return create_app(
+        config_dir=Path(os.environ.get("COLLECTION_SWARM_CONFIG_DIR", "config")),
+        db_path=Path(os.environ.get("COLLECTION_SWARM_DB_PATH", "output/collection_swarm.sqlite")),
+    )
 
 
 def _validate_run_choices(
@@ -549,24 +572,29 @@ async def _run_single_job(
     conversation_model: str,
     judge_model: str,
 ) -> None:
-    job.status = "running"
-    job.message = "Simulation running."
-    engine = _make_engine(config, conversation_model, judge_model)
+    try:
+        job.status = "running"
+        job.message = "Simulation running."
+        engine = _make_engine(config, conversation_model, judge_model)
 
-    async def on_progress(result: SimulationResult) -> None:
-        result.turn_count = len(result.transcript)
-        job.current_run = result.model_copy(update={"status": "running" if result.ended_at is None else result.status})
-        job.message = f"{result.turn_count} turn{'s' if result.turn_count != 1 else ''} recorded."
+        async def on_progress(result: SimulationResult) -> None:
+            result.turn_count = len(result.transcript)
+            job.current_run = result.model_copy(update={"status": "running" if result.ended_at is None else result.status})
+            job.message = f"{result.turn_count} turn{'s' if result.turn_count != 1 else ''} recorded."
 
-    result = await engine.run_simulation(config.profile(profile_id), config.strategy(strategy_id), on_progress=on_progress)
-    store.save_run(result)
-    job.current_run = result
-    job.result_ids = [result.id]
-    job.completed = 1 if result.status == "completed" else 0
-    job.failed = 1 if result.status == "failed" else 0
-    job.status = "completed" if result.status == "completed" else "failed"
-    job.message = "Simulation completed." if result.status == "completed" else result.error_message or "Simulation failed."
-    job.ended_at = utc_now().isoformat()
+        result = await engine.run_simulation(config.profile(profile_id), config.strategy(strategy_id), on_progress=on_progress)
+        store.save_run(result)
+        job.current_run = result
+        job.result_ids = [result.id]
+        job.completed = 1 if result.status == "completed" else 0
+        job.failed = 1 if result.status == "failed" else 0
+        job.status = "completed" if result.status == "completed" else "failed"
+        job.message = "Simulation completed." if result.status == "completed" else result.error_message or "Simulation failed."
+        job.ended_at = utc_now().isoformat()
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        _fail_job(job, exc)
 
 
 async def _run_matrix_job(
@@ -576,38 +604,59 @@ async def _run_matrix_job(
     cells: list[MatrixCell],
     concurrency: int,
 ) -> None:
-    job.status = "running"
-    job.message = "Matrix run in progress."
-    semaphore = asyncio.Semaphore(concurrency)
-    lock = asyncio.Lock()
+    try:
+        job.status = "running"
+        job.message = "Matrix run in progress."
+        semaphore = asyncio.Semaphore(concurrency)
+        lock = asyncio.Lock()
 
-    async def run_cell(cell: MatrixCell) -> None:
-        async with semaphore:
-            engine = _make_engine(config, cell.conversation_model, cell.judge_model)
+        async def run_cell(cell: MatrixCell) -> None:
+            async with semaphore:
+                try:
+                    engine = _make_engine(config, cell.conversation_model, cell.judge_model)
 
-            async def on_progress(result: SimulationResult) -> None:
-                result.turn_count = len(result.transcript)
-                async with lock:
-                    job.current_run = result.model_copy(
-                        update={"status": "running" if result.ended_at is None else result.status}
-                    )
-                    job.message = f"Running {cell.profile_id} x {cell.strategy_id}; {job.completed + job.failed}/{job.total} finished."
+                    async def on_progress(result: SimulationResult) -> None:
+                        result.turn_count = len(result.transcript)
+                        async with lock:
+                            job.current_run = result.model_copy(
+                                update={"status": "running" if result.ended_at is None else result.status}
+                            )
+                            job.message = f"Running {cell.profile_id} x {cell.strategy_id}; {job.completed + job.failed}/{job.total} finished."
 
-            result = await engine.run_simulation(config.profile(cell.profile_id), config.strategy(cell.strategy_id), on_progress=on_progress)
-            store.save_run(result)
-            async with lock:
-                job.result_ids.append(result.id)
-                if result.status == "completed":
-                    job.completed += 1
-                else:
-                    job.failed += 1
-                    job.errors.append(result.error_message or f"{result.id} failed")
-                job.current_run = result
-                job.message = f"{job.completed + job.failed}/{job.total} simulations finished."
+                    result = await engine.run_simulation(config.profile(cell.profile_id), config.strategy(cell.strategy_id), on_progress=on_progress)
+                    store.save_run(result)
+                    async with lock:
+                        job.result_ids.append(result.id)
+                        if result.status == "completed":
+                            job.completed += 1
+                        else:
+                            job.failed += 1
+                            job.errors.append(result.error_message or f"{result.id} failed")
+                        job.current_run = result
+                        job.message = f"{job.completed + job.failed}/{job.total} simulations finished."
+                except asyncio.CancelledError:
+                    raise
+                except Exception as exc:
+                    async with lock:
+                        job.failed += 1
+                        job.errors.append(f"{cell.profile_id} x {cell.strategy_id}: {exc}")
+                        job.message = f"{job.completed + job.failed}/{job.total} simulations finished."
 
-    await asyncio.gather(*(run_cell(cell) for cell in cells))
-    job.status = "completed" if job.failed == 0 else "failed"
-    job.message = f"Matrix finished: {job.completed} completed, {job.failed} failed."
+        await asyncio.gather(*(run_cell(cell) for cell in cells))
+        job.status = "completed" if job.failed == 0 else "failed"
+        job.message = f"Matrix finished: {job.completed} completed, {job.failed} failed."
+        job.ended_at = utc_now().isoformat()
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        _fail_job(job, exc)
+
+
+def _fail_job(job: WebRunJob, exc: Exception) -> None:
+    job.status = "failed"
+    job.failed = job.failed or max(1, job.total - job.completed)
+    job.errors.append(str(exc))
+    job.message = str(exc) or "Job failed."
     job.ended_at = utc_now().isoformat()
 
 
