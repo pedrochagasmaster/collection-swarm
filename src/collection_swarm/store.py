@@ -214,21 +214,32 @@ class SimulationStore:
             rows = connection.execute("SELECT status, COUNT(*) AS count FROM runs GROUP BY status").fetchall()
         return {str(row["status"]): int(row["count"]) for row in rows}
 
-    def get_combo_runs(self, profile_id: str, strategy_id: str) -> list[SimulationResult]:
-        with self._connect() as connection:
-            rows = connection.execute(
-                """
+    def get_combo_runs(
+        self,
+        profile_id: str,
+        strategy_id: str,
+        conversation_model: str | None = None,
+        judge_model: str | None = None,
+    ) -> list[SimulationResult]:
+        sql = """
                 SELECT * FROM runs
                 WHERE status = 'completed' AND profile_id = ? AND strategy_id = ?
-                ORDER BY compliance_score ASC, escalation_risk DESC, started_at DESC
-                """,
-                (profile_id, strategy_id),
-            ).fetchall()
+                """
+        params: list[Any] = [profile_id, strategy_id]
+        if conversation_model:
+            sql += " AND conversation_model = ?"
+            params.append(conversation_model)
+        if judge_model:
+            sql += " AND judge_model = ?"
+            params.append(judge_model)
+        sql += " ORDER BY compliance_score ASC, escalation_risk DESC, started_at DESC"
+        with self._connect() as connection:
+            rows = connection.execute(sql, tuple(params)).fetchall()
         return [_result_from_row(row) for row in rows]
 
     def get_performance_by(self, dimension: str) -> dict[str, dict[str, float]]:
-        if dimension not in {"profile_id", "strategy_id"}:
-            raise ValueError("dimension must be profile_id or strategy_id")
+        if dimension not in {"profile_id", "strategy_id", "conversation_model", "judge_model"}:
+            raise ValueError("unsupported performance dimension")
         with self._connect() as connection:
             rows = connection.execute(
                 f"""

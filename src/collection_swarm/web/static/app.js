@@ -366,6 +366,15 @@ function advancedModelSettings(prefix, conversationOpts, judgeOpts, conversation
     </details>`;
 }
 
+function modelLabel(model) {
+  if (!model) return '';
+  return `${model.id}${model.provider ? ` (${model.provider})` : ''}`;
+}
+
+function modelShortLabel(id) {
+  return String(id || '').replace(/^cursor-/, '').replace(/^nim-/, '');
+}
+
 function linkButton(label, onclick, extraClass = '') {
   return `<button class="btn ${extraClass}" type="button" onclick="${escapeAttr(onclick)}">${escapeHTML(label)}</button>`;
 }
@@ -436,6 +445,7 @@ async function renderPage(page, params = {}) {
       case 'manual': await renderManual(params); break;
       case 'playbook': await renderPlaybook(); break;
       case 'compliance': await renderCompliance(); break;
+      case 'benchmarks': await renderBenchmarks(); break;
       case 'profiles': await renderProfiles(); break;
       case 'strategies': await renderStrategies(); break;
       default: mainEl.innerHTML = emptyState('Not Found', 'Page not found.');
@@ -773,7 +783,7 @@ window.filterRuns = function() {
   if (!tbody) return;
 
   if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="10">${emptyState('No Runs', 'No simulations match the current filters.')}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="12">${emptyState('No Runs', 'No simulations match the current filters.')}</td></tr>`;
     return;
   }
 
@@ -785,6 +795,8 @@ window.filterRuns = function() {
         <td>${statusBadge(r.status)}</td>
         <td>${escapeHTML(fmtId(r.profile_id))}</td>
         <td>${escapeHTML(fmtId(r.strategy_id))}</td>
+        <td>${escapeHTML(r.conversation_model)}</td>
+        <td>${escapeHTML(r.judge_model)}</td>
         <td>${j ? outcomeBadge(j.payment_outcome) : '\u2014'}</td>
         <td class="${j ? scoreClass(j.payment_probability) : ''}">${j ? pct(j.payment_probability) : '\u2014'}</td>
         <td class="${j ? scoreClass(j.compliance_score) : ''}">${j ? pct(j.compliance_score) : '\u2014'}</td>
@@ -859,6 +871,8 @@ function sortValue(run, column) {
     status: run.status,
     profile_id: fmtId(run.profile_id),
     strategy_id: fmtId(run.strategy_id),
+    conversation_model: run.conversation_model || '',
+    judge_model: run.judge_model || '',
     payment_outcome: judgment.payment_outcome || '',
     payment_probability: Number(judgment.payment_probability || 0),
     compliance_score: Number(judgment.compliance_score || 0),
@@ -894,6 +908,8 @@ function renderRunHeaders() {
     ['Status', 'status'],
     ['Profile', 'profile_id'],
     ['Strategy', 'strategy_id'],
+    ['Conversation Model', 'conversation_model'],
+    ['Judge Model', 'judge_model'],
     ['Outcome', 'payment_outcome'],
     ['Payment', 'payment_probability'],
     ['Compliance', 'compliance_score'],
@@ -905,7 +921,7 @@ function renderRunHeaders() {
 
 function exportRunsCSV() {
   const rows = window._filteredRuns || [];
-  const headers = ['id', 'status', 'profile_id', 'strategy_id', 'outcome', 'payment_probability', 'compliance_score', 'debtor_satisfaction', 'escalation_risk', 'turn_count', 'ended_by', 'started_at'];
+  const headers = ['id', 'status', 'profile_id', 'strategy_id', 'conversation_model', 'judge_model', 'outcome', 'payment_probability', 'compliance_score', 'debtor_satisfaction', 'escalation_risk', 'turn_count', 'ended_by', 'started_at'];
   const csvRows = [headers.join(',')].concat(rows.map(run => {
     const j = run.judgment || {};
     return [
@@ -913,6 +929,8 @@ function exportRunsCSV() {
       run.status,
       run.profile_id,
       run.strategy_id,
+      run.conversation_model,
+      run.judge_model,
       j.payment_outcome || '',
       j.payment_probability ?? '',
       j.compliance_score ?? '',
@@ -1018,14 +1036,22 @@ async function renderMatrix(params = {}) {
   const [options, jobs] = await Promise.all([api('/config/run-options'), api('/jobs')]);
   const profiles = checkboxList('matrix-profiles', options.profiles.map(p => [p.id, fmtId(p.id)]), params.profile ? [params.profile] : null);
   const strategies = checkboxList('matrix-strategies', options.strategies.map(s => [s.id, fmtId(s.id)]));
-  const conversationOpts = modelSelectOptions(options.conversation_models, options.defaults.conversation_model);
-  const judgeOpts = modelSelectOptions(options.judge_models, options.defaults.judge_model);
+  const conversationModels = checkboxList(
+    'matrix-conversation-models',
+    options.conversation_models.map(m => [m.id, modelLabel(m)]),
+    [options.defaults.conversation_model]
+  );
+  const judgeModels = checkboxList(
+    'matrix-judge-models',
+    options.judge_models.map(m => [m.id, modelLabel(m)]),
+    [options.defaults.judge_model]
+  );
 
   window._runOptions = options;
   mainEl.innerHTML = `
     <div class="page-header">
       <h1>Batch Comparison</h1>
-      <p>Compare strategy performance across selected debtor profiles.</p>
+      <p>Compare strategies, debtor profiles, conversation models, and judge models in one run.</p>
     </div>
     <div class="grid-2">
       <div class="card">
@@ -1034,7 +1060,8 @@ async function renderMatrix(params = {}) {
           <form class="control-form" onsubmit="startMatrixRun(event)">
             <div class="form-field"><label>Profiles</label><div class="checkbox-grid" onchange="updateMatrixCount()">${profiles}</div></div>
             <div class="form-field"><label>Strategies</label><div class="checkbox-grid" onchange="updateMatrixCount()">${strategies}</div></div>
-            ${advancedModelSettings('matrix', conversationOpts, judgeOpts)}
+            <div class="form-field"><label>Conversation models</label><p class="field-summary">Each checked model role-plays both collector and debtor.</p><div class="checkbox-grid model-grid">${conversationModels}</div></div>
+            <div class="form-field"><label>Judge models</label><p class="field-summary">Each checked judge scores every generated transcript.</p><div class="checkbox-grid model-grid">${judgeModels}</div></div>
             <div class="btn-row">
               ${inputField('matrix-reps', 'Reps', options.defaults.reps || 1, 1, 100, "updateMatrixCount()")}
               ${inputField('matrix-concurrency', 'Concurrency', 2, 1, 10)}
@@ -1066,8 +1093,8 @@ window.startMatrixRun = async function(event) {
     const job = await apiPost('/jobs/matrix', {
       profile_ids: checkedValues('matrix-profiles'),
       strategy_ids: checkedValues('matrix-strategies'),
-      conversation_models: [$('#matrix-conversation-model').value],
-      judge_models: [$('#matrix-judge-model').value],
+      conversation_models: checkedValues('matrix-conversation-models'),
+      judge_models: checkedValues('matrix-judge-models'),
       reps: Number($('#matrix-reps').value || 1),
       concurrency: Number($('#matrix-concurrency').value || 1),
     });
@@ -1229,6 +1256,20 @@ function checkboxList(name, entries, selected = null) {
     </label>`).join('');
 }
 
+function modelDimensionSummary(conversationModels, judgeModels) {
+  const conversation = conversationModels.length === 1 ? conversationModels[0] : `${conversationModels.length} conversation models`;
+  const judge = judgeModels.length === 1 ? judgeModels[0] : `${judgeModels.length} judge models`;
+  return `${conversation} x ${judge}`;
+}
+
+function benchmarkCheckboxList(name, entries, selected = null) {
+  return entries.map(([value, label]) => `
+    <label class="check-option">
+      <input type="checkbox" name="${escapeAttr(name)}" value="${escapeAttr(value)}" ${selected && !selected.includes(value) ? '' : 'checked'} onchange="updateBenchmarkCount()">
+      <span>${escapeHTML(label)}</span>
+    </label>`).join('');
+}
+
 function updateCheckboxSelection(name, selected) {
   $$(`input[name="${name}"]`).forEach(input => {
     input.checked = !selected || selected.includes(input.value);
@@ -1238,12 +1279,24 @@ function updateCheckboxSelection(name, selected) {
 window.updateMatrixCount = function() {
   const profiles = checkedValues('matrix-profiles').length;
   const strategies = checkedValues('matrix-strategies').length;
+  const conversationModels = checkedValues('matrix-conversation-models').length;
+  const judgeModels = checkedValues('matrix-judge-models').length;
   const reps = Number(($('#matrix-reps') || {}).value || 1);
-  const total = profiles * strategies * reps;
+  const total = profiles * strategies * conversationModels * judgeModels * reps;
   const el = $('#matrix-count');
   if (!el) return;
   el.classList.toggle('warning', total > 50);
-  el.textContent = `${profiles} profiles x ${strategies} strategies x ${reps} reps = ${total} total simulations${total > 50 ? '. Large batches take longer and cost more.' : ''}`;
+  el.textContent = `${profiles} profiles x ${strategies} strategies x ${conversationModels} conversation models x ${judgeModels} judge models x ${reps} reps = ${total} total simulations${total > 50 ? '. Large batches take longer and cost more.' : ''}`;
+};
+
+window.updateBenchmarkCount = function() {
+  const models = checkedValues('benchmark-models').length;
+  const roles = checkedValues('benchmark-roles').length;
+  const total = models * roles;
+  const el = $('#benchmark-count');
+  if (!el) return;
+  el.classList.toggle('warning', total > 36);
+  el.textContent = `${models} models x ${roles} roles = ${total} live probes${total > 36 ? '. This is a production-sized benchmark and can take several minutes.' : ''}`;
 };
 
 function checkedValues(name) {
@@ -1320,10 +1373,12 @@ function renderJobPanel(job, panel) {
 
 window.cancelJob = async function(jobId) {
   const job = await apiPost(`/jobs/${pathPart(jobId)}/cancel`, {});
-  const panels = ['single-job-panel', 'matrix-job-panel'];
+  const panels = ['single-job-panel', 'matrix-job-panel', 'benchmark-job-panel'];
   panels.forEach(id => {
     const panel = $(`#${id}`);
-    if (panel) renderJobPanel(job, panel);
+    if (!panel) return;
+    if (id === 'benchmark-job-panel') renderBenchmarkJobPanel(job, panel);
+    else renderJobPanel(job, panel);
   });
 };
 
@@ -1401,7 +1456,8 @@ function runMetaHTML(run) {
   return `
       <div class="meta-tags">
         <span class="meta-tag"><strong>Status:</strong> ${escapeHTML(run.status)}</span>
-        <span class="meta-tag"><strong>Model:</strong> ${escapeHTML(run.conversation_model)}</span>
+        <span class="meta-tag"><strong>Conversation model:</strong> ${escapeHTML(run.conversation_model)}</span>
+        <span class="meta-tag"><strong>Judge model:</strong> ${escapeHTML(run.judge_model)}</span>
         <span class="meta-tag"><strong>Turns:</strong> ${run.turn_count}</span>
         <span class="meta-tag"><strong>Ended by:</strong> ${run.ended_by ? escapeHTML(fmtId(run.ended_by)) : '\u2014'}</span>
         <span class="meta-tag"><strong>Tokens:</strong> ${fmtNum(run.total_input_tokens + run.total_output_tokens)}</span>
@@ -1515,6 +1571,287 @@ window.copyPlaybook = async function() {
   showToast('Playbook copied', 'success');
 };
 
+// ── Model benchmarks ─────────────────────────────────────────────
+
+async function renderBenchmarks() {
+  const [options, jobs, reports] = await Promise.all([
+    api('/model-benchmarks/options'),
+    api('/jobs'),
+    api('/model-benchmarks'),
+  ]);
+  const defaults = options.defaults || {};
+  const selectedModels = options.default_cursor_models || [];
+  const modelEntries = (options.cursor_models || []).map(model => [model, model]);
+  const roleEntries = (options.roles || []).map(role => [role, fmtId(role)]);
+  const profileOpts = runSelectOptions(options.profiles || [], defaults.profile_id);
+  const judgeProfileOpts = runSelectOptions(options.profiles || [], defaults.judge_profile_id);
+  const strategyOpts = runSelectOptions(options.strategies || [], defaults.strategy_id);
+  const benchmarkJobs = jobs.filter(job => job.kind === 'model_benchmark');
+
+  mainEl.innerHTML = `
+    <div class="page-header page-header-actions">
+      <div>
+        <h1>Model Benchmarks</h1>
+        <p>Run live Cursor SDK probes for Collector, Debtor, and Judge roles, then inspect recommendations and schema risks.</p>
+      </div>
+      <button class="btn" type="button" onclick="loadLatestBenchmark()">Load latest result</button>
+    </div>
+
+    <section class="benchmark-hero" aria-label="Benchmark recommendation summary">
+      <div>
+        <p class="eyebrow">Production evaluation</p>
+        <h2>Find the model mix that can safely drive Collection Swarm.</h2>
+        <p>Collector and Debtor probes measure role-play quality. Judge probes are weighted for parseability because malformed Judgments corrupt saved metrics and playbook rankings.</p>
+      </div>
+      <div class="benchmark-hero-metrics">
+        <div><strong>${fmtNum(modelEntries.length)}</strong><span>Available SDK models</span></div>
+        <div><strong>3</strong><span>Production roles</span></div>
+        <div><strong>${fmtNum(selectedModels.length * 3)}</strong><span>Default probes</span></div>
+      </div>
+    </section>
+
+    <div class="grid-2 benchmark-layout">
+      <div class="card">
+        <div class="card-header"><h2>Benchmark Setup</h2></div>
+        <div class="card-body">
+          <form class="control-form" onsubmit="startModelBenchmark(event)">
+            <div class="form-field">
+              <label>Cursor SDK models</label>
+              <div class="checkbox-grid benchmark-model-grid">${benchmarkCheckboxList('benchmark-models', modelEntries, selectedModels)}</div>
+            </div>
+            <div class="form-field">
+              <label>Roles</label>
+              <div class="checkbox-grid benchmark-role-grid">${benchmarkCheckboxList('benchmark-roles', roleEntries, options.roles || ['collector', 'debtor', 'judge'])}</div>
+            </div>
+            ${selectField('benchmark-profile', 'Collector and Debtor profile', profileOpts)}
+            ${selectField('benchmark-strategy', 'Collector strategy', strategyOpts)}
+            ${selectField('benchmark-judge-profile', 'Judge scenario profile', judgeProfileOpts)}
+            ${inputField('benchmark-concurrency', 'Concurrency', defaults.concurrency || 1, 1, 4)}
+            <div class="matrix-count" id="benchmark-count" aria-live="polite"></div>
+            <div class="btn-row">
+              <button class="btn btn-primary" type="submit" id="benchmark-btn">Run benchmark</button>
+              <button class="btn" type="button" onclick="selectProductionBenchmarkModels()">Production set</button>
+              <button class="btn" type="button" onclick="selectAllBenchmarkModels()">Select all</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h2>Progress</h2><div id="benchmark-job-status">${statusBadge('queued')}</div></div>
+        <div class="card-body" id="benchmark-job-panel">
+          ${benchmarkJobs.length ? benchmarkJobs.map(job => benchmarkJobSummaryHTML(job)).join('') : emptyState('Ready', 'Start a benchmark to see live progress and recommendations.')}
+        </div>
+      </div>
+    </div>
+
+    <section class="card benchmark-results-card">
+      <div class="card-header"><h2>Results</h2><div id="benchmark-result-status">${reports.length ? statusBadge('completed') : statusBadge('queued')}</div></div>
+      <div class="card-body" id="benchmark-results">
+        ${reports.length ? benchmarkReportListHTML(reports) : emptyState('No benchmark results', 'Completed benchmark recommendations will appear here.')}
+      </div>
+    </section>
+  `;
+  updateBenchmarkCount();
+}
+
+window.selectProductionBenchmarkModels = function() {
+  const selected = new Set(['composer-2', 'gpt-5.5', 'gpt-5.4', 'gpt-5.3-codex', 'claude-sonnet-4-6', 'claude-opus-4-7', 'gemini-3.1-pro', 'gpt-5.4-mini', 'claude-haiku-4-5']);
+  $$('input[name="benchmark-models"]').forEach(input => { input.checked = selected.has(input.value); });
+  updateBenchmarkCount();
+};
+
+window.selectAllBenchmarkModels = function() {
+  $$('input[name="benchmark-models"]').forEach(input => { input.checked = true; });
+  updateBenchmarkCount();
+};
+
+window.startModelBenchmark = async function(event) {
+  event.preventDefault();
+  clearPoll('benchmark');
+  const panel = $('#benchmark-job-panel');
+  const status = $('#benchmark-job-status');
+  const btn = $('#benchmark-btn');
+  panel.innerHTML = skeleton();
+  if (btn) { btn.classList.add('btn-loading'); btn.disabled = true; }
+  try {
+    const job = await apiPost('/jobs/model-benchmarks', {
+      cursor_model_names: checkedValues('benchmark-models'),
+      roles: checkedValues('benchmark-roles'),
+      profile_id: $('#benchmark-profile').value,
+      strategy_id: $('#benchmark-strategy').value,
+      judge_profile_id: $('#benchmark-judge-profile').value,
+      concurrency: Number($('#benchmark-concurrency').value || 1),
+    });
+    status.innerHTML = statusBadge(job.status);
+    renderBenchmarkJobPanel(job, panel);
+    showToast('Benchmark started', 'success');
+    window._pollers.benchmark = setInterval(() => pollBenchmarkJob(job.id), 1200);
+  } catch (err) {
+    panel.innerHTML = emptyState('Benchmark failed', err.message);
+    showToast(err.message, 'error');
+  } finally {
+    if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; }
+  }
+};
+
+async function pollBenchmarkJob(jobId) {
+  try {
+    const job = await api(`/jobs/${pathPart(jobId)}`);
+    const panel = $('#benchmark-job-panel');
+    const status = $('#benchmark-job-status');
+    if (status) status.innerHTML = statusBadge(job.status);
+    if (panel) renderBenchmarkJobPanel(job, panel);
+    if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') {
+      clearPoll('benchmark');
+      if (job.benchmark_report) renderBenchmarkReport(job.benchmark_report, job);
+      if (job.status === 'completed') showToast('Benchmark completed', 'success');
+      if (job.status === 'failed') showToast('Benchmark failed', 'error');
+    }
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+function renderBenchmarkJobPanel(job, panel) {
+  const canCancel = job.status === 'queued' || job.status === 'running';
+  panel.innerHTML = `
+    <div class="status-card">
+      <div class="job-item-head">
+        <div>
+          <div class="mono-id">${escapeHTML(job.id)}</div>
+          <div class="status-line">${escapeHTML(job.message || '')}</div>
+        </div>
+        ${statusBadge(job.status)}
+      </div>
+      ${progressHTML(job.completed, job.failed, job.total)}
+      ${canCancel ? `<button class="btn btn-danger" type="button" onclick="cancelJob(${jsArg(job.id)})">Cancel benchmark</button>` : ''}
+      ${job.benchmark_report ? benchmarkRecommendationHTML(job.benchmark_report, job) : ''}
+      ${(job.errors || []).length ? `<div class="form-error">${job.errors.map(escapeHTML).join('<br>')}</div>` : ''}
+    </div>`;
+}
+
+function benchmarkJobSummaryHTML(job) {
+  return `
+    <button class="job-item" type="button" onclick="showBenchmarkJob(${jsArg(job.id)})">
+      <span style="font-size:var(--text-sm)">${escapeHTML(job.id)}</span>
+      <span>${statusBadge(job.status)}</span>
+      <span style="font-size:var(--text-xs);color:var(--text-secondary)">${job.completed + job.failed} of ${job.total}</span>
+    </button>`;
+}
+
+window.showBenchmarkJob = async function(jobId) {
+  const job = await api(`/jobs/${pathPart(jobId)}`);
+  const panel = $('#benchmark-job-panel');
+  const status = $('#benchmark-job-status');
+  if (status) status.innerHTML = statusBadge(job.status);
+  if (panel) renderBenchmarkJobPanel(job, panel);
+  if (job.benchmark_report) renderBenchmarkReport(job.benchmark_report, job);
+};
+
+window.loadLatestBenchmark = async function() {
+  const reports = await api('/model-benchmarks');
+  const container = $('#benchmark-results');
+  if (!reports.length) {
+    if (container) container.innerHTML = emptyState('No benchmark results', 'Run a benchmark first.');
+    return;
+  }
+  const report = await api(`/model-benchmarks/${pathPart(reports[0].job_id)}`);
+  renderBenchmarkReport(report, { id: reports[0].job_id, artifacts: {} });
+};
+
+function benchmarkReportListHTML(reports) {
+  return `
+    <div class="benchmark-report-list">
+      ${reports.map(report => `
+        <button class="job-item" type="button" onclick="loadBenchmarkReport(${jsArg(report.job_id)})">
+          <span>${escapeHTML(report.title || 'Benchmark')}</span>
+          <span>${statusBadge('completed')}</span>
+          <span style="font-size:var(--text-xs);color:var(--text-secondary)">${fmtNum(report.probe_count || 0)} probes · ${relTime(report.generated_at)}</span>
+        </button>
+      `).join('')}
+    </div>`;
+}
+
+window.loadBenchmarkReport = async function(jobId) {
+  const report = await api(`/model-benchmarks/${pathPart(jobId)}`);
+  renderBenchmarkReport(report, { id: jobId, artifacts: {} });
+};
+
+function renderBenchmarkReport(report, job = {}) {
+  const container = $('#benchmark-results');
+  const status = $('#benchmark-result-status');
+  if (status) status.innerHTML = statusBadge('completed');
+  if (!container) return;
+  container.innerHTML = `
+    ${benchmarkRecommendationHTML(report, job)}
+    <div class="benchmark-role-sections">
+      ${['collector', 'debtor', 'judge'].map(role => benchmarkRoleTableHTML(report, role)).join('')}
+    </div>`;
+}
+
+function benchmarkRecommendationHTML(report, job = {}) {
+  const recs = report.recommendations || {};
+  const probes = report.probes || [];
+  const failed = probes.filter(probe => probe.status !== 'ok').length;
+  const artifacts = job.artifacts || {};
+  return `
+    <div class="benchmark-summary">
+      <div class="benchmark-recommendations">
+        ${['collector', 'debtor', 'judge'].map(role => `
+          <div class="benchmark-rec">
+            <span>${escapeHTML(fmtId(role))}</span>
+            <strong>${escapeHTML(recs[role] || 'n/a')}</strong>
+          </div>`).join('')}
+      </div>
+      <div class="benchmark-meta">
+        <span>${fmtNum(probes.length)} probes</span>
+        <span>${fmtNum(failed)} failed</span>
+        <span>${escapeHTML(relTime(report.generated_at))}</span>
+      </div>
+      ${artifacts.markdown || artifacts.json ? `
+        <div class="artifact-list">
+          ${artifacts.markdown ? `<span>Markdown: <code>${escapeHTML(artifacts.markdown)}</code></span>` : ''}
+          ${artifacts.json ? `<span>JSON: <code>${escapeHTML(artifacts.json)}</code></span>` : ''}
+        </div>` : ''}
+    </div>`;
+}
+
+function benchmarkRoleTableHTML(report, role) {
+  const rows = (report.assessments || [])
+    .filter(item => item.role === role)
+    .sort((a, b) => (b.score - a.score) || a.model_name.localeCompare(b.model_name));
+  return `
+    <section class="benchmark-role-card">
+      <div class="benchmark-role-head">
+        <h3>${escapeHTML(fmtId(role))}</h3>
+        <span class="badge badge-info">${rows.length} models</span>
+      </div>
+      <div class="benchmark-table-wrap">
+        <table class="data-table benchmark-table">
+          <thead><tr><th>Model</th><th>Score</th><th>Fit</th><th>Evidence</th><th>Caution</th></tr></thead>
+          <tbody>
+            ${rows.map(row => `
+              <tr>
+                <td>${escapeHTML(row.model_name)}</td>
+                <td><span class="benchmark-score ${benchmarkScoreClass(row.score)}">${escapeHTML(row.score)}/10</span></td>
+                <td>${escapeHTML(row.fit)}</td>
+                <td>${escapeHTML(row.evidence)}</td>
+                <td>${escapeHTML(row.caution)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </section>`;
+}
+
+function benchmarkScoreClass(score) {
+  score = Number(score) || 0;
+  if (score >= 9) return 'score-good';
+  if (score >= 6) return 'score-mid';
+  return 'score-bad';
+}
+
 function downloadText(filename, text, type) {
   const blob = new Blob([text], { type });
   const url = URL.createObjectURL(blob);
@@ -1564,7 +1901,8 @@ async function renderCompliance() {
             <span class="threshold-line">Max ${pct(thresholds.max_escalation_risk || 0)}</span>
           </div>
         </div>
-        <p class="status-line">Based on ${fmtNum(e.simulation_count || 0)} simulations</p>
+        <p class="status-line">Based on ${fmtNum(e.simulation_count || 0)} simulations across ${(e.models || []).length || 1} model pairing${((e.models || []).length || 1) !== 1 ? 's' : ''}</p>
+        ${(e.models || []).length ? `<div class="model-pairings">${e.models.map(model => `<span>${escapeHTML(model.conversation_model)} + ${escapeHTML(model.judge_model)}</span>`).join('')}</div>` : ''}
         ${(e.run_ids || []).length ? `<div class="evidence-links">${e.run_ids.map(id => `<button class="text-link" type="button" onclick="openTranscript(${jsArg(id)})">View evidence ${escapeHTML(id)}</button>`).join('')}</div>` : ''}
         <div class="exclusion-detail">${escapeHTML(e.reason)}</div>
       </div>

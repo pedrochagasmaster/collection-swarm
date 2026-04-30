@@ -27,6 +27,15 @@ from collection_swarm.backends.base import LLMResponse
 from collection_swarm.backends.router import LLMRouter
 from collection_swarm.config import load_app_config
 from collection_swarm.engine import SimulationEngine, stalemate_detected, strip_end_signal
+from collection_swarm.model_evaluation import (
+    DEFAULT_CURSOR_PROBE_MODELS,
+    DEFAULT_CURSOR_SDK_MODEL_IDS,
+    ProbeScenario,
+    build_model_role_report,
+    report_to_dict,
+    run_live_role_probes,
+    write_report,
+)
 from collection_swarm.models import EndedBy, MatrixCell, Message, SimulationResult, model_dump_jsonable, utc_now
 from collection_swarm.runner import build_matrix
 from collection_swarm.store import SimulationStore
@@ -48,6 +57,27 @@ class MatrixLaunchRequest(BaseModel):
     judge_models: list[str] | None = None
     reps: int = Field(default=1, ge=1, le=100)
     concurrency: int = Field(default=2, ge=1, le=10)
+
+
+class BenchmarkLaunchRequest(BaseModel):
+    cursor_model_names: list[str] | None = None
+    roles: list[str] = Field(default_factory=lambda: ["collector", "debtor", "judge"])
+    profile_id: str = "cooperative_hardship"
+    strategy_id: str = "empathetic_payment_plan"
+    judge_profile_id: str = "written_proof_disputer"
+    concurrency: int = Field(default=1, ge=1, le=4)
+
+    @field_validator("roles")
+    @classmethod
+    def validate_roles(cls, value: list[str]) -> list[str]:
+        valid = {"collector", "debtor", "judge"}
+        roles = [role.lower().strip() for role in value if role.strip()]
+        invalid = [role for role in roles if role not in valid]
+        if invalid:
+            raise ValueError(f"unknown benchmark role(s): {', '.join(invalid)}")
+        if not roles:
+            raise ValueError("select at least one benchmark role")
+        return roles
 
 
 class ManualSessionRequest(BaseModel):
@@ -80,6 +110,8 @@ class WebRunJob:
     current_run: SimulationResult | None = None
     result_ids: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
+    artifacts: dict[str, str] = field(default_factory=dict)
+    benchmark_report: dict[str, Any] | None = None
     message: str = ""
     started_at: str = field(default_factory=lambda: utc_now().isoformat())
     ended_at: str | None = None
@@ -95,6 +127,8 @@ class WebRunJob:
             "current_run": model_dump_jsonable(self.current_run) if self.current_run else None,
             "result_ids": self.result_ids,
             "errors": self.errors[-5:],
+            "artifacts": self.artifacts,
+            "benchmark_report": self.benchmark_report,
             "message": self.message,
             "started_at": self.started_at,
             "ended_at": self.ended_at,
@@ -136,6 +170,7 @@ def create_app(
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
     app.state.jobs = {}
     app.state.manual_sessions = {}
+    app.state.benchmark_reports = {}
     app.state.tasks = {}
 
     def _store() -> SimulationStore:
@@ -143,6 +178,9 @@ def create_app(
 
     def _config():
         return load_app_config(config_dir)
+
+    def _benchmark_output_dir() -> Path:
+        return db_path.parent / "benchmarks"
 
     def _model_options(config) -> dict[str, Any]:
         conversation = []
@@ -297,6 +335,7 @@ def create_app(
         exclusion_items = []
         for exclusion in exclusions:
             combo_runs = store.get_combo_runs(exclusion.profile_id, exclusion.strategy_id)
+            model_pairs = sorted({(run.conversation_model, run.judge_model) for run in combo_runs})
             exclusion_items.append(
                 {
                     "profile_id": exclusion.profile_id,
@@ -306,6 +345,10 @@ def create_app(
                     "reason": exclusion.reason,
                     "simulation_count": len(combo_runs),
                     "run_ids": [run.id for run in combo_runs[:3]],
+                    "model_pairs": [
+                        {"conversation_model": conversation_model, "judge_model": judge_model}
+                        for conversation_model, judge_model in model_pairs
+                    ],
                 }
             )
         return {
@@ -399,6 +442,47 @@ def create_app(
     def run_options() -> dict[str, Any]:
         return _model_options(_config())
 
+    # ── Model benchmark APIs ────────────────────────────────────────
+
+    @app.get("/api/model-benchmarks/options")
+    def benchmark_options() -> dict[str, Any]:
+        config = _config()
+        return {
+            "cursor_models": list(DEFAULT_CURSOR_SDK_MODEL_IDS),
+            "default_cursor_models": list(DEFAULT_CURSOR_PROBE_MODELS),
+            "roles": ["collector", "debtor", "judge"],
+            "profiles": [model_dump_jsonable(profile) for profile in config.profiles.values()],
+            "strategies": [model_dump_jsonable(strategy) for strategy in config.strategies.values()],
+            "defaults": {
+                "profile_id": "cooperative_hardship",
+                "strategy_id": "empathetic_payment_plan",
+                "judge_profile_id": "written_proof_disputer",
+                "concurrency": 1,
+            },
+        }
+
+    @app.get("/api/model-benchmarks")
+    def list_benchmark_reports() -> list[dict[str, Any]]:
+        reports = []
+        for job_id, report in reversed(list(app.state.benchmark_reports.items())):
+            reports.append(
+                {
+                    "job_id": job_id,
+                    "title": report.get("title"),
+                    "generated_at": report.get("generated_at"),
+                    "recommendations": report.get("recommendations", {}),
+                    "probe_count": len(report.get("probes", [])),
+                }
+            )
+        return reports
+
+    @app.get("/api/model-benchmarks/{job_id}")
+    def get_benchmark_report(job_id: str) -> dict[str, Any]:
+        report = app.state.benchmark_reports.get(job_id)
+        if not report:
+            raise HTTPException(status_code=404, detail=f"Model benchmark '{job_id}' not found")
+        return report
+
     # ── Run launch and progress APIs ────────────────────────────────
 
     @app.post("/api/jobs/simulations")
@@ -432,6 +516,10 @@ def create_app(
             raise HTTPException(status_code=400, detail="Select at least one profile")
         if not strategy_ids:
             raise HTTPException(status_code=400, detail="Select at least one strategy")
+        if not conversation_models:
+            raise HTTPException(status_code=400, detail="Select at least one conversation model")
+        if not judge_models:
+            raise HTTPException(status_code=400, detail="Select at least one judge model")
         try:
             cells = build_matrix(
                 config,
@@ -453,6 +541,45 @@ def create_app(
         )
         app.state.jobs[job.id] = job
         app.state.tasks[job.id] = asyncio.create_task(_run_matrix_job(job, config, _store(), cells, payload.concurrency))
+        return job.snapshot()
+
+    @app.post("/api/jobs/model-benchmarks")
+    async def launch_model_benchmark(payload: BenchmarkLaunchRequest) -> dict[str, Any]:
+        config = _config()
+        try:
+            config.profile(payload.profile_id)
+            config.strategy(payload.strategy_id)
+            config.profile(payload.judge_profile_id)
+        except KeyError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        cursor_model_names = payload.cursor_model_names or list(DEFAULT_CURSOR_PROBE_MODELS)
+        cursor_model_names = [name.strip() for name in cursor_model_names if name.strip()]
+        if not cursor_model_names:
+            raise HTTPException(status_code=400, detail="Select at least one Cursor model")
+
+        job = WebRunJob(
+            id=f"bench_{uuid4().hex[:10]}",
+            kind="model_benchmark",
+            status="queued",
+            total=len(cursor_model_names) * len(payload.roles),
+            message=f"Queued {len(cursor_model_names)} model benchmark.",
+        )
+        app.state.jobs[job.id] = job
+        app.state.tasks[job.id] = asyncio.create_task(
+            _run_model_benchmark_job(
+                job,
+                config,
+                app.state.benchmark_reports,
+                _benchmark_output_dir(),
+                cursor_model_names,
+                payload.roles,
+                payload.profile_id,
+                payload.strategy_id,
+                payload.judge_profile_id,
+                payload.concurrency,
+            )
+        )
         return job.snapshot()
 
     @app.get("/api/jobs/{job_id}")
@@ -692,6 +819,62 @@ async def _run_matrix_job(
         await asyncio.gather(*(run_cell(cell) for cell in cells))
         job.status = "completed" if job.failed == 0 else "failed"
         job.message = f"Matrix finished: {job.completed} completed, {job.failed} failed."
+        job.ended_at = utc_now().isoformat()
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        _fail_job(job, exc)
+
+
+async def _run_model_benchmark_job(
+    job: WebRunJob,
+    config,
+    report_registry: dict[str, dict[str, Any]],
+    output_dir: Path,
+    cursor_model_names: list[str],
+    roles: list[str],
+    profile_id: str,
+    strategy_id: str,
+    judge_profile_id: str,
+    concurrency: int,
+) -> None:
+    try:
+        job.status = "running"
+        job.message = "Benchmark probes running."
+        scenario = ProbeScenario(
+            profile_id=profile_id,
+            strategy_id=strategy_id,
+            judge_profile_id=judge_profile_id,
+        )
+        probes = await run_live_role_probes(
+            config,
+            cursor_model_names=tuple(cursor_model_names),
+            roles=tuple(roles),  # type: ignore[arg-type]
+            scenario=scenario,
+            concurrency=concurrency,
+        )
+        ok_count = sum(1 for probe in probes if probe.status == "ok")
+        failed_count = len(probes) - ok_count
+        report = build_model_role_report(
+            config,
+            probes=probes,
+            scenario=scenario,
+            title="Production Cursor Model Role Benchmark",
+        )
+        stamp = utc_now().strftime("%Y%m%d-%H%M%S")
+        markdown_path = output_dir / f"{job.id}-{stamp}.md"
+        json_path = output_dir / f"{job.id}-{stamp}.json"
+        write_report(report, markdown_path, report_format="markdown")
+        write_report(report, json_path, report_format="json")
+        report_data = report_to_dict(report)
+        report_registry[job.id] = report_data
+
+        job.completed = ok_count
+        job.failed = failed_count
+        job.status = "completed" if failed_count == 0 else "failed"
+        job.message = f"Benchmark finished: {ok_count} probes completed, {failed_count} failed."
+        job.artifacts = {"markdown": str(markdown_path), "json": str(json_path)}
+        job.benchmark_report = report_data
         job.ended_at = utc_now().isoformat()
     except asyncio.CancelledError:
         raise
