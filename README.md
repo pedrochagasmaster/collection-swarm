@@ -249,6 +249,7 @@ config/
   collector_strategies.yaml  # Strategy definitions for Collector behavior
   debtor_profiles.yaml       # Synthetic debtor profiles, constraints, objections
   models.yaml                # Local, NIM, and Cursor SDK model routing
+  prompts.yaml               # Collector, Debtor, and Judge prompt templates
   simulation.yaml            # Turn limits, repetitions, compliance thresholds
 ```
 
@@ -275,7 +276,7 @@ SimulationResult --> SQLite Store --> Analysis --> Playbook
 Key modules:
 
 - `src/collection_swarm/engine.py`: conversation loop, turn limit, end-signal parsing, stalemate detection.
-- `src/collection_swarm/agents/`: collector, debtor, and judge prompt logic.
+- `src/collection_swarm/agents/`: collector, debtor, and judge prompt rendering.
 - `src/collection_swarm/backends/`: model backend implementations and router.
 - `src/collection_swarm/store.py`: SQLite persistence.
 - `src/collection_swarm/analysis/`: compliance filters, statistics, and playbook generation.

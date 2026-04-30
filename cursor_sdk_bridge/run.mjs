@@ -2,17 +2,11 @@ import fs from "node:fs"
 import { Agent } from "@cursor/sdk"
 
 /**
- * Stdin JSON: { "messages": { "role","content" }[], "modelId": string, "cwd": string }
+ * Stdin JSON: { "messages": { "role","content" }[], "modelId": string, "cwd": string, "preamble": string }
  * Stdout JSON: { "content", "inputTokens", "outputTokens", "status" } | { "error": string }
  */
-function formatMessages(messages) {
-  const lines = [
-    "You are the assistant in a structured simulation.",
-    "Follow the conversation below. Reply with only your next assistant message text.",
-    "Do not use tools unless the instructions explicitly require it; prefer a direct reply.",
-    "",
-    "## Messages",
-  ]
+function formatMessages(messages, preamble) {
+  const lines = [preamble.trim(), "", "## Messages"]
   for (const m of messages) {
     lines.push(`### ${m.role}`, m.content, "")
   }
@@ -37,15 +31,15 @@ async function main() {
     return
   }
 
-  const { messages, modelId, cwd } = payload
-  if (!Array.isArray(messages) || !modelId) {
-    console.log(JSON.stringify({ error: "expected messages[] and modelId" }))
+  const { messages, modelId, cwd, preamble } = payload
+  if (!Array.isArray(messages) || !modelId || typeof preamble !== "string") {
+    console.log(JSON.stringify({ error: "expected messages[], modelId, and preamble" }))
     process.exitCode = 1
     return
   }
 
   const workspace = typeof cwd === "string" && cwd.length > 0 ? cwd : process.cwd()
-  const prompt = formatMessages(messages)
+  const prompt = formatMessages(messages, preamble)
 
   let agent
   try {

@@ -8,7 +8,7 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, Field
 
-from collection_swarm.models import ModelConfig, Profile, SimulationSettings, Strategy
+from collection_swarm.models import ModelConfig, Profile, PromptConfig, SimulationSettings, Strategy
 
 
 DEFAULT_CONFIG_DIR = Path("config")
@@ -18,6 +18,7 @@ class AppConfig(BaseModel):
     profiles: dict[str, Profile]
     strategies: dict[str, Strategy]
     models: dict[str, ModelConfig]
+    prompts: PromptConfig
     simulation: SimulationSettings = Field(default_factory=SimulationSettings)
 
     def profile(self, profile_id: str) -> Profile:
@@ -99,6 +100,10 @@ def load_models(path: Path) -> dict[str, ModelConfig]:
     return {model.id: model for model in models}
 
 
+def load_prompts(path: Path) -> PromptConfig:
+    return PromptConfig.model_validate(load_yaml(path))
+
+
 def load_simulation_settings(path: Path) -> SimulationSettings:
     raw = load_yaml(path)
     conversation = raw.get("conversation", {})
@@ -126,5 +131,6 @@ def load_app_config(config_dir: Path | str = DEFAULT_CONFIG_DIR) -> AppConfig:
         profiles=load_profiles(base / "debtor_profiles.yaml"),
         strategies=load_strategies(base / "collector_strategies.yaml"),
         models=load_models(base / "models.yaml"),
+        prompts=load_prompts(base / "prompts.yaml"),
         simulation=load_simulation_settings(base / "simulation.yaml"),
     )

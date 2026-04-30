@@ -63,16 +63,16 @@ async def run_matrix(
     cells: list[MatrixCell],
     concurrency: int = 2,
 ) -> RunSummary:
-    router = LLMRouter(config.models)
+    router = LLMRouter(config.models, cursor_sdk_prompts=config.prompts.cursor_sdk)
     semaphore = asyncio.Semaphore(concurrency)
 
     async def run_cell(cell: MatrixCell) -> SimulationResult:
         async with semaphore:
             settings = config.simulation.conversation
             engine = SimulationEngine(
-                collector=CollectorAgent(router, cell.conversation_model),
-                debtor=DebtorAgent(router, cell.conversation_model),
-                judge=Judge(router, cell.judge_model),
+                collector=CollectorAgent(router, cell.conversation_model, config.prompts.collector),
+                debtor=DebtorAgent(router, cell.conversation_model, config.prompts.debtor),
+                judge=Judge(router, cell.judge_model, config.prompts.judge),
                 max_turns=settings.max_turns,
                 end_signal=settings.end_signal,
                 stalemate_window=settings.stalemate_window,

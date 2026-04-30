@@ -14,7 +14,7 @@ from pathlib import Path
 
 from collection_swarm.backends.base import LLMBackend, LLMResponse
 from collection_swarm.env import load_dotenv_if_present
-from collection_swarm.models import LLMMessage, ModelConfig
+from collection_swarm.models import CursorSdkPromptConfig, LLMMessage, ModelConfig
 
 
 def _repo_root() -> Path:
@@ -26,6 +26,9 @@ def _bridge_script() -> Path:
 
 
 class CursorSdkBackend(LLMBackend):
+    def __init__(self, prompts: CursorSdkPromptConfig) -> None:
+        self.prompts = prompts
+
     async def complete(self, model: ModelConfig, messages: list[LLMMessage]) -> LLMResponse:
         load_dotenv_if_present()
         api_key = os.getenv("CURSOR_API_KEY")
@@ -53,6 +56,7 @@ class CursorSdkBackend(LLMBackend):
                 "messages": [m.model_dump() for m in messages],
                 "modelId": model_id,
                 "cwd": cwd,
+                "preamble": self.prompts.preamble,
             },
             ensure_ascii=False,
         )

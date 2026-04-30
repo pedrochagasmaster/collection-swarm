@@ -35,12 +35,12 @@ def test_stalemate_detected_for_repeated_pairs() -> None:
 
 async def test_engine_runs_scripted_simulation() -> None:
     config = load_app_config("config")
-    router = LLMRouter(config.models)
+    router = LLMRouter(config.models, cursor_sdk_prompts=config.prompts.cursor_sdk)
     settings = config.simulation.conversation
     engine = SimulationEngine(
-        CollectorAgent(router, "local-scripted"),
-        DebtorAgent(router, "local-scripted"),
-        Judge(router, "local-judge"),
+        CollectorAgent(router, "local-scripted", config.prompts.collector),
+        DebtorAgent(router, "local-scripted", config.prompts.debtor),
+        Judge(router, "local-judge", config.prompts.judge),
         max_turns=settings.max_turns,
     )
 

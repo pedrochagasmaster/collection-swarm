@@ -335,6 +335,7 @@ def create_app(
         exclusion_items = []
         for exclusion in exclusions:
             combo_runs = store.get_combo_runs(exclusion.profile_id, exclusion.strategy_id)
+            model_pairs = sorted({(run.conversation_model, run.judge_model) for run in combo_runs})
             exclusion_items.append(
                 {
                     "profile_id": exclusion.profile_id,
@@ -344,6 +345,10 @@ def create_app(
                     "reason": exclusion.reason,
                     "simulation_count": len(combo_runs),
                     "run_ids": [run.id for run in combo_runs[:3]],
+                    "model_pairs": [
+                        {"conversation_model": conversation_model, "judge_model": judge_model}
+                        for conversation_model, judge_model in model_pairs
+                    ],
                 }
             )
         return {
@@ -505,12 +510,18 @@ def create_app(
         config = _config()
         profile_ids = payload.profile_ids if payload.profile_ids is not None else list(config.profiles)
         strategy_ids = payload.strategy_ids if payload.strategy_ids is not None else list(config.strategies)
-        conversation_models = payload.conversation_models or [config.default_conversation_model]
-        judge_models = payload.judge_models or [config.default_judge_model]
+        conversation_models = (
+            payload.conversation_models if payload.conversation_models is not None else [config.default_conversation_model]
+        )
+        judge_models = payload.judge_models if payload.judge_models is not None else [config.default_judge_model]
         if not profile_ids:
             raise HTTPException(status_code=400, detail="Select at least one profile")
         if not strategy_ids:
             raise HTTPException(status_code=400, detail="Select at least one strategy")
+        if not conversation_models:
+            raise HTTPException(status_code=400, detail="Select at least one conversation model")
+        if not judge_models:
+            raise HTTPException(status_code=400, detail="Select at least one judge model")
         try:
             cells = build_matrix(
                 config,
@@ -882,12 +893,12 @@ def _fail_job(job: WebRunJob, exc: Exception) -> None:
 
 
 def _make_engine(config, conversation_model: str, judge_model: str) -> SimulationEngine:
-    router = LLMRouter(config.models)
+    router = LLMRouter(config.models, cursor_sdk_prompts=config.prompts.cursor_sdk)
     settings = config.simulation.conversation
     return SimulationEngine(
-        collector=CollectorAgent(router, conversation_model),
-        debtor=DebtorAgent(router, conversation_model),
-        judge=Judge(router, judge_model),
+        collector=CollectorAgent(router, conversation_model, config.prompts.collector),
+        debtor=DebtorAgent(router, conversation_model, config.prompts.debtor),
+        judge=Judge(router, judge_model, config.prompts.judge),
         max_turns=settings.max_turns,
         end_signal=settings.end_signal,
         stalemate_window=settings.stalemate_window,
@@ -899,14 +910,14 @@ async def _append_ai_turn(session: ManualSession, config, role: str) -> None:
     session.status = "ai_thinking"
     session.message = f"AI {role} is responding."
     result = session.result
-    router = LLMRouter(config.models)
+    router = LLMRouter(config.models, cursor_sdk_prompts=config.prompts.cursor_sdk)
     profile = config.profile(result.profile_id)
     settings = config.simulation.conversation
     if role == "collector":
-        agent = CollectorAgent(router, result.conversation_model)
+        agent = CollectorAgent(router, result.conversation_model, config.prompts.collector)
         response = await agent.generate_turn(config.strategy(result.strategy_id), profile.account_data, result.transcript)
     else:
-        agent = DebtorAgent(router, result.conversation_model)
+        agent = DebtorAgent(router, result.conversation_model, config.prompts.debtor)
         response = await agent.generate_turn(profile, result.transcript)
     _append_response(result, role, response, settings.end_signal)
     result.turn_count = len(result.transcript)
@@ -928,7 +939,11 @@ async def _finish_manual_session(session: ManualSession, config, store: Simulati
     result = session.result
     result.turn_count = len(result.transcript)
     result.ended_by = result.ended_by or EndedBy.TURN_LIMIT
-    judge = Judge(LLMRouter(config.models), result.judge_model)
+    judge = Judge(
+        LLMRouter(config.models, cursor_sdk_prompts=config.prompts.cursor_sdk),
+        result.judge_model,
+        config.prompts.judge,
+    )
     result.judgment = await judge.evaluate(result.transcript, config.profile(result.profile_id))
     if judge.last_response:
         result.total_input_tokens += judge.last_response.input_tokens

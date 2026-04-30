@@ -9,21 +9,22 @@ from pydantic import ValidationError
 
 from collection_swarm.backends.base import LLMResponse
 from collection_swarm.backends.router import LLMRouter
-from collection_swarm.models import Judgment, LLMMessage, Message, PaymentOutcome, Profile
+from collection_swarm.models import JudgePromptConfig, Judgment, LLMMessage, Message, PaymentOutcome, Profile
 
 
 class Judge:
-    def __init__(self, router: LLMRouter, model_id: str) -> None:
+    def __init__(self, router: LLMRouter, model_id: str, prompts: JudgePromptConfig) -> None:
         self.router = router
         self.model_id = model_id
+        self.prompts = prompts
         self.last_response: LLMResponse | None = None
 
     async def evaluate(self, transcript: list[Message], profile: Profile) -> Judgment:
         response = await self.router.complete(
             self.model_id,
             [
-                LLMMessage(role="system", content=_system_prompt()),
-                LLMMessage(role="user", content=_transcript_prompt(transcript, profile)),
+                LLMMessage(role="system", content=_system_prompt(self.prompts)),
+                LLMMessage(role="user", content=_transcript_prompt(self.prompts, transcript, profile)),
             ],
         )
         self.last_response = response
@@ -148,23 +149,12 @@ def _normalize_judgment_data(data: dict) -> None:
             data[field] = value / scale
 
 
-def _system_prompt() -> str:
-    return (
-        "You are the Judge evaluator for a synthetic debt collection simulation. "
-        "Assess only the transcript, profile constraints, and account data. Return only a compact JSON object "
-        "with no Markdown fences or extra prose. Keep reasoning to at most two concise sentences. Include fields "
-        "with reasoning, payment_outcome, payment_probability, debtor_satisfaction, "
-        "compliance_score, conversation_efficiency, rapport_built, escalation_risk, "
-        "end_reason, and constraint_violations."
-    )
+def _system_prompt(prompts: JudgePromptConfig) -> str:
+    return prompts.system.strip()
 
 
-def _transcript_prompt(transcript: list[Message], profile: Profile) -> str:
+def _transcript_prompt(prompts: JudgePromptConfig, transcript: list[Message], profile: Profile) -> str:
     lines = "\n".join(f"{turn.role.title()}: {turn.content}" for turn in transcript)
     constraints = "\n".join(f"- {constraint.text}" for constraint in profile.constraints) or "- none"
     account = profile.account_data
-    return (
-        f"Account data: debt_amount=${account.debt_amount:.2f}, debt_type={account.debt_type}, "
-        f"debt_age_days={account.debt_age_days}, prior_contact_count={account.prior_contact_count}\n"
-        f"Constraints:\n{constraints}\n\nTranscript:\n{lines}"
-    )
+    return prompts.transcript.format(account=account, constraints=constraints, transcript=lines).strip()

@@ -545,7 +545,7 @@ async def run_live_role_probes(
             model_name=model_name,
         )
     probe_config = config.model_copy(update={"models": models})
-    router = LLMRouter(probe_config.models)
+    router = LLMRouter(probe_config.models, cursor_sdk_prompts=probe_config.prompts.cursor_sdk)
     semaphore = asyncio.Semaphore(concurrency)
 
     async def run_one(model_name: str, role: EvaluationRole) -> RoleProbe:
@@ -738,19 +738,19 @@ async def _run_role_probe(
     started = time.perf_counter()
     try:
         if role == "collector":
-            response = await CollectorAgent(router, model_id).generate_turn(
+            response = await CollectorAgent(router, model_id, config.prompts.collector).generate_turn(
                 config.strategy(scenario.strategy_id),
                 config.profile(scenario.profile_id).account_data,
                 [],
             )
             return RoleProbe(model_name, role, "ok", time.perf_counter() - started, response.content)
         if role == "debtor":
-            response = await DebtorAgent(router, model_id).generate_turn(
+            response = await DebtorAgent(router, model_id, config.prompts.debtor).generate_turn(
                 config.profile(scenario.profile_id),
                 [Message(role="collector", content=scenario.debtor_prompt)],
             )
             return RoleProbe(model_name, role, "ok", time.perf_counter() - started, response.content)
-        judgment = await Judge(router, model_id).evaluate(
+        judgment = await Judge(router, model_id, config.prompts.judge).evaluate(
             list(scenario.judge_transcript),
             config.profile(scenario.judge_profile_id),
         )

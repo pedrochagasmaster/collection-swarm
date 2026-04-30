@@ -102,6 +102,34 @@ class LLMMessage(BaseModel):
     content: str
 
 
+class CollectorPromptConfig(BaseModel):
+    system: str
+    history_empty: str
+    history: str
+
+
+class DebtorPromptConfig(BaseModel):
+    system: str
+    constraints_empty: str = "- None"
+    history_message: str
+
+
+class JudgePromptConfig(BaseModel):
+    system: str
+    transcript: str
+
+
+class CursorSdkPromptConfig(BaseModel):
+    preamble: str
+
+
+class PromptConfig(BaseModel):
+    collector: CollectorPromptConfig
+    debtor: DebtorPromptConfig
+    judge: JudgePromptConfig
+    cursor_sdk: CursorSdkPromptConfig
+
+
 class ModelConfig(BaseModel):
     id: str
     backend: str

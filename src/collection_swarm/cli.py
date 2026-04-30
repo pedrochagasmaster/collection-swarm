@@ -102,12 +102,12 @@ def simulate(
     config = load_app_config(ctx.obj["config_dir"])
     conversation_model = conversation_model or config.default_conversation_model
     judge_model = judge_model or config.default_judge_model
-    router = LLMRouter(config.models)
+    router = LLMRouter(config.models, cursor_sdk_prompts=config.prompts.cursor_sdk)
     settings = config.simulation.conversation
     engine = SimulationEngine(
-        CollectorAgent(router, conversation_model),
-        DebtorAgent(router, conversation_model),
-        Judge(router, judge_model),
+        CollectorAgent(router, conversation_model, config.prompts.collector),
+        DebtorAgent(router, conversation_model, config.prompts.debtor),
+        Judge(router, judge_model, config.prompts.judge),
         max_turns=settings.max_turns,
         end_signal=settings.end_signal,
         stalemate_window=settings.stalemate_window,
@@ -237,7 +237,7 @@ def test_connection(ctx: click.Context) -> None:
         console.print(f"Configured default backend is '{model.backend}'. Run a simulation to test live credentials.")
         return
     result = asyncio.run(
-        LLMRouter(config.models).complete(
+        LLMRouter(config.models, cursor_sdk_prompts=config.prompts.cursor_sdk).complete(
             config.default_conversation_model,
             [],
         )
