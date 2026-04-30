@@ -181,6 +181,33 @@ def test_connection(ctx: click.Context) -> None:
     console.print(f"Backend ready: {result.backend} ({result.model_id}), output_tokens={result.output_tokens}")
 
 
+@cli.command()
+@click.option("--host", default="127.0.0.1", show_default=True, help="Bind host.")
+@click.option("--port", default=8000, show_default=True, type=int, help="Bind port.")
+@click.option("--reload", "auto_reload", is_flag=True, help="Enable auto-reload for development.")
+@click.pass_context
+def serve(ctx: click.Context, host: str, port: int, auto_reload: bool) -> None:
+    """Launch the web dashboard."""
+    import uvicorn
+
+    from collection_swarm.web.app import create_app
+
+    app = create_app(config_dir=ctx.obj["config_dir"], db_path=ctx.obj["db_path"])
+    console.print(f"Starting dashboard at http://{host}:{port}")
+    uvicorn.run(app, host=host, port=port, reload=auto_reload)
+
+
+@cli.command("seed")
+@click.option("--count", default=24, show_default=True, type=int, help="Number of seed simulations.")
+@click.pass_context
+def seed_data(ctx: click.Context, count: int) -> None:
+    """Generate realistic demo data for the web dashboard."""
+    from collection_swarm.web.seed import generate_seed_data
+
+    n = generate_seed_data(db_path=ctx.obj["db_path"], num_runs=count)
+    console.print(f"Seeded {n} simulations into {ctx.obj['db_path']}")
+
+
 def _print_result(result) -> None:
     console.rule(f"Simulation {result.id} [{result.status}]")
     for turn in result.transcript:
