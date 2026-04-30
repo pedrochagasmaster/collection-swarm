@@ -57,18 +57,45 @@ function toggleTheme() {
 
 // ── Mobile sidebar ─────────────────────────────────────────────
 
+let _sidebarPreviousFocus = null;
+
 function toggleMobileSidebar() {
   const sidebar = $('#sidebar');
-  const overlay = $('#slideout-overlay');
-  sidebar.classList.toggle('open');
+  const overlay = $('#sidebar-overlay');
+  const isOpen = sidebar.classList.toggle('open');
+  if (overlay) {
+    overlay.classList.toggle('open', isOpen);
+    overlay.setAttribute('aria-hidden', String(!isOpen));
+  }
+  if (isOpen) {
+    _sidebarPreviousFocus = document.activeElement;
+    const firstFocusable = sidebar.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    if (firstFocusable) firstFocusable.focus();
+  } else {
+    if (_sidebarPreviousFocus) {
+      _sidebarPreviousFocus.focus();
+      _sidebarPreviousFocus = null;
+    }
+  }
 }
 
 function closeMobileSidebar() {
   const sidebar = $('#sidebar');
+  const overlay = $('#sidebar-overlay');
   if (sidebar) sidebar.classList.remove('open');
+  if (overlay) {
+    overlay.classList.remove('open');
+    overlay.setAttribute('aria-hidden', 'true');
+  }
+  if (_sidebarPreviousFocus) {
+    _sidebarPreviousFocus.focus();
+    _sidebarPreviousFocus = null;
+  }
 }
 
 // ── Toast notifications ────────────────────────────────────────
+
+const TOAST_MAX = 4;
 
 function showToast(message, type = 'info', duration = 4000) {
   let container = $('#toast-container');
@@ -76,7 +103,22 @@ function showToast(message, type = 'info', duration = 4000) {
     container = document.createElement('div');
     container.id = 'toast-container';
     container.className = 'toast-container';
+    container.setAttribute('role', 'status');
+    container.setAttribute('aria-live', 'polite');
     document.body.appendChild(container);
+  }
+
+  if (type === 'error') {
+    container.setAttribute('aria-live', 'assertive');
+  } else {
+    container.setAttribute('aria-live', 'polite');
+  }
+
+  const toasts = container.querySelectorAll('.toast:not(.toast-out)');
+  if (toasts.length >= TOAST_MAX) {
+    const oldest = toasts[0];
+    oldest.classList.add('toast-out');
+    setTimeout(() => oldest.remove(), 200);
   }
 
   const icons = {
@@ -87,6 +129,7 @@ function showToast(message, type = 'info', duration = 4000) {
 
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
+  toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
   toast.innerHTML = `
     ${icons[type] || icons.info}
     <span class="toast-msg">${escapeHTML(message)}</span>
@@ -502,15 +545,18 @@ async function renderRuns() {
     </div>
 
     <div class="filter-bar" role="search" aria-label="Filter simulations">
+      <label class="sr-only" for="filter-status">Status</label>
       <select class="filter-select" id="filter-status" onchange="filterRuns()" aria-label="Filter by status">
         <option value="">All Status</option>
         <option value="completed">Completed</option>
         <option value="failed">Failed</option>
       </select>
+      <label class="sr-only" for="filter-profile">Profile</label>
       <select class="filter-select" id="filter-profile" onchange="filterRuns()" aria-label="Filter by profile">
         <option value="">All Profiles</option>
         ${profileOpts}
       </select>
+      <label class="sr-only" for="filter-strategy">Strategy</label>
       <select class="filter-select" id="filter-strategy" onchange="filterRuns()" aria-label="Filter by strategy">
         <option value="">All Strategies</option>
         ${strategyOpts}
@@ -896,20 +942,29 @@ function clearPoll(key) {
   delete window._pollers[key];
 }
 
+const _pollFailCounts = {};
+
 async function pollJob(jobId, panelId, statusId, pollKey) {
   try {
     const job = await api(`/jobs/${pathPart(jobId)}`);
+    if (_pollFailCounts[pollKey]) {
+      _pollFailCounts[pollKey] = 0;
+    }
     const panel = $(`#${panelId}`);
     const status = $(`#${statusId}`);
     if (status) status.innerHTML = statusBadge(job.status);
     if (panel) renderJobPanel(job, panel);
     if (job.status === 'completed' || job.status === 'failed') {
       clearPoll(pollKey);
+      delete _pollFailCounts[pollKey];
       if (job.status === 'completed') showToast('Job completed', 'success');
       if (job.status === 'failed') showToast('Job failed', 'error');
     }
   } catch (_) {
-    /* polling errors are transient */
+    _pollFailCounts[pollKey] = (_pollFailCounts[pollKey] || 0) + 1;
+    if (_pollFailCounts[pollKey] === 3) {
+      showToast('Connection interrupted, retrying\u2026', 'error', 6000);
+    }
   }
 }
 
@@ -1037,7 +1092,14 @@ window.closeTranscript = function() {
 };
 
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') closeTranscript();
+  if (e.key === 'Escape') {
+    const sidebar = $('#sidebar');
+    if (sidebar && sidebar.classList.contains('open')) {
+      closeMobileSidebar();
+      return;
+    }
+    closeTranscript();
+  }
 });
 
 // ── Playbook ───────────────────────────────────────────────────

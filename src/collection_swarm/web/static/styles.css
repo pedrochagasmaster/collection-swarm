@@ -62,7 +62,7 @@
 
   --text-primary: oklch(94% 0.006 275);
   --text-secondary: oklch(66% 0.01 275);
-  --text-tertiary: oklch(50% 0.008 275);
+  --text-tertiary: oklch(52% 0.008 275);
   --text-inverse: oklch(10% 0.01 275);
 
   --accent-primary: oklch(65% 0.2 275);
@@ -1248,7 +1248,6 @@ body {
 .btn:disabled, .btn[disabled] {
   opacity: 0.5;
   cursor: not-allowed;
-  pointer-events: none;
 }
 
 .btn-primary {
@@ -1273,10 +1272,17 @@ body {
   position: absolute;
   width: 16px;
   height: 16px;
-  border: 2px solid oklch(99% 0 0 / 0.3);
-  border-top-color: oklch(99% 0 0);
+  border: 2px solid currentColor;
+  border-top-color: transparent;
   border-radius: 50%;
+  opacity: 0.7;
   animation: btn-spin 0.6s linear infinite;
+}
+
+.btn-primary.btn-loading::after {
+  border-color: oklch(99% 0 0 / 0.3);
+  border-top-color: oklch(99% 0 0);
+  opacity: 1;
 }
 
 @keyframes btn-spin {
@@ -1838,22 +1844,20 @@ body {
   to { opacity: 0; transform: translateY(12px) scale(0.96); }
 }
 
-/* ── Keyboard shortcut hints ───────────────────────────────── */
-.kbd {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 4px;
-  border-radius: 4px;
-  background: var(--bg-active);
-  border: 1px solid var(--border-default);
-  font-family: var(--font-sans);
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--text-tertiary);
-  line-height: 1;
+/* ── Sidebar overlay (mobile) ──────────────────────────────── */
+.sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: oklch(0% 0 0 / 0.4);
+  z-index: 19;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-normal) var(--ease-out-quart);
+}
+
+.sidebar-overlay.open {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 /* ── Responsive ────────────────────────────────────────────── */
