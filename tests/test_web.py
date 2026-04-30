@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from collection_swarm.model_evaluation import RoleProbe
 from collection_swarm.web.app import create_app
 from collection_swarm.web.seed import generate_seed_data
 
@@ -223,6 +224,53 @@ class TestRunJobs:
         )
         assert resp.status_code == 400
         assert "strategy" in resp.json()["detail"]
+
+
+class TestModelBenchmarks:
+    def test_benchmark_options_include_models_and_roles(self, empty_client: TestClient) -> None:
+        resp = empty_client.get("/api/model-benchmarks/options")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "gpt-5.5" in data["cursor_models"]
+        assert data["roles"] == ["collector", "debtor", "judge"]
+        assert data["defaults"]["profile_id"] == "cooperative_hardship"
+
+    def test_launch_model_benchmark_job_saves_report(
+        self,
+        empty_client: TestClient,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        async def fake_run_live_role_probes(*args, **kwargs):
+            return (
+                RoleProbe("gpt-5.5", "collector", "ok", 0.01, "This is an attempt to collect a debt for a $1,250 medical balance."),
+                RoleProbe("gpt-5.5", "debtor", "ok", 0.01, "My hours were cut and I can realistically pay $100 a month."),
+            )
+
+        monkeypatch.setattr("collection_swarm.web.app.run_live_role_probes", fake_run_live_role_probes)
+
+        resp = empty_client.post(
+            "/api/jobs/model-benchmarks",
+            json={
+                "cursor_model_names": ["gpt-5.5"],
+                "roles": ["collector", "debtor"],
+                "profile_id": "cooperative_hardship",
+                "strategy_id": "empathetic_payment_plan",
+                "judge_profile_id": "written_proof_disputer",
+                "concurrency": 1,
+            },
+        )
+
+        assert resp.status_code == 200
+        job_id = resp.json()["id"]
+        job = _wait_for_job(empty_client, job_id)
+        assert job["status"] == "completed"
+        assert job["benchmark_report"]["recommendations"]["collector"] == "gpt-5.5"
+        assert job["artifacts"]["json"].endswith(".json")
+
+        report = empty_client.get(f"/api/model-benchmarks/{job_id}")
+        assert report.status_code == 200
+        assert report.json()["title"] == "Production Cursor Model Role Benchmark"
 
 
 class TestManualSessions:

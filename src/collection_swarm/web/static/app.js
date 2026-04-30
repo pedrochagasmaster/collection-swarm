@@ -436,6 +436,7 @@ async function renderPage(page, params = {}) {
       case 'manual': await renderManual(params); break;
       case 'playbook': await renderPlaybook(); break;
       case 'compliance': await renderCompliance(); break;
+      case 'benchmarks': await renderBenchmarks(); break;
       case 'profiles': await renderProfiles(); break;
       case 'strategies': await renderStrategies(); break;
       default: mainEl.innerHTML = emptyState('Not Found', 'Page not found.');
@@ -1229,6 +1230,14 @@ function checkboxList(name, entries, selected = null) {
     </label>`).join('');
 }
 
+function benchmarkCheckboxList(name, entries, selected = null) {
+  return entries.map(([value, label]) => `
+    <label class="check-option">
+      <input type="checkbox" name="${escapeAttr(name)}" value="${escapeAttr(value)}" ${selected && !selected.includes(value) ? '' : 'checked'} onchange="updateBenchmarkCount()">
+      <span>${escapeHTML(label)}</span>
+    </label>`).join('');
+}
+
 function updateCheckboxSelection(name, selected) {
   $$(`input[name="${name}"]`).forEach(input => {
     input.checked = !selected || selected.includes(input.value);
@@ -1244,6 +1253,16 @@ window.updateMatrixCount = function() {
   if (!el) return;
   el.classList.toggle('warning', total > 50);
   el.textContent = `${profiles} profiles x ${strategies} strategies x ${reps} reps = ${total} total simulations${total > 50 ? '. Large batches take longer and cost more.' : ''}`;
+};
+
+window.updateBenchmarkCount = function() {
+  const models = checkedValues('benchmark-models').length;
+  const roles = checkedValues('benchmark-roles').length;
+  const total = models * roles;
+  const el = $('#benchmark-count');
+  if (!el) return;
+  el.classList.toggle('warning', total > 36);
+  el.textContent = `${models} models x ${roles} roles = ${total} live probes${total > 36 ? '. This is a production-sized benchmark and can take several minutes.' : ''}`;
 };
 
 function checkedValues(name) {
@@ -1320,10 +1339,12 @@ function renderJobPanel(job, panel) {
 
 window.cancelJob = async function(jobId) {
   const job = await apiPost(`/jobs/${pathPart(jobId)}/cancel`, {});
-  const panels = ['single-job-panel', 'matrix-job-panel'];
+  const panels = ['single-job-panel', 'matrix-job-panel', 'benchmark-job-panel'];
   panels.forEach(id => {
     const panel = $(`#${id}`);
-    if (panel) renderJobPanel(job, panel);
+    if (!panel) return;
+    if (id === 'benchmark-job-panel') renderBenchmarkJobPanel(job, panel);
+    else renderJobPanel(job, panel);
   });
 };
 
@@ -1514,6 +1535,287 @@ window.copyPlaybook = async function() {
   await navigator.clipboard.writeText(data.content || '');
   showToast('Playbook copied', 'success');
 };
+
+// ── Model benchmarks ─────────────────────────────────────────────
+
+async function renderBenchmarks() {
+  const [options, jobs, reports] = await Promise.all([
+    api('/model-benchmarks/options'),
+    api('/jobs'),
+    api('/model-benchmarks'),
+  ]);
+  const defaults = options.defaults || {};
+  const selectedModels = options.default_cursor_models || [];
+  const modelEntries = (options.cursor_models || []).map(model => [model, model]);
+  const roleEntries = (options.roles || []).map(role => [role, fmtId(role)]);
+  const profileOpts = runSelectOptions(options.profiles || [], defaults.profile_id);
+  const judgeProfileOpts = runSelectOptions(options.profiles || [], defaults.judge_profile_id);
+  const strategyOpts = runSelectOptions(options.strategies || [], defaults.strategy_id);
+  const benchmarkJobs = jobs.filter(job => job.kind === 'model_benchmark');
+
+  mainEl.innerHTML = `
+    <div class="page-header page-header-actions">
+      <div>
+        <h1>Model Benchmarks</h1>
+        <p>Run live Cursor SDK probes for Collector, Debtor, and Judge roles, then inspect recommendations and schema risks.</p>
+      </div>
+      <button class="btn" type="button" onclick="loadLatestBenchmark()">Load latest result</button>
+    </div>
+
+    <section class="benchmark-hero" aria-label="Benchmark recommendation summary">
+      <div>
+        <p class="eyebrow">Production evaluation</p>
+        <h2>Find the model mix that can safely drive Collection Swarm.</h2>
+        <p>Collector and Debtor probes measure role-play quality. Judge probes are weighted for parseability because malformed Judgments corrupt saved metrics and playbook rankings.</p>
+      </div>
+      <div class="benchmark-hero-metrics">
+        <div><strong>${fmtNum(modelEntries.length)}</strong><span>Available SDK models</span></div>
+        <div><strong>3</strong><span>Production roles</span></div>
+        <div><strong>${fmtNum(selectedModels.length * 3)}</strong><span>Default probes</span></div>
+      </div>
+    </section>
+
+    <div class="grid-2 benchmark-layout">
+      <div class="card">
+        <div class="card-header"><h2>Benchmark Setup</h2></div>
+        <div class="card-body">
+          <form class="control-form" onsubmit="startModelBenchmark(event)">
+            <div class="form-field">
+              <label>Cursor SDK models</label>
+              <div class="checkbox-grid benchmark-model-grid">${benchmarkCheckboxList('benchmark-models', modelEntries, selectedModels)}</div>
+            </div>
+            <div class="form-field">
+              <label>Roles</label>
+              <div class="checkbox-grid benchmark-role-grid">${benchmarkCheckboxList('benchmark-roles', roleEntries, options.roles || ['collector', 'debtor', 'judge'])}</div>
+            </div>
+            ${selectField('benchmark-profile', 'Collector and Debtor profile', profileOpts)}
+            ${selectField('benchmark-strategy', 'Collector strategy', strategyOpts)}
+            ${selectField('benchmark-judge-profile', 'Judge scenario profile', judgeProfileOpts)}
+            ${inputField('benchmark-concurrency', 'Concurrency', defaults.concurrency || 1, 1, 4)}
+            <div class="matrix-count" id="benchmark-count" aria-live="polite"></div>
+            <div class="btn-row">
+              <button class="btn btn-primary" type="submit" id="benchmark-btn">Run benchmark</button>
+              <button class="btn" type="button" onclick="selectProductionBenchmarkModels()">Production set</button>
+              <button class="btn" type="button" onclick="selectAllBenchmarkModels()">Select all</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h2>Progress</h2><div id="benchmark-job-status">${statusBadge('queued')}</div></div>
+        <div class="card-body" id="benchmark-job-panel">
+          ${benchmarkJobs.length ? benchmarkJobs.map(job => benchmarkJobSummaryHTML(job)).join('') : emptyState('Ready', 'Start a benchmark to see live progress and recommendations.')}
+        </div>
+      </div>
+    </div>
+
+    <section class="card benchmark-results-card">
+      <div class="card-header"><h2>Results</h2><div id="benchmark-result-status">${reports.length ? statusBadge('completed') : statusBadge('queued')}</div></div>
+      <div class="card-body" id="benchmark-results">
+        ${reports.length ? benchmarkReportListHTML(reports) : emptyState('No benchmark results', 'Completed benchmark recommendations will appear here.')}
+      </div>
+    </section>
+  `;
+  updateBenchmarkCount();
+}
+
+window.selectProductionBenchmarkModels = function() {
+  const selected = new Set(['composer-2', 'gpt-5.5', 'gpt-5.4', 'gpt-5.3-codex', 'claude-sonnet-4-6', 'claude-opus-4-7', 'gemini-3.1-pro', 'gpt-5.4-mini', 'claude-haiku-4-5']);
+  $$('input[name="benchmark-models"]').forEach(input => { input.checked = selected.has(input.value); });
+  updateBenchmarkCount();
+};
+
+window.selectAllBenchmarkModels = function() {
+  $$('input[name="benchmark-models"]').forEach(input => { input.checked = true; });
+  updateBenchmarkCount();
+};
+
+window.startModelBenchmark = async function(event) {
+  event.preventDefault();
+  clearPoll('benchmark');
+  const panel = $('#benchmark-job-panel');
+  const status = $('#benchmark-job-status');
+  const btn = $('#benchmark-btn');
+  panel.innerHTML = skeleton();
+  if (btn) { btn.classList.add('btn-loading'); btn.disabled = true; }
+  try {
+    const job = await apiPost('/jobs/model-benchmarks', {
+      cursor_model_names: checkedValues('benchmark-models'),
+      roles: checkedValues('benchmark-roles'),
+      profile_id: $('#benchmark-profile').value,
+      strategy_id: $('#benchmark-strategy').value,
+      judge_profile_id: $('#benchmark-judge-profile').value,
+      concurrency: Number($('#benchmark-concurrency').value || 1),
+    });
+    status.innerHTML = statusBadge(job.status);
+    renderBenchmarkJobPanel(job, panel);
+    showToast('Benchmark started', 'success');
+    window._pollers.benchmark = setInterval(() => pollBenchmarkJob(job.id), 1200);
+  } catch (err) {
+    panel.innerHTML = emptyState('Benchmark failed', err.message);
+    showToast(err.message, 'error');
+  } finally {
+    if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; }
+  }
+};
+
+async function pollBenchmarkJob(jobId) {
+  try {
+    const job = await api(`/jobs/${pathPart(jobId)}`);
+    const panel = $('#benchmark-job-panel');
+    const status = $('#benchmark-job-status');
+    if (status) status.innerHTML = statusBadge(job.status);
+    if (panel) renderBenchmarkJobPanel(job, panel);
+    if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') {
+      clearPoll('benchmark');
+      if (job.benchmark_report) renderBenchmarkReport(job.benchmark_report, job);
+      if (job.status === 'completed') showToast('Benchmark completed', 'success');
+      if (job.status === 'failed') showToast('Benchmark failed', 'error');
+    }
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+function renderBenchmarkJobPanel(job, panel) {
+  const canCancel = job.status === 'queued' || job.status === 'running';
+  panel.innerHTML = `
+    <div class="status-card">
+      <div class="job-item-head">
+        <div>
+          <div class="mono-id">${escapeHTML(job.id)}</div>
+          <div class="status-line">${escapeHTML(job.message || '')}</div>
+        </div>
+        ${statusBadge(job.status)}
+      </div>
+      ${progressHTML(job.completed, job.failed, job.total)}
+      ${canCancel ? `<button class="btn btn-danger" type="button" onclick="cancelJob(${jsArg(job.id)})">Cancel benchmark</button>` : ''}
+      ${job.benchmark_report ? benchmarkRecommendationHTML(job.benchmark_report, job) : ''}
+      ${(job.errors || []).length ? `<div class="form-error">${job.errors.map(escapeHTML).join('<br>')}</div>` : ''}
+    </div>`;
+}
+
+function benchmarkJobSummaryHTML(job) {
+  return `
+    <button class="job-item" type="button" onclick="showBenchmarkJob(${jsArg(job.id)})">
+      <span style="font-size:var(--text-sm)">${escapeHTML(job.id)}</span>
+      <span>${statusBadge(job.status)}</span>
+      <span style="font-size:var(--text-xs);color:var(--text-secondary)">${job.completed + job.failed} of ${job.total}</span>
+    </button>`;
+}
+
+window.showBenchmarkJob = async function(jobId) {
+  const job = await api(`/jobs/${pathPart(jobId)}`);
+  const panel = $('#benchmark-job-panel');
+  const status = $('#benchmark-job-status');
+  if (status) status.innerHTML = statusBadge(job.status);
+  if (panel) renderBenchmarkJobPanel(job, panel);
+  if (job.benchmark_report) renderBenchmarkReport(job.benchmark_report, job);
+};
+
+window.loadLatestBenchmark = async function() {
+  const reports = await api('/model-benchmarks');
+  const container = $('#benchmark-results');
+  if (!reports.length) {
+    if (container) container.innerHTML = emptyState('No benchmark results', 'Run a benchmark first.');
+    return;
+  }
+  const report = await api(`/model-benchmarks/${pathPart(reports[0].job_id)}`);
+  renderBenchmarkReport(report, { id: reports[0].job_id, artifacts: {} });
+};
+
+function benchmarkReportListHTML(reports) {
+  return `
+    <div class="benchmark-report-list">
+      ${reports.map(report => `
+        <button class="job-item" type="button" onclick="loadBenchmarkReport(${jsArg(report.job_id)})">
+          <span>${escapeHTML(report.title || 'Benchmark')}</span>
+          <span>${statusBadge('completed')}</span>
+          <span style="font-size:var(--text-xs);color:var(--text-secondary)">${fmtNum(report.probe_count || 0)} probes · ${relTime(report.generated_at)}</span>
+        </button>
+      `).join('')}
+    </div>`;
+}
+
+window.loadBenchmarkReport = async function(jobId) {
+  const report = await api(`/model-benchmarks/${pathPart(jobId)}`);
+  renderBenchmarkReport(report, { id: jobId, artifacts: {} });
+};
+
+function renderBenchmarkReport(report, job = {}) {
+  const container = $('#benchmark-results');
+  const status = $('#benchmark-result-status');
+  if (status) status.innerHTML = statusBadge('completed');
+  if (!container) return;
+  container.innerHTML = `
+    ${benchmarkRecommendationHTML(report, job)}
+    <div class="benchmark-role-sections">
+      ${['collector', 'debtor', 'judge'].map(role => benchmarkRoleTableHTML(report, role)).join('')}
+    </div>`;
+}
+
+function benchmarkRecommendationHTML(report, job = {}) {
+  const recs = report.recommendations || {};
+  const probes = report.probes || [];
+  const failed = probes.filter(probe => probe.status !== 'ok').length;
+  const artifacts = job.artifacts || {};
+  return `
+    <div class="benchmark-summary">
+      <div class="benchmark-recommendations">
+        ${['collector', 'debtor', 'judge'].map(role => `
+          <div class="benchmark-rec">
+            <span>${escapeHTML(fmtId(role))}</span>
+            <strong>${escapeHTML(recs[role] || 'n/a')}</strong>
+          </div>`).join('')}
+      </div>
+      <div class="benchmark-meta">
+        <span>${fmtNum(probes.length)} probes</span>
+        <span>${fmtNum(failed)} failed</span>
+        <span>${escapeHTML(relTime(report.generated_at))}</span>
+      </div>
+      ${artifacts.markdown || artifacts.json ? `
+        <div class="artifact-list">
+          ${artifacts.markdown ? `<span>Markdown: <code>${escapeHTML(artifacts.markdown)}</code></span>` : ''}
+          ${artifacts.json ? `<span>JSON: <code>${escapeHTML(artifacts.json)}</code></span>` : ''}
+        </div>` : ''}
+    </div>`;
+}
+
+function benchmarkRoleTableHTML(report, role) {
+  const rows = (report.assessments || [])
+    .filter(item => item.role === role)
+    .sort((a, b) => (b.score - a.score) || a.model_name.localeCompare(b.model_name));
+  return `
+    <section class="benchmark-role-card">
+      <div class="benchmark-role-head">
+        <h3>${escapeHTML(fmtId(role))}</h3>
+        <span class="badge badge-info">${rows.length} models</span>
+      </div>
+      <div class="benchmark-table-wrap">
+        <table class="data-table benchmark-table">
+          <thead><tr><th>Model</th><th>Score</th><th>Fit</th><th>Evidence</th><th>Caution</th></tr></thead>
+          <tbody>
+            ${rows.map(row => `
+              <tr>
+                <td>${escapeHTML(row.model_name)}</td>
+                <td><span class="benchmark-score ${benchmarkScoreClass(row.score)}">${escapeHTML(row.score)}/10</span></td>
+                <td>${escapeHTML(row.fit)}</td>
+                <td>${escapeHTML(row.evidence)}</td>
+                <td>${escapeHTML(row.caution)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </section>`;
+}
+
+function benchmarkScoreClass(score) {
+  score = Number(score) || 0;
+  if (score >= 9) return 'score-good';
+  if (score >= 6) return 'score-mid';
+  return 'score-bad';
+}
 
 function downloadText(filename, text, type) {
   const blob = new Blob([text], { type });
