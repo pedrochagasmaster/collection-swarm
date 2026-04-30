@@ -12,6 +12,14 @@ from collection_swarm.web.app import create_app
 from collection_swarm.web.seed import generate_seed_data
 
 
+def _wait_for_job(client: TestClient, job_id: str) -> dict:
+    for _ in range(20):
+        data = client.get(f"/api/jobs/{job_id}").json()
+        if data["status"] in {"completed", "failed"}:
+            return data
+    raise AssertionError(f"job {job_id} did not finish")
+
+
 @pytest.fixture()
 def seeded_client(tmp_path: Path) -> TestClient:
     db_path = tmp_path / "test.sqlite"
@@ -133,6 +141,87 @@ class TestConfig:
         assert resp.status_code == 200
         data = resp.json()
         assert len(data) == 4
+
+    def test_list_models(self, seeded_client: TestClient) -> None:
+        resp = seeded_client.get("/api/config/models")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["default_conversation_model"] == "local-scripted"
+        assert data["default_judge_model"] == "local-judge"
+        assert any(model["id"] == "local-scripted" for model in data["models"])
+
+
+class TestRunJobs:
+    def test_launch_single_simulation_job(self, empty_client: TestClient) -> None:
+        resp = empty_client.post(
+            "/api/jobs/simulations",
+            json={
+                "profile_id": "cooperative_hardship",
+                "strategy_id": "empathetic_payment_plan",
+                "conversation_model": "local-scripted",
+                "judge_model": "local-judge",
+            },
+        )
+        assert resp.status_code == 200
+        job_id = resp.json()["id"]
+        job = _wait_for_job(empty_client, job_id)
+        assert job["status"] == "completed"
+        assert job["completed"] == 1
+        run_id = job["result_ids"][0]
+        run = empty_client.get(f"/api/runs/{run_id}").json()
+        assert run["status"] == "completed"
+        assert len(run["transcript"]) > 0
+
+    def test_launch_matrix_job_tracks_progress(self, empty_client: TestClient) -> None:
+        resp = empty_client.post(
+            "/api/jobs/matrix",
+            json={
+                "profile_ids": ["cooperative_hardship"],
+                "strategy_ids": ["empathetic_payment_plan", "neutral_reminder"],
+                "conversation_models": ["local-scripted"],
+                "judge_models": ["local-judge"],
+                "reps": 1,
+                "concurrency": 2,
+            },
+        )
+        assert resp.status_code == 200
+        job_id = resp.json()["id"]
+        job = _wait_for_job(empty_client, job_id)
+        assert job["status"] == "completed"
+        assert job["total"] == 2
+        assert job["completed"] == 2
+        assert len(job["result_ids"]) == 2
+
+
+class TestManualSessions:
+    def test_manual_debtor_session_completes_and_saves(self, empty_client: TestClient) -> None:
+        resp = empty_client.post(
+            "/api/manual-sessions",
+            json={
+                "profile_id": "cooperative_hardship",
+                "strategy_id": "empathetic_payment_plan",
+                "human_role": "debtor",
+                "conversation_model": "local-scripted",
+                "judge_model": "local-judge",
+            },
+        )
+        assert resp.status_code == 200
+        session = resp.json()
+        assert session["status"] == "waiting_for_human"
+        assert session["run"]["transcript"][0]["role"] == "collector"
+
+        resp = empty_client.post(
+            f"/api/manual-sessions/{session['id']}/turn",
+            json={"content": "I can do $100 per month. [END_CONVERSATION]"},
+        )
+        assert resp.status_code == 200
+        session = resp.json()
+        assert session["status"] == "completed"
+        run = session["run"]
+        assert run["status"] == "completed"
+        assert run["judgment"] is not None
+        saved = empty_client.get(f"/api/runs/{run['id']}").json()
+        assert saved["id"] == run["id"]
 
 
 class TestSPA:

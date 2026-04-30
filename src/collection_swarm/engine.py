@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from datetime import timezone
 from difflib import SequenceMatcher
+from inspect import isawaitable
 
 from collection_swarm.agents.collector import CollectorAgent
 from collection_swarm.agents.debtor import DebtorAgent
@@ -30,7 +32,12 @@ class SimulationEngine:
         self.stalemate_window = stalemate_window
         self.stalemate_similarity_threshold = stalemate_similarity_threshold
 
-    async def run_simulation(self, profile: Profile, strategy: Strategy) -> SimulationResult:
+    async def run_simulation(
+        self,
+        profile: Profile,
+        strategy: Strategy,
+        on_progress: Callable[[SimulationResult], Awaitable[None] | None] | None = None,
+    ) -> SimulationResult:
         result = SimulationResult(
             profile_id=profile.id,
             strategy_id=strategy.id,
@@ -40,13 +47,16 @@ class SimulationEngine:
         try:
             while len(result.transcript) < self.max_turns:
                 await self._add_collector_turn(result, profile, strategy)
+                await _notify_progress(on_progress, result)
                 if result.ended_by:
                     break
                 if len(result.transcript) >= self.max_turns:
                     break
                 await self._add_debtor_turn(result, profile)
+                await _notify_progress(on_progress, result)
                 if result.ended_by or self._stalemate_detected(result.transcript):
                     result.ended_by = result.ended_by or EndedBy.STALEMATE
+                    await _notify_progress(on_progress, result)
                     break
 
             if result.ended_by is None:
@@ -59,12 +69,14 @@ class SimulationEngine:
                 result.total_output_tokens += self.judge.last_response.output_tokens
                 result.estimated_cost_usd += self.judge.last_response.estimated_cost_usd
             result.ended_at = utc_now()
+            await _notify_progress(on_progress, result)
             return result
         except Exception as exc:
             result.status = "failed"
             result.error_message = str(exc)
             result.turn_count = len(result.transcript)
             result.ended_at = utc_now().astimezone(timezone.utc)
+            await _notify_progress(on_progress, result)
             return result
 
     async def _add_collector_turn(self, result: SimulationResult, profile: Profile, strategy: Strategy) -> None:
@@ -95,6 +107,17 @@ def strip_end_signal(content: str, signal: str = "[END_CONVERSATION]") -> tuple[
     ended = signal in content
     cleaned = content.replace(signal, "").strip()
     return cleaned, ended
+
+
+async def _notify_progress(
+    callback: Callable[[SimulationResult], Awaitable[None] | None] | None,
+    result: SimulationResult,
+) -> None:
+    if callback is None:
+        return
+    maybe_awaitable = callback(result)
+    if isawaitable(maybe_awaitable):
+        await maybe_awaitable
 
 
 def stalemate_detected(transcript: list[Message], window: int = 3, threshold: float = 0.6) -> bool:

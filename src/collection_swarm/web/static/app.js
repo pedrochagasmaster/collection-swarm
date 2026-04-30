@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════
-   Collection Swarm — Single-Page Application
+   Collection Swarm - Single-Page Application
    Impeccable edition: skeleton loading, overview strip (no hero-
    metric template), capped stagger, ARIA management.
    ═══════════════════════════════════════════════════════════════ */
@@ -58,6 +58,23 @@ function toggleTheme() {
 async function api(path) {
   const res = await fetch(`/api${path}`);
   if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+async function apiPost(path, body = {}) {
+  const res = await fetch(`/api${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let detail = `API error: ${res.status}`;
+    try {
+      const data = await res.json();
+      detail = data.detail || detail;
+    } catch (_) {}
+    throw new Error(detail);
+  }
   return res.json();
 }
 
@@ -131,6 +148,65 @@ function outcomeBadge(outcome) {
   return `<span class="badge ${map[outcome] || 'badge-neutral'}">${fmtId(outcome)}</span>`;
 }
 
+function statusBadge(status) {
+  const map = {
+    completed: 'badge-success',
+    failed: 'badge-danger',
+    running: 'badge-info',
+    queued: 'badge-warning',
+    waiting_for_human: 'badge-warning',
+    ai_thinking: 'badge-info',
+    judging: 'badge-info',
+  };
+  return `<span class="badge ${map[status] || 'badge-neutral'}">${fmtId(status)}</span>`;
+}
+
+function chatHTML(transcript = []) {
+  const MAX_STAGGER = 10;
+  return transcript.map((m, i) => {
+    const avatarMap = { collector: 'C', debtor: 'D', system: 'S', judge: 'J' };
+    const delay = Math.min(i, MAX_STAGGER) * 40;
+    return `
+      <div class="chat-msg ${m.role}" style="animation-delay:${delay}ms" role="listitem">
+        <div class="chat-avatar" aria-hidden="true">${avatarMap[m.role] || '?'}</div>
+        <div class="chat-bubble">
+          <div class="chat-role">${m.role}</div>
+          ${m.content || ''}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function progressHTML(completed, failed, total) {
+  const done = completed + failed;
+  const pctDone = total ? Math.round((done / total) * 100) : 0;
+  return `
+    <div class="progress-wrap" role="progressbar" aria-valuenow="${pctDone}" aria-valuemin="0" aria-valuemax="100">
+      <div class="progress-bar-fill" style="width:${pctDone}%"></div>
+    </div>
+    <div class="progress-meta">${done}/${total} finished, ${completed} completed, ${failed} failed</div>`;
+}
+
+function runSelectOptions(items, selectedId) {
+  return items.map(item => `<option value="${item.id}" ${item.id === selectedId ? 'selected' : ''}>${fmtId(item.id)}</option>`).join('');
+}
+
+function modelSelectOptions(items, selectedId) {
+  return items.map(item => `<option value="${item.id}" ${item.id === selectedId ? 'selected' : ''}>${item.id}</option>`).join('');
+}
+
+function checkedBoxes(items, name) {
+  return items.map(item => `
+    <label class="check-row">
+      <input type="checkbox" name="${name}" value="${item.id}" checked>
+      <span>${fmtId(item.id)}</span>
+    </label>`).join('');
+}
+
+function selectedValues(name) {
+  return $$(`input[name="${name}"]:checked`).map(input => input.value);
+}
+
 const OUTCOME_COLORS = {
   'full_payment': 'var(--chart-7)',
   'partial_payment': 'var(--chart-1)',
@@ -151,6 +227,9 @@ async function renderPage(page, params = {}) {
     switch (page) {
       case 'dashboard': await renderDashboard(); break;
       case 'runs': await renderRuns(); break;
+      case 'launch': await renderLaunch(); break;
+      case 'matrix': await renderMatrix(); break;
+      case 'manual': await renderManual(); break;
       case 'playbook': await renderPlaybook(); break;
       case 'compliance': await renderCompliance(); break;
       case 'profiles': await renderProfiles(); break;
@@ -402,7 +481,7 @@ window.filterRuns = function() {
     return `
       <tr onclick="openTranscript('${r.id}')" tabindex="0" role="button" aria-label="View transcript for ${r.id}" onkeydown="if(event.key==='Enter')openTranscript('${r.id}')">
         <td>${r.id}</td>
-        <td><span class="badge ${r.status === 'completed' ? 'badge-success' : 'badge-danger'}">${r.status}</span></td>
+        <td>${statusBadge(r.status)}</td>
         <td>${fmtId(r.profile_id)}</td>
         <td>${fmtId(r.strategy_id)}</td>
         <td>${j ? outcomeBadge(j.payment_outcome) : '\u2014'}</td>
@@ -413,6 +492,328 @@ window.filterRuns = function() {
         <td>${relTime(r.started_at)}</td>
       </tr>`;
   }).join('');
+};
+
+// ── Launch single run ───────────────────────────────────────────
+
+async function renderLaunch() {
+  const options = await api('/config/run-options');
+  const profileOpts = options.profiles.map(p => `<option value="${p.id}">${fmtId(p.id)}</option>`).join('');
+  const strategyOpts = options.strategies.map(s => `<option value="${s.id}">${fmtId(s.id)}</option>`).join('');
+  const conversationOpts = options.conversation_models.map(m =>
+    `<option value="${m.id}" ${m.id === options.defaults.conversation_model ? 'selected' : ''}>${m.id}</option>`
+  ).join('');
+  const judgeOpts = options.judge_models.map(m =>
+    `<option value="${m.id}" ${m.id === options.defaults.judge_model ? 'selected' : ''}>${m.id}</option>`
+  ).join('');
+
+  mainEl.innerHTML = `
+    <div class="page-header">
+      <h1>Launch Run</h1>
+      <p>Configure one simulation and watch the transcript fill in while it runs</p>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header"><h2>Single Simulation</h2></div>
+        <div class="card-body">
+          <form class="run-form" onsubmit="startSingleRun(event)">
+            ${selectField('launch-profile', 'Profile', profileOpts)}
+            ${selectField('launch-strategy', 'Strategy', strategyOpts)}
+            ${selectField('launch-conversation-model', 'Conversation model', conversationOpts)}
+            ${selectField('launch-judge-model', 'Judge model', judgeOpts)}
+            <button class="primary-btn" type="submit">Start run</button>
+          </form>
+        </div>
+      </div>
+      <div class="card live-card">
+        <div class="card-header"><h2>Live Progress</h2><div id="single-job-status">${statusBadge('queued')}</div></div>
+        <div class="card-body" id="single-job-panel">
+          ${emptyState('Ready', 'Start a simulation to see turns, status, and judgment here.')}
+        </div>
+      </div>
+    </div>`;
+}
+
+window.startSingleRun = async function(event) {
+  event.preventDefault();
+  clearPoll('single');
+  const panel = $('#single-job-panel');
+  const status = $('#single-job-status');
+  panel.innerHTML = skeleton();
+  try {
+    const job = await apiPost('/jobs/simulations', {
+      profile_id: $('#launch-profile').value,
+      strategy_id: $('#launch-strategy').value,
+      conversation_model: $('#launch-conversation-model').value,
+      judge_model: $('#launch-judge-model').value,
+    });
+    status.innerHTML = statusBadge(job.status);
+    renderJobPanel(job, panel);
+    window._pollers.single = setInterval(() => pollJob(job.id, 'single-job-panel', 'single-job-status', 'single'), 800);
+  } catch (err) {
+    panel.innerHTML = emptyState('Launch failed', err.message);
+  }
+};
+
+// ── Matrix runs ─────────────────────────────────────────────────
+
+async function renderMatrix() {
+  const [options, jobs] = await Promise.all([api('/config/run-options'), api('/jobs')]);
+  const profiles = checkboxList('matrix-profiles', options.profiles.map(p => [p.id, fmtId(p.id)]));
+  const strategies = checkboxList('matrix-strategies', options.strategies.map(s => [s.id, fmtId(s.id)]));
+  const conversationOpts = options.conversation_models.map(m =>
+    `<option value="${m.id}" ${m.id === options.defaults.conversation_model ? 'selected' : ''}>${m.id}</option>`
+  ).join('');
+  const judgeOpts = options.judge_models.map(m =>
+    `<option value="${m.id}" ${m.id === options.defaults.judge_model ? 'selected' : ''}>${m.id}</option>`
+  ).join('');
+
+  mainEl.innerHTML = `
+    <div class="page-header">
+      <h1>Matrix Runs</h1>
+      <p>Run background matrices and monitor aggregate progress</p>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header"><h2>Matrix Setup</h2></div>
+        <div class="card-body">
+          <form class="run-form" onsubmit="startMatrixRun(event)">
+            <div class="form-field"><label>Profiles</label><div class="check-grid">${profiles}</div></div>
+            <div class="form-field"><label>Strategies</label><div class="check-grid">${strategies}</div></div>
+            ${selectField('matrix-conversation-model', 'Conversation model', conversationOpts)}
+            ${selectField('matrix-judge-model', 'Judge model', judgeOpts)}
+            <div class="form-row">
+              ${inputField('matrix-reps', 'Reps', options.defaults.reps || 1, 1, 100)}
+              ${inputField('matrix-concurrency', 'Concurrency', 2, 1, 10)}
+            </div>
+            <button class="primary-btn" type="submit">Start matrix</button>
+          </form>
+        </div>
+      </div>
+      <div class="card live-card">
+        <div class="card-header"><h2>Background Progress</h2><div id="matrix-job-status">${statusBadge('queued')}</div></div>
+        <div class="card-body" id="matrix-job-panel">
+          ${jobs.length ? jobs.map(jobSummaryHTML).join('') : emptyState('No Matrix Active', 'Start a matrix to watch completion counts and current cells.')}
+        </div>
+      </div>
+    </div>`;
+}
+
+window.startMatrixRun = async function(event) {
+  event.preventDefault();
+  clearPoll('matrix');
+  const panel = $('#matrix-job-panel');
+  const status = $('#matrix-job-status');
+  panel.innerHTML = skeleton();
+  try {
+    const job = await apiPost('/jobs/matrix', {
+      profile_ids: checkedValues('matrix-profiles'),
+      strategy_ids: checkedValues('matrix-strategies'),
+      conversation_models: [$('#matrix-conversation-model').value],
+      judge_models: [$('#matrix-judge-model').value],
+      reps: Number($('#matrix-reps').value || 1),
+      concurrency: Number($('#matrix-concurrency').value || 1),
+    });
+    status.innerHTML = statusBadge(job.status);
+    renderJobPanel(job, panel);
+    window._pollers.matrix = setInterval(() => pollJob(job.id, 'matrix-job-panel', 'matrix-job-status', 'matrix'), 800);
+  } catch (err) {
+    panel.innerHTML = emptyState('Matrix failed', err.message);
+  }
+};
+
+// ── Manual role-play ────────────────────────────────────────────
+
+async function renderManual() {
+  const options = await api('/config/run-options');
+  const profileOpts = options.profiles.map(p => `<option value="${p.id}">${fmtId(p.id)}</option>`).join('');
+  const strategyOpts = options.strategies.map(s => `<option value="${s.id}">${fmtId(s.id)}</option>`).join('');
+  const conversationOpts = options.conversation_models.map(m =>
+    `<option value="${m.id}" ${m.id === options.defaults.conversation_model ? 'selected' : ''}>${m.id}</option>`
+  ).join('');
+  const judgeOpts = options.judge_models.map(m =>
+    `<option value="${m.id}" ${m.id === options.defaults.judge_model ? 'selected' : ''}>${m.id}</option>`
+  ).join('');
+
+  mainEl.innerHTML = `
+    <div class="page-header">
+      <h1>Manual Run</h1>
+      <p>Play the collector or debtor, then save the judged transcript as a run</p>
+    </div>
+    <div class="grid-2 manual-layout">
+      <div class="card">
+        <div class="card-header"><h2>Session Setup</h2></div>
+        <div class="card-body">
+          <form class="run-form" onsubmit="startManualSession(event)">
+            ${selectField('manual-profile', 'Profile', profileOpts)}
+            ${selectField('manual-strategy', 'Strategy', strategyOpts)}
+            ${selectField('manual-role', 'You play', '<option value="debtor">Debtor</option><option value="collector">Collector</option>')}
+            ${selectField('manual-conversation-model', 'AI model', conversationOpts)}
+            ${selectField('manual-judge-model', 'Judge model', judgeOpts)}
+            <button class="primary-btn" type="submit">Start manual run</button>
+          </form>
+        </div>
+      </div>
+      <div class="card live-card">
+        <div class="card-header"><h2>Role-play Transcript</h2><div id="manual-status">${statusBadge('waiting_for_human')}</div></div>
+        <div class="card-body" id="manual-panel">${emptyState('No Session', 'Start a manual run to enter turns.')}</div>
+      </div>
+    </div>`;
+}
+
+window.startManualSession = async function(event) {
+  event.preventDefault();
+  const panel = $('#manual-panel');
+  panel.innerHTML = skeleton();
+  try {
+    const session = await apiPost('/manual-sessions', {
+      profile_id: $('#manual-profile').value,
+      strategy_id: $('#manual-strategy').value,
+      human_role: $('#manual-role').value,
+      conversation_model: $('#manual-conversation-model').value,
+      judge_model: $('#manual-judge-model').value,
+    });
+    window._manualSessionId = session.id;
+    renderManualSession(session);
+  } catch (err) {
+    panel.innerHTML = emptyState('Manual setup failed', err.message);
+  }
+};
+
+window.submitManualTurn = async function(event) {
+  event.preventDefault();
+  const input = $('#manual-turn-content');
+  const panel = $('#manual-panel');
+  const content = input.value.trim();
+  if (!content || !window._manualSessionId) return;
+  input.value = '';
+  panel.classList.add('is-loading');
+  try {
+    const session = await apiPost(`/manual-sessions/${window._manualSessionId}/turn`, { content });
+    renderManualSession(session);
+  } catch (err) {
+    panel.innerHTML += `<div class="form-error">${err.message}</div>`;
+  } finally {
+    panel.classList.remove('is-loading');
+  }
+};
+
+window.finishManualSession = async function() {
+  if (!window._manualSessionId) return;
+  const session = await apiPost(`/manual-sessions/${window._manualSessionId}/finish`, {});
+  renderManualSession(session);
+};
+
+function renderManualSession(session) {
+  $('#manual-status').innerHTML = statusBadge(session.status);
+  const run = session.run;
+  const disabled = session.status !== 'waiting_for_human' ? 'disabled' : '';
+  $('#manual-panel').innerHTML = `
+    ${runMetaHTML(run)}
+    ${transcriptHTML(run)}
+    ${judgmentHTML(run)}
+    ${session.status === 'completed' ? `
+      <div class="action-row">
+        <button class="secondary-btn" onclick="openTranscript('${run.id}')">Open saved run</button>
+      </div>` : `
+      <form class="manual-turn-form" onsubmit="submitManualTurn(event)">
+        <label for="manual-turn-content">Your ${session.human_role} turn</label>
+        <textarea id="manual-turn-content" rows="4" ${disabled} placeholder="Type the next line. Add [END_CONVERSATION] to stop."></textarea>
+        <div class="action-row">
+          <button class="primary-btn" type="submit" ${disabled}>Send turn</button>
+          <button class="secondary-btn" type="button" onclick="finishManualSession()">Finish and judge</button>
+        </div>
+      </form>`}
+    <p class="status-note">${session.message || ''}</p>`;
+}
+
+// ── Launch form helpers ─────────────────────────────────────────
+
+window._pollers = {};
+
+function selectField(id, label, optionsHTML) {
+  return `
+    <div class="form-field">
+      <label for="${id}">${label}</label>
+      <select class="filter-select" id="${id}">${optionsHTML}</select>
+    </div>`;
+}
+
+function inputField(id, label, value, min, max) {
+  return `
+    <div class="form-field">
+      <label for="${id}">${label}</label>
+      <input class="text-input" id="${id}" type="number" value="${value}" min="${min}" max="${max}">
+    </div>`;
+}
+
+function checkboxList(name, entries) {
+  return entries.map(([value, label]) => `
+    <label class="check-option">
+      <input type="checkbox" name="${name}" value="${value}" checked>
+      <span>${label}</span>
+    </label>`).join('');
+}
+
+function checkedValues(name) {
+  return $$(`input[name="${name}"]:checked`).map(input => input.value);
+}
+
+function clearPoll(key) {
+  if (window._pollers[key]) clearInterval(window._pollers[key]);
+  delete window._pollers[key];
+}
+
+async function pollJob(jobId, panelId, statusId, pollKey) {
+  const job = await api(`/jobs/${jobId}`);
+  const panel = $(`#${panelId}`);
+  const status = $(`#${statusId}`);
+  if (status) status.innerHTML = statusBadge(job.status);
+  if (panel) renderJobPanel(job, panel);
+  if (job.status === 'completed' || job.status === 'failed') clearPoll(pollKey);
+}
+
+function renderJobPanel(job, panel) {
+  panel.innerHTML = `
+    <div class="job-panel">
+      <div class="job-header-row">
+        <div>
+          <div class="job-id">${job.id}</div>
+          <div class="status-note">${job.message || ''}</div>
+        </div>
+        ${statusBadge(job.status)}
+      </div>
+      ${progressHTML(job.completed, job.failed, job.total)}
+      ${job.current_run ? `
+        <div class="live-transcript">
+          ${runMetaHTML(job.current_run)}
+          ${transcriptHTML(job.current_run)}
+          ${judgmentHTML(job.current_run)}
+        </div>` : ''}
+      ${job.result_ids && job.result_ids.length ? `
+        <div class="action-row">
+          <button class="secondary-btn" type="button" onclick="openTranscript('${job.result_ids[job.result_ids.length - 1]}')">Open latest saved run</button>
+          <button class="secondary-btn" type="button" onclick="navigateTo('runs')">View all runs</button>
+        </div>` : ''}
+      ${(job.errors || []).length ? `<div class="form-error">${job.errors.join('<br>')}</div>` : ''}
+    </div>`;
+}
+
+function jobSummaryHTML(job) {
+  return `
+    <button class="job-summary" type="button" onclick="showJob('${job.id}', 'matrix-job-panel', 'matrix-job-status')">
+      <span>${job.kind}, ${job.id}</span>
+      <span>${statusBadge(job.status)}</span>
+      <span>${job.completed + job.failed}/${job.total}</span>
+    </button>`;
+}
+
+window.showJob = async function(jobId, panelId, statusId) {
+  const job = await api(`/jobs/${jobId}`);
+  const panel = $(`#${panelId}`);
+  const status = $(`#${statusId}`);
+  if (status) status.innerHTML = statusBadge(job.status);
+  if (panel) renderJobPanel(job, panel);
 };
 
 // ── Transcript slideout ────────────────────────────────────────
@@ -436,7 +837,18 @@ window.openTranscript = async function(runId) {
     title.textContent = run.id;
     subtitle.textContent = `${fmtId(run.profile_id)} \u00d7 ${fmtId(run.strategy_id)}`;
 
-    const metaTags = `
+    const metaTags = runMetaHTML(run);
+
+    body.innerHTML = metaTags + transcriptHTML(run) + judgmentHTML(run);
+
+    panel.querySelector('.slideout-close').focus();
+  } catch (err) {
+    body.innerHTML = emptyState('Error', err.message);
+  }
+};
+
+function runMetaHTML(run) {
+  return `
       <div class="meta-tags">
         <span class="meta-tag"><strong>Status:</strong> ${run.status}</span>
         <span class="meta-tag"><strong>Model:</strong> ${run.conversation_model}</span>
@@ -445,26 +857,19 @@ window.openTranscript = async function(runId) {
         <span class="meta-tag"><strong>Tokens:</strong> ${fmtNum(run.total_input_tokens + run.total_output_tokens)}</span>
         <span class="meta-tag"><strong>Cost:</strong> ${fmtMoney(run.estimated_cost_usd)}</span>
       </div>`;
+}
 
-    const MAX_STAGGER = 10;
-    const chatMsgs = (run.transcript || []).map((m, i) => {
-      const avatarMap = { collector: 'C', debtor: 'D', system: 'S', judge: 'J' };
-      const delay = Math.min(i, MAX_STAGGER) * 40;
-      return `
-        <div class="chat-msg ${m.role}" style="animation-delay:${delay}ms" role="listitem">
-          <div class="chat-avatar" aria-hidden="true">${avatarMap[m.role] || '?'}</div>
-          <div class="chat-bubble">
-            <div class="chat-role">${m.role}</div>
-            ${m.content}
-          </div>
-        </div>`;
-    }).join('');
+function transcriptHTML(run) {
+  const MAX_STAGGER = 10;
+  const chatMsgs = chatHTML(run.transcript || '');
+  return `<div class="chat-container" role="list" aria-label="Conversation transcript">${chatMsgs || emptyState('No Turns', 'No transcript turns yet.')}</div>`;
+}
 
-    let judgmentHTML = '';
-    if (run.judgment) {
-      const j = run.judgment;
-      const violations = (j.constraint_violations || []);
-      judgmentHTML = `
+function judgmentHTML(run) {
+  if (!run.judgment) return '';
+  const j = run.judgment;
+  const violations = (j.constraint_violations || []);
+  return `
         <div class="judgment-panel">
           <h3>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
@@ -484,15 +889,7 @@ window.openTranscript = async function(runId) {
             </div>` : ''}
           ${j.reasoning ? `<div class="judgment-reasoning">${j.reasoning}</div>` : ''}
         </div>`;
-    }
-
-    body.innerHTML = metaTags + `<div class="chat-container" role="list" aria-label="Conversation transcript">${chatMsgs}</div>` + judgmentHTML;
-
-    panel.querySelector('.slideout-close').focus();
-  } catch (err) {
-    body.innerHTML = emptyState('Error', err.message);
-  }
-};
+}
 
 window.closeTranscript = function() {
   const overlay = $('#slideout-overlay');

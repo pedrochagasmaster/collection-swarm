@@ -147,7 +147,7 @@ class SimulationResult(BaseModel):
     model_config = ConfigDict(use_enum_values=True)
 
     id: str = Field(default_factory=lambda: f"sim_{uuid4().hex[:12]}")
-    status: Literal["completed", "failed"] = "completed"
+    status: Literal["completed", "failed", "running"] = "completed"
     error_message: str | None = None
     profile_id: str
     strategy_id: str
