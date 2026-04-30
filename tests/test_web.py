@@ -110,7 +110,14 @@ class TestCompliance:
         resp = seeded_client.get("/api/compliance/exclusions")
         assert resp.status_code == 200
         data = resp.json()
-        assert isinstance(data, list)
+        assert "thresholds" in data
+        assert "exclusions" in data
+        assert "total_completed_runs" in data
+        assert isinstance(data["exclusions"], list)
+        if data["exclusions"]:
+            exclusion = data["exclusions"][0]
+            assert "simulation_count" in exclusion
+            assert "run_ids" in exclusion
 
 
 class TestPlaybook:
