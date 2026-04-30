@@ -1,7 +1,8 @@
 /* ═══════════════════════════════════════════════════════════════
-   Collection Swarm - Single-Page Application
-   Impeccable edition: skeleton loading, overview strip (no hero-
-   metric template), capped stagger, ARIA management.
+   Collection Swarm — Single-Page Application
+   Production edition: page transitions, toast notifications,
+   keyboard navigation, filter state management, loading states,
+   mobile sidebar toggle, scroll-to-top on navigate.
    ═══════════════════════════════════════════════════════════════ */
 
 const $ = (sel, ctx = document) => ctx.querySelector(sel);
@@ -24,6 +25,7 @@ function navigateTo(page, params = {}) {
     }
   });
   window.history.pushState({ page, params }, '', `#${page}`);
+  closeMobileSidebar();
   renderPage(page, params);
 }
 
@@ -52,6 +54,56 @@ function toggleTheme() {
   const saved = localStorage.getItem('cs-theme');
   if (saved) document.documentElement.dataset.theme = saved;
 })();
+
+// ── Mobile sidebar ─────────────────────────────────────────────
+
+function toggleMobileSidebar() {
+  const sidebar = $('#sidebar');
+  const overlay = $('#slideout-overlay');
+  sidebar.classList.toggle('open');
+}
+
+function closeMobileSidebar() {
+  const sidebar = $('#sidebar');
+  if (sidebar) sidebar.classList.remove('open');
+}
+
+// ── Toast notifications ────────────────────────────────────────
+
+function showToast(message, type = 'info', duration = 4000) {
+  let container = $('#toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toast-container';
+    container.className = 'toast-container';
+    document.body.appendChild(container);
+  }
+
+  const icons = {
+    success: '<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+    error: '<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
+    info: '<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
+  };
+
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.innerHTML = `
+    ${icons[type] || icons.info}
+    <span class="toast-msg">${escapeHTML(message)}</span>
+    <button class="toast-close" aria-label="Dismiss" onclick="this.parentElement.classList.add('toast-out');setTimeout(()=>this.parentElement.remove(),200)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>`;
+  container.appendChild(toast);
+
+  if (duration > 0) {
+    setTimeout(() => {
+      if (toast.parentElement) {
+        toast.classList.add('toast-out');
+        setTimeout(() => toast.remove(), 200);
+      }
+    }, duration);
+  }
+}
 
 // ── Data fetching ──────────────────────────────────────────────
 
@@ -208,7 +260,7 @@ function progressHTML(completed, failed, total) {
     <div class="progress-wrap" role="progressbar" aria-valuenow="${pctDone}" aria-valuemin="0" aria-valuemax="100">
       <div class="progress-bar-fill" style="width:${pctDone}%"></div>
     </div>
-    <div class="progress-meta">${done}/${total} finished, ${completed} completed, ${failed} failed</div>`;
+    <div class="progress-meta">${done} of ${total} finished \u00b7 ${completed} completed \u00b7 ${failed} failed</div>`;
 }
 
 function runSelectOptions(items, selectedId) {
@@ -251,6 +303,7 @@ const OUTCOME_COLORS = {
 
 async function renderPage(page, params = {}) {
   mainEl.innerHTML = skeleton();
+  mainEl.scrollTop = 0;
   try {
     switch (page) {
       case 'dashboard': await renderDashboard(); break;
@@ -264,6 +317,9 @@ async function renderPage(page, params = {}) {
       case 'strategies': await renderStrategies(); break;
       default: mainEl.innerHTML = emptyState('Not Found', 'Page not found.');
     }
+    mainEl.classList.remove('page-enter');
+    void mainEl.offsetWidth;
+    mainEl.classList.add('page-enter');
   } catch (err) {
     mainEl.innerHTML = emptyState('Error', err.message);
   }
@@ -298,7 +354,7 @@ async function renderDashboard() {
       `<button class="tab-btn${i === 0 ? ' active' : ''}" onclick="switchProfileTab(${jsArg(p)}, this)" role="tab" aria-selected="${i === 0}">${escapeHTML(fmtId(p))}</button>`
     ).join('');
     strategySection = `
-      <div class="card" style="margin-top:var(--space-8)">
+      <div class="card" style="margin-top:var(--space-6)">
         <div class="card-header"><h2>Strategy Rankings</h2></div>
         <div class="card-body">
           <div class="tabs" role="tablist" aria-label="Profile strategy rankings" id="profile-tabs">${tabs}</div>
@@ -308,10 +364,12 @@ async function renderDashboard() {
     setTimeout(() => loadStrategyComparison(data.profiles[0]), 0);
   }
 
+  const successRate = total_runs > 0 ? Math.round((completed / total_runs) * 100) : 0;
+
   mainEl.innerHTML = `
     <div class="page-header">
       <h1>Dashboard</h1>
-      <p>Overview of simulation results and performance metrics</p>
+      <p>Simulation performance overview across ${fmtNum(total_runs)} runs</p>
     </div>
 
     <div class="overview-strip" role="status" aria-label="Simulation summary">
@@ -328,6 +386,11 @@ async function renderDashboard() {
       <div class="overview-item">
         <span class="overview-label">Failed</span>
         <span class="overview-value">${fmtNum(failed)}</span>
+      </div>
+      <div class="overview-sep" aria-hidden="true"></div>
+      <div class="overview-item">
+        <span class="overview-label">Success</span>
+        <span class="overview-value">${successRate}%</span>
       </div>
       <div class="overview-sep" aria-hidden="true"></div>
       <div class="overview-item">
@@ -439,22 +502,24 @@ async function renderRuns() {
     </div>
 
     <div class="filter-bar" role="search" aria-label="Filter simulations">
-      <label class="sr-only" for="filter-status">Status</label>
       <select class="filter-select" id="filter-status" onchange="filterRuns()" aria-label="Filter by status">
         <option value="">All Status</option>
         <option value="completed">Completed</option>
         <option value="failed">Failed</option>
       </select>
-      <label class="sr-only" for="filter-profile">Profile</label>
       <select class="filter-select" id="filter-profile" onchange="filterRuns()" aria-label="Filter by profile">
         <option value="">All Profiles</option>
         ${profileOpts}
       </select>
-      <label class="sr-only" for="filter-strategy">Strategy</label>
       <select class="filter-select" id="filter-strategy" onchange="filterRuns()" aria-label="Filter by strategy">
         <option value="">All Strategies</option>
         ${strategyOpts}
       </select>
+      <button class="filter-clear" id="filter-clear-btn" onclick="clearFilters()" style="display:none" aria-label="Clear all filters">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        Clear filters
+      </button>
+      <span class="filter-count" id="filter-count"></span>
     </div>
 
     <div class="card">
@@ -496,6 +561,20 @@ window.filterRuns = function() {
   if (profile) filtered = filtered.filter(r => r.profile_id === profile);
   if (strategy) filtered = filtered.filter(r => r.strategy_id === strategy);
 
+  const hasFilters = status || profile || strategy;
+  const clearBtn = $('#filter-clear-btn');
+  if (clearBtn) clearBtn.style.display = hasFilters ? '' : 'none';
+
+  $$('.filter-select').forEach(el => {
+    el.classList.toggle('has-value', !!el.value);
+  });
+
+  const countEl = $('#filter-count');
+  if (countEl) {
+    const total = (window._allRuns || []).length;
+    countEl.textContent = hasFilters ? `${filtered.length} of ${total}` : `${total} total`;
+  }
+
   const tbody = $('#runs-tbody');
   if (!tbody) return;
 
@@ -517,9 +596,14 @@ window.filterRuns = function() {
         <td class="${j ? scoreClass(j.compliance_score) : ''}">${j ? pct(j.compliance_score) : '\u2014'}</td>
         <td>${r.turn_count}</td>
         <td>${r.ended_by ? escapeHTML(fmtId(r.ended_by)) : '\u2014'}</td>
-        <td>${relTime(r.started_at)}</td>
+        <td title="${escapeAttr(r.started_at || '')}">${relTime(r.started_at)}</td>
       </tr>`;
   }).join('');
+};
+
+window.clearFilters = function() {
+  $$('.filter-select').forEach(el => { el.value = ''; });
+  filterRuns();
 };
 
 // ── Launch single run ───────────────────────────────────────────
@@ -534,25 +618,25 @@ async function renderLaunch() {
   mainEl.innerHTML = `
     <div class="page-header">
       <h1>Launch Run</h1>
-      <p>Configure one simulation and watch the transcript fill in while it runs</p>
+      <p>Configure and start a single simulation</p>
     </div>
     <div class="grid-2">
       <div class="card">
-        <div class="card-header"><h2>Single Simulation</h2></div>
+        <div class="card-header"><h2>Configuration</h2></div>
         <div class="card-body">
           <form class="control-form" onsubmit="startSingleRun(event)">
             ${selectField('launch-profile', 'Profile', profileOpts)}
             ${selectField('launch-strategy', 'Strategy', strategyOpts)}
             ${selectField('launch-conversation-model', 'Conversation model', conversationOpts)}
             ${selectField('launch-judge-model', 'Judge model', judgeOpts)}
-            <button class="btn btn-primary" type="submit">Start run</button>
+            <button class="btn btn-primary" type="submit" id="launch-btn">Start simulation</button>
           </form>
         </div>
       </div>
       <div class="card">
         <div class="card-header"><h2>Live Progress</h2><div id="single-job-status">${statusBadge('queued')}</div></div>
         <div class="card-body" id="single-job-panel">
-          ${emptyState('Ready', 'Start a simulation to see turns, status, and judgment here.')}
+          ${emptyState('Ready', 'Configure and start a simulation to see live progress here.')}
         </div>
       </div>
     </div>`;
@@ -563,7 +647,9 @@ window.startSingleRun = async function(event) {
   clearPoll('single');
   const panel = $('#single-job-panel');
   const status = $('#single-job-status');
+  const btn = $('#launch-btn');
   panel.innerHTML = skeleton();
+  if (btn) { btn.classList.add('btn-loading'); btn.disabled = true; }
   try {
     const job = await apiPost('/jobs/simulations', {
       profile_id: $('#launch-profile').value,
@@ -573,9 +659,13 @@ window.startSingleRun = async function(event) {
     });
     status.innerHTML = statusBadge(job.status);
     renderJobPanel(job, panel);
+    showToast('Simulation started', 'success');
     window._pollers.single = setInterval(() => pollJob(job.id, 'single-job-panel', 'single-job-status', 'single'), 800);
   } catch (err) {
     panel.innerHTML = emptyState('Launch failed', err.message);
+    showToast(err.message, 'error');
+  } finally {
+    if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; }
   }
 };
 
@@ -591,7 +681,7 @@ async function renderMatrix() {
   mainEl.innerHTML = `
     <div class="page-header">
       <h1>Matrix Runs</h1>
-      <p>Run background matrices and monitor aggregate progress</p>
+      <p>Run all profile-strategy combinations and monitor progress</p>
     </div>
     <div class="grid-2">
       <div class="card">
@@ -606,14 +696,14 @@ async function renderMatrix() {
               ${inputField('matrix-reps', 'Reps', options.defaults.reps || 1, 1, 100)}
               ${inputField('matrix-concurrency', 'Concurrency', 2, 1, 10)}
             </div>
-            <button class="btn btn-primary" type="submit">Start matrix</button>
+            <button class="btn btn-primary" type="submit" id="matrix-btn">Start matrix</button>
           </form>
         </div>
       </div>
       <div class="card">
-        <div class="card-header"><h2>Background Progress</h2><div id="matrix-job-status">${statusBadge('queued')}</div></div>
+        <div class="card-header"><h2>Progress</h2><div id="matrix-job-status">${statusBadge('queued')}</div></div>
         <div class="card-body" id="matrix-job-panel">
-          ${jobs.length ? jobs.map(jobSummaryHTML).join('') : emptyState('No Matrix Active', 'Start a matrix to watch completion counts and current cells.')}
+          ${jobs.length ? jobs.map(jobSummaryHTML).join('') : emptyState('No Jobs', 'Start a matrix run to watch progress.')}
         </div>
       </div>
     </div>`;
@@ -624,7 +714,9 @@ window.startMatrixRun = async function(event) {
   clearPoll('matrix');
   const panel = $('#matrix-job-panel');
   const status = $('#matrix-job-status');
+  const btn = $('#matrix-btn');
   panel.innerHTML = skeleton();
+  if (btn) { btn.classList.add('btn-loading'); btn.disabled = true; }
   try {
     const job = await apiPost('/jobs/matrix', {
       profile_ids: checkedValues('matrix-profiles'),
@@ -636,9 +728,13 @@ window.startMatrixRun = async function(event) {
     });
     status.innerHTML = statusBadge(job.status);
     renderJobPanel(job, panel);
+    showToast('Matrix run started', 'success');
     window._pollers.matrix = setInterval(() => pollJob(job.id, 'matrix-job-panel', 'matrix-job-status', 'matrix'), 800);
   } catch (err) {
     panel.innerHTML = emptyState('Matrix failed', err.message);
+    showToast(err.message, 'error');
+  } finally {
+    if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; }
   }
 };
 
@@ -654,7 +750,7 @@ async function renderManual() {
   mainEl.innerHTML = `
     <div class="page-header">
       <h1>Manual Run</h1>
-      <p>Play the collector or debtor, then save the judged transcript as a run</p>
+      <p>Play the collector or debtor role, then save the judged transcript</p>
     </div>
     <div class="grid-2 manual-layout">
       <div class="card">
@@ -666,13 +762,13 @@ async function renderManual() {
             ${selectField('manual-role', 'You play', '<option value="debtor">Debtor</option><option value="collector">Collector</option>')}
             ${selectField('manual-conversation-model', 'AI model', conversationOpts)}
             ${selectField('manual-judge-model', 'Judge model', judgeOpts)}
-            <button class="btn btn-primary" type="submit">Start manual run</button>
+            <button class="btn btn-primary" type="submit" id="manual-btn">Start session</button>
           </form>
         </div>
       </div>
       <div class="card">
-        <div class="card-header"><h2>Role-play Transcript</h2><div id="manual-status">${statusBadge('waiting_for_human')}</div></div>
-        <div class="card-body" id="manual-panel">${emptyState('No Session', 'Start a manual run to enter turns.')}</div>
+        <div class="card-header"><h2>Transcript</h2><div id="manual-status">${statusBadge('waiting_for_human')}</div></div>
+        <div class="card-body" id="manual-panel">${emptyState('No Session', 'Start a manual session to begin.')}</div>
       </div>
     </div>`;
 }
@@ -680,7 +776,9 @@ async function renderManual() {
 window.startManualSession = async function(event) {
   event.preventDefault();
   const panel = $('#manual-panel');
+  const btn = $('#manual-btn');
   panel.innerHTML = skeleton();
+  if (btn) { btn.classList.add('btn-loading'); btn.disabled = true; }
   try {
     const session = await apiPost('/manual-sessions', {
       profile_id: $('#manual-profile').value,
@@ -691,8 +789,12 @@ window.startManualSession = async function(event) {
     });
     window._manualSessionId = session.id;
     renderManualSession(session);
+    showToast('Session started', 'success');
   } catch (err) {
-    panel.innerHTML = emptyState('Manual setup failed', err.message);
+    panel.innerHTML = emptyState('Setup failed', err.message);
+    showToast(err.message, 'error');
+  } finally {
+    if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; }
   }
 };
 
@@ -720,6 +822,7 @@ window.finishManualSession = async function() {
   try {
     const session = await apiPost(`/manual-sessions/${window._manualSessionId}/finish`, {});
     renderManualSession(session);
+    showToast('Session finished and judged', 'success');
   } catch (err) {
     appendFormError(panel, err.message);
   }
@@ -734,18 +837,18 @@ function renderManualSession(session) {
     ${transcriptHTML(run)}
     ${judgmentHTML(run)}
     ${session.status === 'completed' ? `
-      <div class="btn-row">
-        ${linkButton('Open saved run', `openTranscript(${jsArg(run.id)})`)}
+      <div class="btn-row" style="margin-top:var(--space-4)">
+        ${linkButton('View saved run', `openTranscript(${jsArg(run.id)})`)}
       </div>` : `
-      <form class="control-form" onsubmit="submitManualTurn(event)">
-        <label for="manual-turn-content">Your ${escapeHTML(session.human_role)} turn</label>
+      <form class="control-form" style="margin-top:var(--space-4)" onsubmit="submitManualTurn(event)">
+        <label for="manual-turn-content" class="form-label">Your ${escapeHTML(session.human_role)} turn</label>
         <textarea class="form-textarea" id="manual-turn-content" rows="4" ${disabled} placeholder="Type the next line. Add [END_CONVERSATION] to stop."></textarea>
         <div class="btn-row">
           <button class="btn btn-primary" type="submit" ${disabled}>Send turn</button>
           <button class="btn" type="button" onclick="finishManualSession()">Finish and judge</button>
         </div>
       </form>`}
-    <p class="status-line">${escapeHTML(session.message || '')}</p>`;
+    <p class="status-line" style="margin-top:var(--space-3)">${escapeHTML(session.message || '')}</p>`;
 }
 
 // ── Launch form helpers ─────────────────────────────────────────
@@ -794,12 +897,20 @@ function clearPoll(key) {
 }
 
 async function pollJob(jobId, panelId, statusId, pollKey) {
-  const job = await api(`/jobs/${pathPart(jobId)}`);
-  const panel = $(`#${panelId}`);
-  const status = $(`#${statusId}`);
-  if (status) status.innerHTML = statusBadge(job.status);
-  if (panel) renderJobPanel(job, panel);
-  if (job.status === 'completed' || job.status === 'failed') clearPoll(pollKey);
+  try {
+    const job = await api(`/jobs/${pathPart(jobId)}`);
+    const panel = $(`#${panelId}`);
+    const status = $(`#${statusId}`);
+    if (status) status.innerHTML = statusBadge(job.status);
+    if (panel) renderJobPanel(job, panel);
+    if (job.status === 'completed' || job.status === 'failed') {
+      clearPoll(pollKey);
+      if (job.status === 'completed') showToast('Job completed', 'success');
+      if (job.status === 'failed') showToast('Job failed', 'error');
+    }
+  } catch (_) {
+    /* polling errors are transient */
+  }
 }
 
 function renderJobPanel(job, panel) {
@@ -807,7 +918,7 @@ function renderJobPanel(job, panel) {
     <div class="status-card">
       <div class="job-item-head">
         <div>
-          <div class="job-id">${escapeHTML(job.id)}</div>
+          <div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-secondary)">${escapeHTML(job.id)}</div>
           <div class="status-line">${escapeHTML(job.message || '')}</div>
         </div>
         ${statusBadge(job.status)}
@@ -820,20 +931,20 @@ function renderJobPanel(job, panel) {
           ${judgmentHTML(job.current_run)}
         </div>` : ''}
       ${job.result_ids && job.result_ids.length ? `
-        <div class="btn-row">
-          ${linkButton('Open latest saved run', `openTranscript(${jsArg(job.result_ids[job.result_ids.length - 1])})`)}
-          ${linkButton('View all runs', "navigateTo('runs')")}
+        <div class="btn-row" style="margin-top:var(--space-3)">
+          ${linkButton('View latest run', `openTranscript(${jsArg(job.result_ids[job.result_ids.length - 1])})`)}
+          ${linkButton('All runs', "navigateTo('runs')")}
         </div>` : ''}
-      ${(job.errors || []).length ? `<div class="form-error">${job.errors.map(escapeHTML).join('<br>')}</div>` : ''}
+      ${(job.errors || []).length ? `<div class="form-error" style="margin-top:var(--space-3)">${job.errors.map(escapeHTML).join('<br>')}</div>` : ''}
     </div>`;
 }
 
 function jobSummaryHTML(job) {
   return `
     <button class="job-item" type="button" onclick="showJob(${jsArg(job.id)}, 'matrix-job-panel', 'matrix-job-status')">
-      <span>${escapeHTML(job.kind)}, ${escapeHTML(job.id)}</span>
+      <span style="font-size:var(--text-sm)">${escapeHTML(job.kind)} \u00b7 ${escapeHTML(job.id)}</span>
       <span>${statusBadge(job.status)}</span>
-      <span>${job.completed + job.failed}/${job.total}</span>
+      <span style="font-size:var(--text-xs);color:var(--text-secondary)">${job.completed + job.failed} of ${job.total}</span>
     </button>`;
 }
 
@@ -866,9 +977,7 @@ window.openTranscript = async function(runId) {
     title.textContent = run.id;
     subtitle.textContent = `${fmtId(run.profile_id)} \u00d7 ${fmtId(run.strategy_id)}`;
 
-    const metaTags = runMetaHTML(run);
-
-    body.innerHTML = metaTags + transcriptHTML(run) + judgmentHTML(run);
+    body.innerHTML = runMetaHTML(run) + transcriptHTML(run) + judgmentHTML(run);
 
     panel.querySelector('.slideout-close').focus();
   } catch (err) {
@@ -889,7 +998,6 @@ function runMetaHTML(run) {
 }
 
 function transcriptHTML(run) {
-  const MAX_STAGGER = 10;
   const chatMsgs = chatHTML(run.transcript || '');
   return `<div class="chat-container" role="list" aria-label="Conversation transcript">${chatMsgs || emptyState('No Turns', 'No transcript turns yet.')}</div>`;
 }
@@ -971,8 +1079,15 @@ async function renderCompliance() {
     const cards = exclusions.map(e => `
       <div class="exclusion-card" role="alert">
         <h4>${escapeHTML(fmtId(e.strategy_id))} \u00d7 ${escapeHTML(fmtId(e.profile_id))}</h4>
-        <div class="exclusion-detail">
-          <strong>Compliance:</strong> ${pct(e.compliance_score)} &nbsp;|&nbsp; <strong>Escalation Risk:</strong> ${pct(e.escalation_risk)}
+        <div class="exclusion-stats">
+          <div class="exclusion-stat">
+            <span class="exclusion-stat-label">Compliance</span>
+            <span class="exclusion-stat-value ${scoreClass(e.compliance_score)}">${pct(e.compliance_score)}</span>
+          </div>
+          <div class="exclusion-stat">
+            <span class="exclusion-stat-label">Escalation</span>
+            <span class="exclusion-stat-value ${scoreClass(1 - e.escalation_risk)}">${pct(e.escalation_risk)}</span>
+          </div>
         </div>
         <div class="exclusion-detail">${escapeHTML(e.reason)}</div>
       </div>
@@ -983,7 +1098,7 @@ async function renderCompliance() {
   mainEl.innerHTML = `
     <div class="page-header">
       <h1>Compliance Monitor</h1>
-      <p>Strategy-profile combinations flagged for compliance or escalation risk concerns</p>
+      <p>${exclusions.length} strategy-profile combination${exclusions.length !== 1 ? 's' : ''} flagged</p>
     </div>
     ${content}
   `;
@@ -994,9 +1109,22 @@ async function renderCompliance() {
 async function renderProfiles() {
   const profiles = await api('/config/profiles');
 
-  const cards = profiles.map(p => `
+  const archetypeColors = {
+    cooperative: '--chart-7',
+    avoidant: '--chart-6',
+    hostile: '--chart-5',
+    disputer: '--chart-4',
+    confused: '--chart-3',
+  };
+
+  const cards = profiles.map(p => {
+    const colorVar = archetypeColors[p.archetype] || '--chart-1';
+    return `
     <div class="config-card">
-      <h3>${escapeHTML(fmtId(p.id))}</h3>
+      <div class="config-card-header">
+        <div class="config-card-icon" style="background:var(${colorVar});color:oklch(99% 0 0);font-weight:700;font-size:var(--text-sm)">${escapeHTML(fmtId(p.archetype).charAt(0))}</div>
+        <h3>${escapeHTML(fmtId(p.id))}</h3>
+      </div>
       <div class="config-field"><span class="config-field-key">Archetype</span><span class="config-field-value">${escapeHTML(fmtId(p.archetype))}</span></div>
       <div class="config-field"><span class="config-field-key">Debt</span><span class="config-field-value">$${p.debt_amount.toLocaleString()} ${escapeHTML(p.debt_type)}</span></div>
       <div class="config-field"><span class="config-field-key">Age</span><span class="config-field-value">${p.debt_age_days} days</span></div>
@@ -1011,12 +1139,13 @@ async function renderProfiles() {
           ${p.constraints.map(c => `<div class="config-constraint">${escapeHTML(c.text)}</div>`).join('')}
         </div>` : ''}
     </div>
-  `).join('');
+  `;
+  }).join('');
 
   mainEl.innerHTML = `
     <div class="page-header">
       <h1>Debtor Profiles</h1>
-      <p>Configured debtor archetypes used in simulations</p>
+      <p>${profiles.length} configured debtor archetype${profiles.length !== 1 ? 's' : ''}</p>
     </div>
     <div class="grid-3">${cards}</div>
   `;
@@ -1027,9 +1156,21 @@ async function renderProfiles() {
 async function renderStrategies() {
   const strategies = await api('/config/strategies');
 
-  const cards = strategies.map(s => `
+  const toneColors = {
+    empathetic: '--chart-7',
+    assertive: '--chart-5',
+    neutral: '--chart-1',
+    urgent: '--chart-6',
+  };
+
+  const cards = strategies.map(s => {
+    const colorVar = toneColors[s.tone] || '--chart-2';
+    return `
     <div class="config-card">
-      <h3>${escapeHTML(fmtId(s.id))}</h3>
+      <div class="config-card-header">
+        <div class="config-card-icon" style="background:var(${colorVar});color:oklch(99% 0 0);font-weight:700;font-size:var(--text-sm)">${escapeHTML(fmtId(s.tone).charAt(0))}</div>
+        <h3>${escapeHTML(fmtId(s.id))}</h3>
+      </div>
       <div class="config-field"><span class="config-field-key">Tone</span><span class="config-field-value">${escapeHTML(fmtId(s.tone))}</span></div>
       <div class="config-field"><span class="config-field-key">Opening</span><span class="config-field-value">${escapeHTML(fmtId(s.opening_approach))}</span></div>
       <div class="config-field"><span class="config-field-key">Negotiation</span><span class="config-field-value">${escapeHTML(fmtId(s.negotiation_tactic))}</span></div>
@@ -1038,12 +1179,13 @@ async function renderStrategies() {
       <div class="config-field"><span class="config-field-key">Compliance</span><span class="config-field-value">${escapeHTML(fmtId(s.compliance_adherence))}</span></div>
       <div class="config-field"><span class="config-field-key">Follow-up</span><span class="config-field-value">${escapeHTML(fmtId(s.follow_up_strategy))}</span></div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 
   mainEl.innerHTML = `
     <div class="page-header">
       <h1>Collector Strategies</h1>
-      <p>Configured collection strategies used in simulations</p>
+      <p>${strategies.length} configured collection strateg${strategies.length !== 1 ? 'ies' : 'y'}</p>
     </div>
     <div class="grid-2">${cards}</div>
   `;
