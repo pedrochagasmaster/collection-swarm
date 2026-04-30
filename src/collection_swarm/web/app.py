@@ -183,6 +183,21 @@ def create_app(
     def _benchmark_output_dir() -> Path:
         return db_path.parent / "benchmarks"
 
+    def _load_saved_benchmark_reports() -> None:
+        bench_dir = _benchmark_output_dir()
+        if not bench_dir.is_dir():
+            return
+        for path in sorted(bench_dir.glob("bench_*-*.json")):
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+                job_id = path.stem.split("-")[0]
+                if job_id not in app.state.benchmark_reports:
+                    app.state.benchmark_reports[job_id] = data
+            except Exception:
+                pass
+
+    _load_saved_benchmark_reports()
+
     def _model_options(config) -> dict[str, Any]:
         conversation = []
         judge = []
