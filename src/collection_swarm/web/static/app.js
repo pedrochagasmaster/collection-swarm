@@ -12,9 +12,21 @@ const mainEl = $('#main-content');
 // ── Routing ────────────────────────────────────────────────────
 
 let currentPage = 'dashboard';
+let _lastFocusedBeforeSlideout = null;
+let _runsSortColumn = 'started_at';
+let _runsSortDirection = 'desc';
+let _runsSearchTimer = null;
+let _lastPageParams = {};
+let _runsSortColumn = 'started_at';
+let _runsSortDirection = 'desc';
+let _runsSearchDebounce = null;
+let _slideoutPreviousFocus = null;
+let _slideoutRunIds = [];
+let _currentSlideoutRunId = null;
 
 function navigateTo(page, params = {}) {
   currentPage = page;
+  _lastPageParams[page] = params || {};
   $$('.nav-link').forEach(el => {
     const isActive = el.dataset.page === page;
     el.classList.toggle('active', isActive);
@@ -48,12 +60,19 @@ function toggleTheme() {
   const next = html.dataset.theme === 'dark' ? 'light' : 'dark';
   html.dataset.theme = next;
   localStorage.setItem('cs-theme', next);
+  updateThemeLabel();
 }
 
 (function initTheme() {
   const saved = localStorage.getItem('cs-theme');
   if (saved) document.documentElement.dataset.theme = saved;
+  updateThemeLabel();
 })();
+
+function updateThemeLabel() {
+  const label = $('.theme-label');
+  if (label) label.textContent = `Theme: ${fmtId(document.documentElement.dataset.theme || 'dark')}`;
+}
 
 // ── Mobile sidebar ─────────────────────────────────────────────
 
@@ -235,17 +254,30 @@ function emptyState(title, msg) {
 
 function scoreBarHTML(label, value) {
   value = safePctInput(value);
-  const cls = scoreClass(value);
+  const isRisk = label.toLowerCase().includes('escalation');
+  const interpreted = isRisk ? 1 - value : value;
+  const cls = scoreClass(interpreted);
   const colorVar = cls === 'score-good' ? '--success' : cls === 'score-mid' ? '--warning' : '--danger';
   const safeLabel = escapeHTML(label);
+  const definitions = {
+    'Payment Probability': 'Estimated likelihood that the debtor would pay based on judge assessment. Higher is better.',
+    'Compliance Score': 'How closely the conversation stays within collection policy and constraints. Higher is better.',
+    'Debtor Satisfaction': 'Estimated debtor trust and comfort after the conversation. Higher is better.',
+    'Rapport Built': 'How well the collector established trust and cooperation. Higher is better.',
+    'Escalation Risk': 'Likelihood that the interaction increases complaints, disputes, or hostility. Lower is better.',
+    'Efficiency': 'How quickly the conversation reached a useful endpoint. Higher is better.',
+  };
+  const definition = definitions[label] || `${label} score.`;
+  const meaning = cls === 'score-good' ? 'Good' : cls === 'score-mid' ? 'Watch' : 'Risk';
+  const labelText = isRisk ? `${label} (lower is better)` : label;
   return `
     <div class="judgment-score-item">
-      <span class="judgment-score-label">${safeLabel}</span>
+      <span class="judgment-score-label" title="${escapeAttr(definition)}">${escapeHTML(labelText)}</span>
       <div class="score-bar-wrap">
-        <div class="score-bar" role="meter" aria-valuenow="${Math.round(value * 100)}" aria-valuemin="0" aria-valuemax="100" aria-label="${escapeAttr(label)}">
+        <div class="score-bar" role="meter" aria-valuenow="${Math.round(value * 100)}" aria-valuemin="0" aria-valuemax="100" aria-label="${escapeAttr(`${labelText}: ${definition}`)}">
           <div class="score-bar-fill" style="width:${value * 100}%;background:var(${colorVar})"></div>
         </div>
-        <span class="score-bar-label ${cls}">${pct(value)}</span>
+        <span class="score-bar-label ${cls}"><span aria-hidden="true">${cls === 'score-good' ? 'OK' : cls === 'score-mid' ? '!' : 'X'}</span> ${pct(value)} ${meaning}</span>
       </div>
     </div>`;
 }
@@ -314,6 +346,36 @@ function modelSelectOptions(items, selectedId) {
   return items.map(item => `<option value="${escapeAttr(item.id)}" ${item.id === selectedId ? 'selected' : ''}>${escapeHTML(item.id)}</option>`).join('');
 }
 
+function profileSummary(profile) {
+  if (!profile) return 'Select a profile to see debtor context.';
+  const constraints = (profile.constraints || []).slice(0, 2).map(c => c.text).join(' ');
+  return `${fmtId(profile.archetype)} debtor, $${Number(profile.debt_amount || 0).toLocaleString()} ${profile.debt_type || 'debt'}. ${constraints || profile.backstory || ''}`.trim();
+}
+
+function strategySummary(strategy) {
+  if (!strategy) return 'Select a strategy to see its approach.';
+  return `${fmtId(strategy.tone)} tone, ${fmtId(strategy.opening_approach)} opening, ${fmtId(strategy.negotiation_tactic)} negotiation.`;
+}
+
+function updateSelectSummary(selectId, summaryId, items, formatter) {
+  const select = $(`#${selectId}`);
+  const summary = $(`#${summaryId}`);
+  if (!select || !summary) return;
+  const item = items.find(entry => entry.id === select.value);
+  summary.textContent = formatter(item);
+}
+
+function advancedModelSettings(prefix, conversationOpts, judgeOpts, conversationLabel = 'Conversation model') {
+  return `
+    <details class="advanced-settings">
+      <summary>Advanced model settings</summary>
+      <div class="advanced-settings-body">
+        ${selectField(`${prefix}-conversation-model`, conversationLabel, conversationOpts)}
+        ${selectField(`${prefix}-judge-model`, 'Judge model', judgeOpts)}
+      </div>
+    </details>`;
+}
+
 function linkButton(label, onclick, extraClass = '') {
   return `<button class="btn ${extraClass}" type="button" onclick="${escapeAttr(onclick)}">${escapeHTML(label)}</button>`;
 }
@@ -340,6 +402,34 @@ const OUTCOME_COLORS = {
   'hang_up': 'var(--chart-4)',
 };
 
+const METRIC_DEFINITIONS = {
+  'Payment Probability': 'Estimated likelihood that the debtor would pay based on judge assessment. Higher is better.',
+  'Compliance Score': 'How closely the conversation stayed within compliance expectations. Higher is better.',
+  'Debtor Satisfaction': 'Estimated debtor sentiment and perceived fairness. Higher is better.',
+  'Rapport Built': 'How much trust and collaboration the conversation created. Higher is better.',
+  'Escalation Risk': 'Risk that the interaction increases complaints, avoidance, or regulatory exposure. Lower is better.',
+  'Efficiency': 'Conversation progress relative to the expected turn budget. Higher means fewer wasted turns.',
+  Runs: 'Total simulations recorded in the current database.',
+  Completed: 'Simulations that finished and produced a saved result.',
+  Failed: 'Simulations that ended with an error.',
+  Success: 'Completed runs divided by all recorded runs.',
+};
+
+function metricLabelHTML(label, extra = '') {
+  const title = METRIC_DEFINITIONS[label] || '';
+  return `<span class="metric-help" title="${escapeAttr(title)}">${escapeHTML(label)}${extra ? ` <span class="metric-note">${escapeHTML(extra)}</span>` : ''}</span>`;
+}
+
+function performanceSummaryHTML(performance) {
+  if (!performance || !performance.run_count) return '';
+  return `
+    <div class="performance-summary" aria-label="Performance summary">
+      <span><strong>${fmtNum(performance.run_count)}</strong> runs</span>
+      <span><strong>${pct(performance.payment_probability)}</strong> payment</span>
+      <span><strong>${pct(performance.compliance_score)}</strong> compliance</span>
+    </div>`;
+}
+
 // ══════════════════════════════════════════════════════════════
 //  PAGE RENDERERS
 // ══════════════════════════════════════════════════════════════
@@ -349,11 +439,11 @@ async function renderPage(page, params = {}) {
   mainEl.scrollTop = 0;
   try {
     switch (page) {
-      case 'dashboard': await renderDashboard(); break;
+      case 'dashboard': await renderDashboard(params); break;
       case 'runs': await renderRuns(); break;
-      case 'launch': await renderLaunch(); break;
-      case 'matrix': await renderMatrix(); break;
-      case 'manual': await renderManual(); break;
+      case 'launch': await renderLaunch(params); break;
+      case 'matrix': await renderMatrix(params); break;
+      case 'manual': await renderManual(params); break;
       case 'playbook': await renderPlaybook(); break;
       case 'compliance': await renderCompliance(); break;
       case 'profiles': await renderProfiles(); break;
@@ -371,81 +461,79 @@ async function renderPage(page, params = {}) {
 // ── Dashboard ──────────────────────────────────────────────────
 
 async function renderDashboard() {
-  const data = await api('/dashboard');
+  const [data, compliance] = await Promise.all([
+    api('/dashboard'),
+    api('/compliance/exclusions'),
+  ]);
   const { total_runs, completed, failed, average_scores: avg, outcome_distribution: dist, cost } = data;
 
   const totalOutcomes = Object.values(dist).reduce((a, b) => a + b, 0) || 1;
-
-  let outcomeRows = '';
-  const sortedOutcomes = Object.entries(dist).sort((a, b) => b[1] - a[1]);
-  for (const [outcome, count] of sortedOutcomes) {
+  const outcomeRows = Object.entries(dist).sort((a, b) => b[1] - a[1]).map(([outcome, count]) => {
     const w = (count / totalOutcomes) * 100;
     const color = OUTCOME_COLORS[outcome] || 'var(--chart-1)';
-    outcomeRows += `
+    return `
       <div class="dist-row">
         <span class="dist-label">${escapeHTML(fmtId(outcome))}</span>
         <div class="dist-bar-track">
-          <div class="dist-bar-fill" style="width:${Math.max(w, 6)}%;background:${color}"><span>${pct(count/totalOutcomes)}</span></div>
+          <div class="dist-bar-fill" style="width:${Math.max(w, 6)}%;background:${color}"><span>${pct(count / totalOutcomes)}</span></div>
         </div>
         <span class="dist-count">${count}</span>
       </div>`;
-  }
+  }).join('');
 
-  let strategySection = '';
-  if (data.profiles.length) {
-    const tabs = data.profiles.map((p, i) =>
-      `<button class="tab-btn${i === 0 ? ' active' : ''}" onclick="switchProfileTab(${jsArg(p)}, this)" role="tab" aria-selected="${i === 0}">${escapeHTML(fmtId(p))}</button>`
-    ).join('');
-    strategySection = `
-      <div class="card" style="margin-top:var(--space-6)">
-        <div class="card-header"><h2>Strategy Rankings</h2></div>
-        <div class="card-body">
-          <div class="tabs" role="tablist" aria-label="Profile strategy rankings" id="profile-tabs">${tabs}</div>
-          <div id="strategy-comparison" role="tabpanel">${skeleton()}</div>
+  const tabs = data.profiles.map((p, i) => {
+    const tabId = `profile-tab-${i}`;
+    const panelId = 'strategy-comparison';
+    return `<button id="${tabId}" class="tab-btn${i === 0 ? ' active' : ''}" onclick="switchProfileTab(${jsArg(p)}, this)" onkeydown="handleProfileTabKey(event)" role="tab" aria-selected="${i === 0}" aria-controls="${panelId}" tabindex="${i === 0 ? '0' : '-1'}">${escapeHTML(fmtId(p))}</button>`;
+  }).join('');
+  const strategySection = data.profiles.length ? `
+    <section class="card decision-card">
+      <div class="card-header">
+        <div>
+          <h2>Strategy Rankings</h2>
+          <p class="section-lead">Best strategy per debtor profile, ranked by payment probability.</p>
         </div>
-      </div>`;
-    setTimeout(() => loadStrategyComparison(data.profiles[0]), 0);
-  }
+      </div>
+      <div class="card-body">
+        <div class="tabs" role="tablist" aria-label="Profile strategy rankings" id="profile-tabs">${tabs}</div>
+        <div id="strategy-comparison" role="tabpanel" tabindex="0" aria-labelledby="profile-tab-0">${skeleton()}</div>
+      </div>
+    </section>` : '';
 
+  const complianceBanner = renderComplianceBanner(compliance);
   const successRate = total_runs > 0 ? Math.round((completed / total_runs) * 100) : 0;
 
   mainEl.innerHTML = `
     <div class="page-header">
       <h1>Dashboard</h1>
-      <p>Simulation performance overview across ${fmtNum(total_runs)} runs</p>
+      <p>Which strategy to use, which to avoid, and why.</p>
     </div>
 
     <div class="overview-strip" role="status" aria-label="Simulation summary">
       <div class="overview-item">
-        <span class="overview-label">Runs</span>
+        <span class="overview-label">${metricLabelHTML('Runs')}</span>
         <span class="overview-value">${fmtNum(total_runs)}</span>
       </div>
       <div class="overview-sep" aria-hidden="true"></div>
       <div class="overview-item">
-        <span class="overview-label">Completed</span>
+        <span class="overview-label">${metricLabelHTML('Completed')}</span>
         <span class="overview-value">${fmtNum(completed)}</span>
       </div>
       <div class="overview-sep" aria-hidden="true"></div>
       <div class="overview-item">
-        <span class="overview-label">Failed</span>
+        <span class="overview-label">${metricLabelHTML('Failed')}</span>
         <span class="overview-value">${fmtNum(failed)}</span>
       </div>
       <div class="overview-sep" aria-hidden="true"></div>
       <div class="overview-item">
-        <span class="overview-label">Success</span>
+        <span class="overview-label">${metricLabelHTML('Success')}</span>
         <span class="overview-value">${successRate}%</span>
       </div>
-      <div class="overview-sep" aria-hidden="true"></div>
-      <div class="overview-item">
-        <span class="overview-label">Cost</span>
-        <span class="overview-value">${fmtMoney(cost.estimated_cost_usd || 0)}</span>
-      </div>
-      <div class="overview-sep" aria-hidden="true"></div>
-      <div class="overview-item">
-        <span class="overview-label">Tokens</span>
-        <span class="overview-value">${fmtNum((cost.input_tokens || 0) + (cost.output_tokens || 0))}</span>
-      </div>
     </div>
+
+    ${total_runs === 0 ? renderFirstRunPanel() : ''}
+    ${strategySection}
+    ${complianceBanner}
 
     <div class="grid-2">
       <div class="card">
@@ -471,18 +559,69 @@ async function renderDashboard() {
       </div>
     </div>
 
-    ${strategySection}
+    <details class="operational-details">
+      <summary>Operational Details</summary>
+      <div class="operational-grid">
+        <span>Estimated cost <strong>${fmtMoney(cost.estimated_cost_usd || 0)}</strong></span>
+        <span>Input tokens <strong>${fmtNum(cost.input_tokens || 0)}</strong></span>
+        <span>Output tokens <strong>${fmtNum(cost.output_tokens || 0)}</strong></span>
+      </div>
+    </details>
   `;
+
+  if (data.profiles.length) setTimeout(() => loadStrategyComparison(data.profiles[0]), 0);
+}
+
+function renderFirstRunPanel() {
+  return `
+    <section class="first-run-panel" aria-label="Getting started">
+      <div>
+        <p class="eyebrow">Start here</p>
+        <h2>Run enough evidence to choose a collection strategy.</h2>
+      </div>
+      <div class="first-run-actions">
+        <button class="first-run-action" type="button" onclick="navigateTo('launch', { demo: true })"><strong>Run a demo simulation</strong><span>Use defaults to create the first judged transcript.</span></button>
+        <button class="first-run-action" type="button" onclick="navigateTo('matrix', { profile: 'cooperative_hardship' })"><strong>Compare strategies for a profile</strong><span>Run every strategy against one debtor archetype.</span></button>
+        <button class="first-run-action" type="button" onclick="navigateTo('compliance')"><strong>Review compliance risks</strong><span>Check what thresholds will exclude a strategy.</span></button>
+      </div>
+    </section>`;
+}
+
+function renderComplianceBanner(data) {
+  const exclusions = data.exclusions || [];
+  if (!exclusions.length) {
+    return `<div class="compliance-strip success"><strong>No compliance exceptions</strong><span>${fmtNum(data.total_completed_runs || 0)} completed runs checked.</span><button class="text-link" type="button" onclick="navigateTo('compliance')">View details</button></div>`;
+  }
+  const critical = exclusions.slice(0, 3).map(e =>
+    `<span>${escapeHTML(fmtId(e.strategy_id))} x ${escapeHTML(fmtId(e.profile_id))}: ${pct(e.compliance_score)} compliance, ${pct(e.escalation_risk)} escalation</span>`
+  ).join('');
+  return `<div class="compliance-strip danger"><strong>${exclusions.length} compliance exception${exclusions.length !== 1 ? 's' : ''}</strong><span>${critical}</span><button class="text-link" type="button" onclick="navigateTo('compliance')">View details</button></div>`;
 }
 
 window.switchProfileTab = async function(profileId, btn) {
   $$('#profile-tabs .tab-btn').forEach(b => {
-    b.classList.remove('active');
-    b.setAttribute('aria-selected', 'false');
+    const selected = b === btn;
+    b.classList.toggle('active', selected);
+    b.setAttribute('aria-selected', String(selected));
+    b.setAttribute('tabindex', selected ? '0' : '-1');
   });
-  btn.classList.add('active');
-  btn.setAttribute('aria-selected', 'true');
+  const panel = $('#strategy-comparison');
+  if (panel) panel.setAttribute('aria-labelledby', btn.id);
+  btn.focus();
   await loadStrategyComparison(profileId);
+};
+
+window.handleProfileTabKey = function(event) {
+  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+  event.preventDefault();
+  const tabs = $$('#profile-tabs .tab-btn');
+  const index = tabs.indexOf(event.currentTarget);
+  let next = index;
+  if (event.key === 'ArrowLeft') next = index <= 0 ? tabs.length - 1 : index - 1;
+  if (event.key === 'ArrowRight') next = index >= tabs.length - 1 ? 0 : index + 1;
+  if (event.key === 'Home') next = 0;
+  if (event.key === 'End') next = tabs.length - 1;
+  tabs[next].click();
 };
 
 async function loadStrategyComparison(profileId) {
@@ -495,7 +634,9 @@ async function loadStrategyComparison(profileId) {
       container.innerHTML = emptyState('No Data', `No completed simulations for ${fmtId(profileId)}.`);
       return;
     }
-    container.innerHTML = data.strategies.map((s, i) => `
+    container.innerHTML = data.strategies.map((s, i) => {
+      const escalationClass = scoreClass(1 - safePctInput(s.mean_escalation_risk));
+      return `
       <div class="comparison-row">
         <div class="comparison-rank" aria-label="Rank ${i + 1}">${i + 1}</div>
         <div class="comparison-name">${escapeHTML(fmtId(s.strategy_id))}</div>
@@ -509,16 +650,16 @@ async function loadStrategyComparison(profileId) {
             <span class="comparison-metric-label">Compliance</span>
           </div>
           <div class="comparison-metric">
-            <span class="comparison-metric-value ${scoreClass(1 - s.mean_escalation_risk)}">${pct(s.mean_escalation_risk)}</span>
-            <span class="comparison-metric-label">Escalation</span>
+            <span class="comparison-metric-value ${escalationClass}">${pct(s.mean_escalation_risk)}</span>
+            <span class="comparison-metric-label">Escalation, lower is better</span>
           </div>
           <div class="comparison-metric">
             <span class="comparison-metric-value">${s.simulation_count}</span>
             <span class="comparison-metric-label">Runs</span>
           </div>
         </div>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
   } catch (err) {
     container.innerHTML = emptyState('Error', err.message);
   }
@@ -539,12 +680,17 @@ async function renderRuns() {
   const strategyOpts = strategies.map(s => `<option value="${escapeAttr(s)}">${escapeHTML(fmtId(s))}</option>`).join('');
 
   mainEl.innerHTML = `
-    <div class="page-header">
-      <h1>Simulation Runs</h1>
-      <p>${runs.length} simulation${runs.length !== 1 ? 's' : ''} recorded</p>
+    <div class="page-header page-header-actions">
+      <div>
+        <h1>Simulation Runs</h1>
+        <p>${runs.length} simulation${runs.length !== 1 ? 's' : ''} recorded</p>
+      </div>
+      <button class="btn" type="button" onclick="exportRunsCSV()">Export CSV</button>
     </div>
 
     <div class="filter-bar" role="search" aria-label="Filter simulations">
+      <label class="sr-only" for="filter-search">Search runs</label>
+      <input class="form-input filter-search" id="filter-search" type="search" placeholder="Search runs, profiles, strategies, outcomes, transcripts" oninput="debouncedFilterRuns()" aria-label="Search runs">
       <label class="sr-only" for="filter-status">Status</label>
       <select class="filter-select" id="filter-status" onchange="filterRuns()" aria-label="Filter by status">
         <option value="">All Status</option>
@@ -562,30 +708,18 @@ async function renderRuns() {
         ${strategyOpts}
       </select>
       <button class="filter-clear" id="filter-clear-btn" onclick="clearFilters()" style="display:none" aria-label="Clear all filters">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         Clear filters
       </button>
       <span class="filter-count" id="filter-count"></span>
     </div>
+    <div class="filter-chips" id="filter-chips" aria-live="polite"></div>
 
     <div class="card">
       <div class="card-body no-padding">
-        <div style="overflow-x:auto;max-height:calc(100vh - 280px)">
+        <div style="overflow-x:auto;max-height:calc(100vh - 320px)">
           <table class="data-table" id="runs-table" aria-label="Simulation runs">
-            <thead>
-              <tr>
-                <th scope="col">ID</th>
-                <th scope="col">Status</th>
-                <th scope="col">Profile</th>
-                <th scope="col">Strategy</th>
-                <th scope="col">Outcome</th>
-                <th scope="col">Payment</th>
-                <th scope="col">Compliance</th>
-                <th scope="col">Turns</th>
-                <th scope="col">Ended By</th>
-                <th scope="col">Time</th>
-              </tr>
-            </thead>
+            <thead><tr id="runs-head-row"></tr></thead>
             <tbody id="runs-tbody"></tbody>
           </table>
         </div>
@@ -594,6 +728,9 @@ async function renderRuns() {
   `;
 
   window._allRuns = runs;
+  window._sortColumn = window._sortColumn || 'started_at';
+  window._sortDirection = window._sortDirection || 'desc';
+  renderRunHeaders();
   filterRuns();
 }
 
@@ -601,13 +738,32 @@ window.filterRuns = function() {
   const status = ($('#filter-status') || {}).value || '';
   const profile = ($('#filter-profile') || {}).value || '';
   const strategy = ($('#filter-strategy') || {}).value || '';
+  const search = (($('#filter-search') || {}).value || '').trim().toLowerCase();
 
   let filtered = window._allRuns || [];
   if (status) filtered = filtered.filter(r => r.status === status);
   if (profile) filtered = filtered.filter(r => r.profile_id === profile);
   if (strategy) filtered = filtered.filter(r => r.strategy_id === strategy);
+  if (search) {
+    filtered = filtered.filter(r => {
+      const j = r.judgment || {};
+      const haystack = [
+        r.id,
+        r.profile_id,
+        r.strategy_id,
+        r.status,
+        j.payment_outcome,
+        r.conversation_model,
+        r.judge_model,
+        r.error_message,
+      ].join(' ').toLowerCase();
+      return haystack.includes(search);
+    });
+  }
+  filtered = sortRuns(filtered);
+  window._filteredRuns = filtered;
 
-  const hasFilters = status || profile || strategy;
+  const hasFilters = status || profile || strategy || search;
   const clearBtn = $('#filter-clear-btn');
   if (clearBtn) clearBtn.style.display = hasFilters ? '' : 'none';
 
@@ -620,6 +776,8 @@ window.filterRuns = function() {
     const total = (window._allRuns || []).length;
     countEl.textContent = hasFilters ? `${filtered.length} of ${total}` : `${total} total`;
   }
+  const chipsEl = $('#filter-chips');
+  if (chipsEl) chipsEl.innerHTML = renderFilterChips({ status, profile, strategy, search });
 
   const tbody = $('#runs-tbody');
   if (!tbody) return;
@@ -629,10 +787,10 @@ window.filterRuns = function() {
     return;
   }
 
-  tbody.innerHTML = filtered.slice().reverse().map(r => {
+  tbody.innerHTML = filtered.map(r => {
     const j = r.judgment;
     return `
-      <tr onclick="openTranscript(${jsArg(r.id)})" tabindex="0" role="button" aria-label="View transcript for ${escapeAttr(r.id)}" onkeydown="if(event.key==='Enter')openTranscript(${jsArg(r.id)})">
+      <tr onclick="openTranscript(${jsArg(r.id)})" tabindex="0" role="button" aria-label="View transcript for ${escapeAttr(r.id)}" onkeydown="handleRunRowKey(event, ${jsArg(r.id)})">
         <td>${escapeHTML(r.id)}</td>
         <td>${statusBadge(r.status)}</td>
         <td>${escapeHTML(fmtId(r.profile_id))}</td>
@@ -647,34 +805,182 @@ window.filterRuns = function() {
   }).join('');
 };
 
+let _runFilterTimer = null;
+window.debouncedFilterRuns = function() {
+  clearTimeout(_runFilterTimer);
+  _runFilterTimer = setTimeout(filterRuns, 200);
+};
+
+window.handleRunRowKey = function(event, runId) {
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  event.preventDefault();
+  openTranscript(runId);
+};
+
 window.clearFilters = function() {
   $$('.filter-select').forEach(el => { el.value = ''; });
+  const search = $('#filter-search');
+  if (search) search.value = '';
   filterRuns();
+};
+
+function renderFilterChips(filters) {
+  const chips = [];
+  if (filters.status) chips.push(['status', `Status: ${fmtId(filters.status)}`]);
+  if (filters.profile) chips.push(['profile', `Profile: ${fmtId(filters.profile)}`]);
+  if (filters.strategy) chips.push(['strategy', `Strategy: ${fmtId(filters.strategy)}`]);
+  if (filters.search) chips.push(['search', `Search: ${filters.search}`]);
+  return chips.map(([key, label]) => `
+    <span class="filter-chip">
+      ${escapeHTML(label)}
+      <button type="button" onclick="clearFilter(${jsArg(key)})" aria-label="Clear ${escapeAttr(label)}">x</button>
+    </span>
+  `).join('');
+}
+
+window.clearFilter = function(key) {
+  const map = {
+    status: '#filter-status',
+    profile: '#filter-profile',
+    strategy: '#filter-strategy',
+    search: '#filter-search',
+  };
+  const el = $(map[key]);
+  if (el) el.value = '';
+  filterRuns();
+};
+
+function sortRuns(runs) {
+  const column = window._sortColumn || 'started_at';
+  const direction = window._sortDirection === 'asc' ? 1 : -1;
+  return runs.slice().sort((a, b) => {
+    const av = sortValue(a, column);
+    const bv = sortValue(b, column);
+    if (av < bv) return -1 * direction;
+    if (av > bv) return 1 * direction;
+    return 0;
+  });
+}
+
+function sortValue(run, column) {
+  const judgment = run.judgment || {};
+  const values = {
+    id: run.id,
+    status: run.status,
+    profile_id: fmtId(run.profile_id),
+    strategy_id: fmtId(run.strategy_id),
+    payment_outcome: judgment.payment_outcome || '',
+    payment_probability: Number(judgment.payment_probability || 0),
+    compliance_score: Number(judgment.compliance_score || 0),
+    turn_count: Number(run.turn_count || 0),
+    ended_by: run.ended_by || '',
+    started_at: run.started_at || '',
+  };
+  return values[column] ?? '';
+}
+
+function sortableHeader(label, column) {
+  const active = window._sortColumn === column;
+  const arrow = active ? (window._sortDirection === 'asc' ? 'up' : 'down') : '';
+  return `<button class="sort-btn${active ? ' active' : ''}" type="button" onclick="setRunSort(${jsArg(column)})">${escapeHTML(label)} <span aria-hidden="true">${arrow === 'up' ? '^' : arrow === 'down' ? 'v' : ''}</span></button>`;
+}
+
+window.setRunSort = function(column) {
+  if (window._sortColumn === column) {
+    window._sortDirection = window._sortDirection === 'asc' ? 'desc' : 'asc';
+  } else {
+    window._sortColumn = column;
+    window._sortDirection = column === 'started_at' ? 'desc' : 'asc';
+  }
+  renderRunHeaders();
+  filterRuns();
+};
+
+function renderRunHeaders() {
+  const row = $('#runs-head-row');
+  if (!row) return;
+  row.innerHTML = [
+    ['ID', 'id'],
+    ['Status', 'status'],
+    ['Profile', 'profile_id'],
+    ['Strategy', 'strategy_id'],
+    ['Outcome', 'payment_outcome'],
+    ['Payment', 'payment_probability'],
+    ['Compliance', 'compliance_score'],
+    ['Turns', 'turn_count'],
+    ['Ended By', 'ended_by'],
+    ['Time', 'started_at'],
+  ].map(([label, column]) => `<th scope="col">${sortableHeader(label, column)}</th>`).join('');
+}
+
+function exportRunsCSV() {
+  const rows = window._filteredRuns || [];
+  const headers = ['id', 'status', 'profile_id', 'strategy_id', 'outcome', 'payment_probability', 'compliance_score', 'debtor_satisfaction', 'escalation_risk', 'turn_count', 'ended_by', 'started_at'];
+  const csvRows = [headers.join(',')].concat(rows.map(run => {
+    const j = run.judgment || {};
+    return [
+      run.id,
+      run.status,
+      run.profile_id,
+      run.strategy_id,
+      j.payment_outcome || '',
+      j.payment_probability ?? '',
+      j.compliance_score ?? '',
+      j.debtor_satisfaction ?? '',
+      j.escalation_risk ?? '',
+      run.turn_count ?? '',
+      run.ended_by || '',
+      run.started_at || '',
+    ].map(csvCell).join(',');
+  }));
+  const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `collection-swarm-runs-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function csvCell(value) {
+  return `"${String(value ?? '').replace(/"/g, '""')}"`;
+}
+
+window.updateLaunchDescriptions = function() {
+  const options = window._runOptions || { profiles: [], strategies: [] };
+  updateSelectSummary('launch-profile', 'launch-profile-summary', options.profiles, profileSummary);
+  updateSelectSummary('launch-strategy', 'launch-strategy-summary', options.strategies, strategySummary);
 };
 
 // ── Launch single run ───────────────────────────────────────────
 
-async function renderLaunch() {
+async function renderLaunch(params = {}) {
   const options = await api('/config/run-options');
-  const profileOpts = runSelectOptions(options.profiles, '');
-  const strategyOpts = runSelectOptions(options.strategies, '');
+  const selectedProfile = params.profile || (params.demo ? 'cooperative_hardship' : '');
+  const selectedStrategy = params.strategy || (params.demo ? 'empathetic_payment_plan' : '');
+  const profileOpts = runSelectOptions(options.profiles, selectedProfile);
+  const strategyOpts = runSelectOptions(options.strategies, selectedStrategy);
   const conversationOpts = modelSelectOptions(options.conversation_models, options.defaults.conversation_model);
   const judgeOpts = modelSelectOptions(options.judge_models, options.defaults.judge_model);
 
+  window._runOptions = options;
   mainEl.innerHTML = `
     <div class="page-header">
       <h1>Launch Run</h1>
-      <p>Configure and start a single simulation</p>
+      <p>Choose the debtor and strategy; defaults handle the model setup.</p>
     </div>
     <div class="grid-2">
       <div class="card">
         <div class="card-header"><h2>Configuration</h2></div>
         <div class="card-body">
           <form class="control-form" onsubmit="startSingleRun(event)">
-            ${selectField('launch-profile', 'Profile', profileOpts)}
-            ${selectField('launch-strategy', 'Strategy', strategyOpts)}
-            ${selectField('launch-conversation-model', 'Conversation model', conversationOpts)}
-            ${selectField('launch-judge-model', 'Judge model', judgeOpts)}
+            ${selectField('launch-profile', 'Profile', profileOpts, "updateLaunchDescriptions()")}
+            <p class="field-summary" id="launch-profile-summary"></p>
+            ${selectField('launch-strategy', 'Strategy', strategyOpts, "updateLaunchDescriptions()")}
+            <p class="field-summary" id="launch-strategy-summary"></p>
+            ${advancedModelSettings('launch', conversationOpts, judgeOpts)}
             <button class="btn btn-primary" type="submit" id="launch-btn">Start simulation</button>
           </form>
         </div>
@@ -686,6 +992,7 @@ async function renderLaunch() {
         </div>
       </div>
     </div>`;
+  updateLaunchDescriptions();
 }
 
 window.startSingleRun = async function(event) {
@@ -717,31 +1024,32 @@ window.startSingleRun = async function(event) {
 
 // ── Matrix runs ─────────────────────────────────────────────────
 
-async function renderMatrix() {
+async function renderMatrix(params = {}) {
   const [options, jobs] = await Promise.all([api('/config/run-options'), api('/jobs')]);
-  const profiles = checkboxList('matrix-profiles', options.profiles.map(p => [p.id, fmtId(p.id)]));
+  const profiles = checkboxList('matrix-profiles', options.profiles.map(p => [p.id, fmtId(p.id)]), params.profile ? [params.profile] : null);
   const strategies = checkboxList('matrix-strategies', options.strategies.map(s => [s.id, fmtId(s.id)]));
   const conversationOpts = modelSelectOptions(options.conversation_models, options.defaults.conversation_model);
   const judgeOpts = modelSelectOptions(options.judge_models, options.defaults.judge_model);
 
+  window._runOptions = options;
   mainEl.innerHTML = `
     <div class="page-header">
-      <h1>Matrix Runs</h1>
-      <p>Run all profile-strategy combinations and monitor progress</p>
+      <h1>Batch Comparison</h1>
+      <p>Compare strategy performance across selected debtor profiles.</p>
     </div>
     <div class="grid-2">
       <div class="card">
         <div class="card-header"><h2>Matrix Setup</h2></div>
         <div class="card-body">
           <form class="control-form" onsubmit="startMatrixRun(event)">
-            <div class="form-field"><label>Profiles</label><div class="checkbox-grid">${profiles}</div></div>
-            <div class="form-field"><label>Strategies</label><div class="checkbox-grid">${strategies}</div></div>
-            ${selectField('matrix-conversation-model', 'Conversation model', conversationOpts)}
-            ${selectField('matrix-judge-model', 'Judge model', judgeOpts)}
+            <div class="form-field"><label>Profiles</label><div class="checkbox-grid" onchange="updateMatrixCount()">${profiles}</div></div>
+            <div class="form-field"><label>Strategies</label><div class="checkbox-grid" onchange="updateMatrixCount()">${strategies}</div></div>
+            ${advancedModelSettings('matrix', conversationOpts, judgeOpts)}
             <div class="btn-row">
-              ${inputField('matrix-reps', 'Reps', options.defaults.reps || 1, 1, 100)}
+              ${inputField('matrix-reps', 'Reps', options.defaults.reps || 1, 1, 100, "updateMatrixCount()")}
               ${inputField('matrix-concurrency', 'Concurrency', 2, 1, 10)}
             </div>
+            <div class="matrix-count" id="matrix-count" aria-live="polite"></div>
             <button class="btn btn-primary" type="submit" id="matrix-btn">Start matrix</button>
           </form>
         </div>
@@ -753,6 +1061,7 @@ async function renderMatrix() {
         </div>
       </div>
     </div>`;
+  updateMatrixCount();
 }
 
 window.startMatrixRun = async function(event) {
@@ -793,6 +1102,7 @@ async function renderManual() {
   const conversationOpts = modelSelectOptions(options.conversation_models, options.defaults.conversation_model);
   const judgeOpts = modelSelectOptions(options.judge_models, options.defaults.judge_model);
 
+  window._runOptions = options;
   mainEl.innerHTML = `
     <div class="page-header">
       <h1>Manual Run</h1>
@@ -803,11 +1113,12 @@ async function renderManual() {
         <div class="card-header"><h2>Session Setup</h2></div>
         <div class="card-body">
           <form class="control-form" onsubmit="startManualSession(event)">
-            ${selectField('manual-profile', 'Profile', profileOpts)}
-            ${selectField('manual-strategy', 'Strategy', strategyOpts)}
+            ${selectField('manual-profile', 'Profile', profileOpts, "updateManualDescriptions()")}
+            <p class="field-summary" id="manual-profile-summary"></p>
+            ${selectField('manual-strategy', 'Strategy', strategyOpts, "updateManualDescriptions()")}
+            <p class="field-summary" id="manual-strategy-summary"></p>
             ${selectField('manual-role', 'You play', '<option value="debtor">Debtor</option><option value="collector">Collector</option>')}
-            ${selectField('manual-conversation-model', 'AI model', conversationOpts)}
-            ${selectField('manual-judge-model', 'Judge model', judgeOpts)}
+            ${advancedModelSettings('manual', conversationOpts, judgeOpts, 'AI model')}
             <button class="btn btn-primary" type="submit" id="manual-btn">Start session</button>
           </form>
         </div>
@@ -817,6 +1128,7 @@ async function renderManual() {
         <div class="card-body" id="manual-panel">${emptyState('No Session', 'Start a manual session to begin.')}</div>
       </div>
     </div>`;
+  updateManualDescriptions();
 }
 
 window.startManualSession = async function(event) {
@@ -888,10 +1200,10 @@ function renderManualSession(session) {
       </div>` : `
       <form class="control-form" style="margin-top:var(--space-4)" onsubmit="submitManualTurn(event)">
         <label for="manual-turn-content" class="form-label">Your ${escapeHTML(session.human_role)} turn</label>
-        <textarea class="form-textarea" id="manual-turn-content" rows="4" ${disabled} placeholder="Type the next line. Add [END_CONVERSATION] to stop."></textarea>
+        <textarea class="form-textarea" id="manual-turn-content" rows="4" ${disabled} placeholder="Type your response as the ${escapeAttr(session.human_role)}."></textarea>
         <div class="btn-row">
           <button class="btn btn-primary" type="submit" ${disabled}>Send turn</button>
-          <button class="btn" type="button" onclick="finishManualSession()">Finish and judge</button>
+          <button class="btn btn-primary" type="button" onclick="finishManualSession()">Finish and judge</button>
         </div>
       </form>`}
     <p class="status-line" style="margin-top:var(--space-3)">${escapeHTML(session.message || '')}</p>`;
@@ -901,29 +1213,48 @@ function renderManualSession(session) {
 
 window._pollers = {};
 
-function selectField(id, label, optionsHTML) {
+function selectField(id, label, optionsHTML, onchange = '') {
+  const changeAttr = onchange ? ` onchange="${escapeAttr(onchange)}"` : '';
   return `
     <div class="form-field">
       <label for="${escapeAttr(id)}">${escapeHTML(label)}</label>
-      <select class="filter-select" id="${escapeAttr(id)}">${optionsHTML}</select>
+      <select class="filter-select" id="${escapeAttr(id)}"${changeAttr}>${optionsHTML}</select>
     </div>`;
 }
 
-function inputField(id, label, value, min, max) {
+function inputField(id, label, value, min, max, oninput = '') {
+  const inputAttr = oninput ? ` oninput="${escapeAttr(oninput)}"` : '';
   return `
     <div class="form-field">
       <label for="${escapeAttr(id)}">${escapeHTML(label)}</label>
-      <input class="form-input" id="${escapeAttr(id)}" type="number" value="${escapeAttr(value)}" min="${escapeAttr(min)}" max="${escapeAttr(max)}">
+      <input class="form-input" id="${escapeAttr(id)}" type="number" value="${escapeAttr(value)}" min="${escapeAttr(min)}" max="${escapeAttr(max)}"${inputAttr}>
     </div>`;
 }
 
-function checkboxList(name, entries) {
+function checkboxList(name, entries, selected = null) {
   return entries.map(([value, label]) => `
     <label class="check-option">
-      <input type="checkbox" name="${escapeAttr(name)}" value="${escapeAttr(value)}" checked>
+      <input type="checkbox" name="${escapeAttr(name)}" value="${escapeAttr(value)}" ${selected && !selected.includes(value) ? '' : 'checked'} onchange="updateMatrixCount()">
       <span>${escapeHTML(label)}</span>
     </label>`).join('');
 }
+
+function updateCheckboxSelection(name, selected) {
+  $$(`input[name="${name}"]`).forEach(input => {
+    input.checked = !selected || selected.includes(input.value);
+  });
+}
+
+window.updateMatrixCount = function() {
+  const profiles = checkedValues('matrix-profiles').length;
+  const strategies = checkedValues('matrix-strategies').length;
+  const reps = Number(($('#matrix-reps') || {}).value || 1);
+  const total = profiles * strategies * reps;
+  const el = $('#matrix-count');
+  if (!el) return;
+  el.classList.toggle('warning', total > 50);
+  el.textContent = `${profiles} profiles x ${strategies} strategies x ${reps} reps = ${total} total simulations${total > 50 ? '. Large batches take longer and cost more.' : ''}`;
+};
 
 function checkedValues(name) {
   return $$(`input[name="${name}"]:checked`).map(input => input.value);
@@ -954,11 +1285,12 @@ async function pollJob(jobId, panelId, statusId, pollKey) {
     const status = $(`#${statusId}`);
     if (status) status.innerHTML = statusBadge(job.status);
     if (panel) renderJobPanel(job, panel);
-    if (job.status === 'completed' || job.status === 'failed') {
+    if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') {
       clearPoll(pollKey);
       delete _pollFailCounts[pollKey];
       if (job.status === 'completed') showToast('Job completed', 'success');
       if (job.status === 'failed') showToast('Job failed', 'error');
+      if (job.status === 'cancelled') showToast('Job cancelled', 'info');
     }
   } catch (_) {
     _pollFailCounts[pollKey] = (_pollFailCounts[pollKey] || 0) + 1;
@@ -969,6 +1301,7 @@ async function pollJob(jobId, panelId, statusId, pollKey) {
 }
 
 function renderJobPanel(job, panel) {
+  const canCancel = job.status === 'queued' || job.status === 'running';
   panel.innerHTML = `
     <div class="status-card">
       <div class="job-item-head">
@@ -979,6 +1312,7 @@ function renderJobPanel(job, panel) {
         ${statusBadge(job.status)}
       </div>
       ${progressHTML(job.completed, job.failed, job.total)}
+      ${canCancel ? `<button class="btn btn-danger" type="button" onclick="cancelJob(${jsArg(job.id)})">Cancel job</button>` : ''}
       ${job.current_run ? `
         <div class="live-transcript">
           ${runMetaHTML(job.current_run)}
@@ -993,6 +1327,15 @@ function renderJobPanel(job, panel) {
       ${(job.errors || []).length ? `<div class="form-error" style="margin-top:var(--space-3)">${job.errors.map(escapeHTML).join('<br>')}</div>` : ''}
     </div>`;
 }
+
+window.cancelJob = async function(jobId) {
+  const job = await apiPost(`/jobs/${pathPart(jobId)}/cancel`, {});
+  const panels = ['single-job-panel', 'matrix-job-panel'];
+  panels.forEach(id => {
+    const panel = $(`#${id}`);
+    if (panel) renderJobPanel(job, panel);
+  });
+};
 
 function jobSummaryHTML(job) {
   return `
@@ -1013,6 +1356,8 @@ window.showJob = async function(jobId, panelId, statusId) {
 
 // ── Transcript slideout ────────────────────────────────────────
 
+let _slideoutPreviousFocus = null;
+
 window.openTranscript = async function(runId) {
   const overlay = $('#slideout-overlay');
   const panel = $('#slideout-panel');
@@ -1020,6 +1365,8 @@ window.openTranscript = async function(runId) {
   const title = $('#slideout-title');
   const subtitle = $('#slideout-subtitle');
 
+  if (!panel.classList.contains('open')) _slideoutPreviousFocus = document.activeElement;
+  window._currentTranscriptRunId = runId;
   overlay.classList.add('open');
   overlay.removeAttribute('aria-hidden');
   panel.classList.add('open');
@@ -1033,12 +1380,34 @@ window.openTranscript = async function(runId) {
     subtitle.textContent = `${fmtId(run.profile_id)} \u00d7 ${fmtId(run.strategy_id)}`;
 
     body.innerHTML = runMetaHTML(run) + transcriptHTML(run) + judgmentHTML(run);
+    renderSlideoutNav(runId);
 
     panel.querySelector('.slideout-close').focus();
   } catch (err) {
     body.innerHTML = emptyState('Error', err.message);
   }
 };
+
+function renderSlideoutNav(runId) {
+  let nav = $('#slideout-nav');
+  const header = $('.slideout-header');
+  if (!nav && header) {
+    nav = document.createElement('div');
+    nav.id = 'slideout-nav';
+    nav.className = 'slideout-nav';
+    header.insertBefore(nav, header.querySelector('.slideout-close'));
+  }
+  if (!nav) return;
+  const runs = window._filteredRuns || window._allRuns || [];
+  const index = runs.findIndex(run => run.id === runId);
+  if (index === -1 || runs.length < 2) {
+    nav.innerHTML = '';
+    return;
+  }
+  nav.innerHTML = `
+    <button class="btn" type="button" ${index === 0 ? 'disabled' : ''} onclick="openTranscript(${jsArg(runs[index - 1]?.id || '')})">Previous</button>
+    <button class="btn" type="button" ${index === runs.length - 1 ? 'disabled' : ''} onclick="openTranscript(${jsArg(runs[index + 1]?.id || '')})">Next</button>`;
+}
 
 function runMetaHTML(run) {
   return `
@@ -1089,9 +1458,30 @@ window.closeTranscript = function() {
   overlay.classList.remove('open');
   overlay.setAttribute('aria-hidden', 'true');
   panel.classList.remove('open');
+  const nav = $('#slideout-nav');
+  if (nav) nav.innerHTML = '';
+  if (_slideoutPreviousFocus && typeof _slideoutPreviousFocus.focus === 'function') {
+    _slideoutPreviousFocus.focus();
+    _slideoutPreviousFocus = null;
+  }
 };
 
 document.addEventListener('keydown', (e) => {
+  const panel = $('#slideout-panel');
+  if (e.key === 'Tab' && panel && panel.classList.contains('open')) {
+    const focusable = $$('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])', panel).filter(el => !el.disabled);
+    if (focusable.length) {
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  }
   if (e.key === 'Escape') {
     const sidebar = $('#sidebar');
     if (sidebar && sidebar.classList.contains('open')) {
@@ -1108,9 +1498,15 @@ async function renderPlaybook() {
   const data = await api('/playbook?format=html');
 
   mainEl.innerHTML = `
-    <div class="page-header">
-      <h1>Generated Playbook</h1>
-      <p>Strategy recommendations based on simulation data</p>
+    <div class="page-header page-header-actions">
+      <div>
+        <h1>Generated Playbook</h1>
+        <p>Strategy recommendations based on simulation data</p>
+      </div>
+      <div class="btn-row">
+        <button class="btn" type="button" onclick="copyPlaybook()">Copy Markdown</button>
+        <button class="btn" type="button" onclick="exportPlaybook()">Export Markdown</button>
+      </div>
     </div>
     <div class="card">
       <div class="card-body">
@@ -1120,20 +1516,47 @@ async function renderPlaybook() {
   `;
 }
 
+window.exportPlaybook = async function() {
+  const data = await api('/playbook?format=markdown');
+  downloadText('collection-swarm-playbook.md', data.content || '', 'text/markdown;charset=utf-8');
+};
+
+window.copyPlaybook = async function() {
+  const data = await api('/playbook?format=markdown');
+  await navigator.clipboard.writeText(data.content || '');
+  showToast('Playbook copied', 'success');
+};
+
+function downloadText(filename, text, type) {
+  const blob = new Blob([text], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 // ── Compliance ─────────────────────────────────────────────────
 
 async function renderCompliance() {
-  const exclusions = await api('/compliance/exclusions');
+  const data = await api('/compliance/exclusions');
+  const exclusions = data.exclusions || [];
+  const thresholds = data.thresholds || {};
+  const thresholdText = `Excluded when compliance < ${pct(thresholds.min_compliance_score || 0)} or escalation risk > ${pct(thresholds.max_escalation_risk || 0)}.`;
 
   let content;
   if (!exclusions.length) {
+    const lowCoverage = (data.total_completed_runs || 0) < (data.minimum_runs_per_combination || 3);
     content = `
       <div class="card">
         <div class="card-body">
           <div class="empty-state" role="status">
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4" stroke="var(--success)"/></svg>
             <h3>All Clear</h3>
-            <p>No compliance exclusions detected. All strategy-profile combinations meet the configured thresholds.</p>
+            <p>All combinations clear across ${fmtNum(data.total_completed_runs || 0)} completed runs. ${lowCoverage ? 'Some combinations have fewer than 3 data points; additional runs would increase confidence.' : 'Coverage meets the current confidence target.'}</p>
           </div>
         </div>
       </div>`;
@@ -1145,12 +1568,16 @@ async function renderCompliance() {
           <div class="exclusion-stat">
             <span class="exclusion-stat-label">Compliance</span>
             <span class="exclusion-stat-value ${scoreClass(e.compliance_score)}">${pct(e.compliance_score)}</span>
+            <span class="threshold-line">Threshold ${pct(thresholds.min_compliance_score || 0)}</span>
           </div>
           <div class="exclusion-stat">
             <span class="exclusion-stat-label">Escalation</span>
             <span class="exclusion-stat-value ${scoreClass(1 - e.escalation_risk)}">${pct(e.escalation_risk)}</span>
+            <span class="threshold-line">Max ${pct(thresholds.max_escalation_risk || 0)}</span>
           </div>
         </div>
+        <p class="status-line">Based on ${fmtNum(e.simulation_count || 0)} simulations</p>
+        ${(e.run_ids || []).length ? `<div class="evidence-links">${e.run_ids.map(id => `<button class="text-link" type="button" onclick="openTranscript(${jsArg(id)})">View evidence ${escapeHTML(id)}</button>`).join('')}</div>` : ''}
         <div class="exclusion-detail">${escapeHTML(e.reason)}</div>
       </div>
     `).join('');
@@ -1160,7 +1587,7 @@ async function renderCompliance() {
   mainEl.innerHTML = `
     <div class="page-header">
       <h1>Compliance Monitor</h1>
-      <p>${exclusions.length} strategy-profile combination${exclusions.length !== 1 ? 's' : ''} flagged</p>
+      <p>${thresholdText}</p>
     </div>
     ${content}
   `;
@@ -1195,11 +1622,16 @@ async function renderProfiles() {
       <div class="config-field"><span class="config-field-key">Objection</span><span class="config-field-value">${escapeHTML(fmtId(p.primary_objection))}</span></div>
       <div class="config-field"><span class="config-field-key">Responsiveness</span><span class="config-field-value">${escapeHTML(fmtId(p.responsiveness))}</span></div>
       <div class="config-field"><span class="config-field-key">Demographics</span><span class="config-field-value">${escapeHTML(fmtId(p.demographics))}</span></div>
+      ${performanceSummaryHTML(p.performance)}
       ${p.backstory ? `<div class="config-backstory">${escapeHTML(p.backstory.trim())}</div>` : ''}
       ${p.constraints && p.constraints.length ? `
         <div class="config-constraints">
           ${p.constraints.map(c => `<div class="config-constraint">${escapeHTML(c.text)}</div>`).join('')}
         </div>` : ''}
+      <div class="btn-row config-actions">
+        <button class="btn btn-primary" type="button" onclick="navigateTo('launch', { profile: ${jsArg(p.id)} })">Run simulation</button>
+        <button class="btn" type="button" onclick="navigateTo('matrix', { profile: ${jsArg(p.id)} })">Compare strategies</button>
+      </div>
     </div>
   `;
   }).join('');
@@ -1240,6 +1672,10 @@ async function renderStrategies() {
       <div class="config-field"><span class="config-field-key">Concessions</span><span class="config-field-value">${escapeHTML(fmtId(s.concession_willingness))}</span></div>
       <div class="config-field"><span class="config-field-key">Compliance</span><span class="config-field-value">${escapeHTML(fmtId(s.compliance_adherence))}</span></div>
       <div class="config-field"><span class="config-field-key">Follow-up</span><span class="config-field-value">${escapeHTML(fmtId(s.follow_up_strategy))}</span></div>
+      ${performanceSummaryHTML(s.performance)}
+      <div class="btn-row config-actions">
+        <button class="btn btn-primary" type="button" onclick="navigateTo('launch', { strategy: ${jsArg(s.id)} })">Launch with this strategy</button>
+      </div>
     </div>
   `;
   }).join('');

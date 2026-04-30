@@ -101,6 +101,12 @@ class WebRunJob:
         }
 
 
+def _job_cancelled_snapshot(job: WebRunJob) -> None:
+    job.status = "cancelled"
+    job.message = "Job cancelled."
+    job.ended_at = utc_now().isoformat()
+
+
 @dataclass
 class ManualSession:
     id: str
@@ -277,7 +283,7 @@ def create_app(
     # ── Compliance exclusions ───────────────────────────────────────
 
     @app.get("/api/compliance/exclusions")
-    def compliance_exclusions() -> list[dict[str, Any]]:
+    def compliance_exclusions() -> dict[str, Any]:
         store = _store()
         config = _config()
         exclusions = check_exclusions(
@@ -287,16 +293,30 @@ def create_app(
             min_compliance_score=config.simulation.min_compliance_score,
             max_escalation_risk=config.simulation.max_escalation_risk,
         )
-        return [
-            {
-                "profile_id": e.profile_id,
-                "strategy_id": e.strategy_id,
-                "compliance_score": e.compliance_score,
-                "escalation_risk": e.escalation_risk,
-                "reason": e.reason,
-            }
-            for e in exclusions
-        ]
+        total_runs = store.count_by_status().get("completed", 0)
+        exclusion_items = []
+        for exclusion in exclusions:
+            combo_runs = store.get_combo_runs(exclusion.profile_id, exclusion.strategy_id)
+            exclusion_items.append(
+                {
+                    "profile_id": exclusion.profile_id,
+                    "strategy_id": exclusion.strategy_id,
+                    "compliance_score": exclusion.compliance_score,
+                    "escalation_risk": exclusion.escalation_risk,
+                    "reason": exclusion.reason,
+                    "simulation_count": len(combo_runs),
+                    "run_ids": [run.id for run in combo_runs[:3]],
+                }
+            )
+        return {
+            "thresholds": {
+                "min_compliance_score": config.simulation.min_compliance_score,
+                "max_escalation_risk": config.simulation.max_escalation_risk,
+            },
+            "total_completed_runs": total_runs,
+            "minimum_runs_per_combination": 3,
+            "exclusions": exclusion_items,
+        }
 
     # ── Objection analysis ──────────────────────────────────────────
 
@@ -346,12 +366,24 @@ def create_app(
     @app.get("/api/config/profiles")
     def list_profiles() -> list[dict[str, Any]]:
         config = _config()
-        return [model_dump_jsonable(p) for p in config.profiles.values()]
+        performance = _store().get_performance_by("profile_id")
+        profiles = []
+        for profile in config.profiles.values():
+            item = model_dump_jsonable(profile)
+            item["performance"] = performance.get(profile.id)
+            profiles.append(item)
+        return profiles
 
     @app.get("/api/config/strategies")
     def list_strategies() -> list[dict[str, Any]]:
         config = _config()
-        return [model_dump_jsonable(s) for s in config.strategies.values()]
+        performance = _store().get_performance_by("strategy_id")
+        strategies = []
+        for strategy in config.strategies.values():
+            item = model_dump_jsonable(strategy)
+            item["performance"] = performance.get(strategy.id)
+            strategies.append(item)
+        return strategies
 
     @app.get("/api/config/models")
     def list_models() -> dict[str, Any]:
@@ -433,6 +465,21 @@ def create_app(
     @app.get("/api/jobs")
     def list_jobs() -> list[dict[str, Any]]:
         return [job.snapshot() for job in reversed(list(app.state.jobs.values()))]
+
+    @app.post("/api/jobs/{job_id}/cancel")
+    async def cancel_job(job_id: str) -> dict[str, Any]:
+        job = app.state.jobs.get(job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
+        if job.status not in {"queued", "running"}:
+            return job.snapshot()
+        job.status = "cancelled"
+        job.message = "Job cancelled by user."
+        job.ended_at = utc_now().isoformat()
+        task = app.state.tasks.get(job_id)
+        if task and not task.done():
+            task.cancel()
+        return job.snapshot()
 
     # ── Manual role-play sessions ───────────────────────────────────
 

@@ -214,6 +214,42 @@ class SimulationStore:
             rows = connection.execute("SELECT status, COUNT(*) AS count FROM runs GROUP BY status").fetchall()
         return {str(row["status"]): int(row["count"]) for row in rows}
 
+    def get_combo_runs(self, profile_id: str, strategy_id: str) -> list[SimulationResult]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT * FROM runs
+                WHERE status = 'completed' AND profile_id = ? AND strategy_id = ?
+                ORDER BY compliance_score ASC, escalation_risk DESC, started_at DESC
+                """,
+                (profile_id, strategy_id),
+            ).fetchall()
+        return [_result_from_row(row) for row in rows]
+
+    def get_performance_by(self, dimension: str) -> dict[str, dict[str, float]]:
+        if dimension not in {"profile_id", "strategy_id"}:
+            raise ValueError("dimension must be profile_id or strategy_id")
+        with self._connect() as connection:
+            rows = connection.execute(
+                f"""
+                SELECT {dimension} AS id,
+                       COUNT(*) AS run_count,
+                       AVG(payment_probability) AS payment_probability,
+                       AVG(compliance_score) AS compliance_score
+                FROM runs
+                WHERE status = 'completed' AND payment_probability IS NOT NULL
+                GROUP BY {dimension}
+                """
+            ).fetchall()
+        return {
+            str(row["id"]): {
+                "run_count": float(row["run_count"] or 0),
+                "payment_probability": float(row["payment_probability"] or 0.0),
+                "compliance_score": float(row["compliance_score"] or 0.0),
+            }
+            for row in rows
+        }
+
 
 def _enum_value(value: Any) -> str | None:
     if value is None:
