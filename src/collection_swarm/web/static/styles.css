@@ -1581,7 +1581,8 @@ body {
   font-weight: 600;
 }
 
-.benchmark-table-wrap {
+.benchmark-table-wrap,
+.bench-table-wrap {
   overflow-x: auto;
 }
 
@@ -1631,6 +1632,497 @@ body {
   .benchmark-recommendations {
     grid-template-columns: 1fr;
   }
+}
+
+/* ── Benchmark Dashboard ─────────────────────────────────── */
+
+.bench-dash {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.bench-dash-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: stretch;
+}
+
+.bench-dash-rec {
+  flex: 1 1 140px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.bench-dash-rec-label {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+}
+
+.bench-dash-rec-value {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+.bench-dash-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  min-width: 72px;
+}
+
+.bench-dash-stat-value {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.bench-dash-stat-label {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.bench-tabs {
+  display: flex;
+  gap: var(--space-1);
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 0;
+}
+
+.bench-tab-panel {
+  display: none;
+}
+
+.bench-tab-panel.active {
+  display: block;
+}
+
+.bench-grid-2 {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: var(--space-6);
+  margin-top: var(--space-6);
+}
+
+@media (max-width: 900px) {
+  .bench-grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Heatmap */
+.bench-heatmap-wrap {
+  margin-bottom: var(--space-4);
+}
+
+.bench-heatmap-wrap h3,
+.bench-barchart-wrap h3,
+.bench-fitdist-wrap h3 {
+  font-size: var(--text-base);
+  font-weight: 600;
+  margin-bottom: var(--space-1);
+}
+
+.bench-section-desc {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-4);
+  max-width: 60ch;
+}
+
+.bench-heatmap {
+  display: grid;
+  gap: 2px;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.bench-hm-corner {
+  background: transparent;
+}
+
+.bench-hm-colhead {
+  padding: var(--space-2) var(--space-3);
+  text-align: center;
+  font-weight: 600;
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+
+.bench-hm-rowhead {
+  padding: var(--space-2) var(--space-3);
+  font-weight: 500;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+  display: flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+}
+
+.bench-hm-cell {
+  padding: var(--space-2) var(--space-3);
+  text-align: center;
+  font-weight: 700;
+  font-size: var(--text-sm);
+  border-radius: var(--radius-sm);
+  transition: transform var(--dur-fast) var(--ease-out-quart);
+  cursor: default;
+}
+
+.bench-hm-cell:hover {
+  transform: scale(1.08);
+  z-index: 1;
+}
+
+.bench-hm-legend {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.bench-hm-legend span:nth-child(odd) {
+  width: 14px;
+  height: 10px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+/* Bar chart */
+.bench-barchart-wrap {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  background: var(--bg-surface);
+}
+
+.bench-barchart-legend {
+  display: flex;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.bench-barchart-legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: var(--space-1);
+  vertical-align: middle;
+}
+
+.bench-barchart {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.bench-bar-group {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.bench-bar-label {
+  font-size: var(--text-sm);
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bench-bar-tracks {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.bench-bar-track {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 14px;
+}
+
+.bench-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width var(--dur-normal) var(--ease-out-expo);
+  min-width: 2px;
+}
+
+.bench-bar-val {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  min-width: 28px;
+}
+
+/* Fit distribution */
+.bench-fitdist-wrap {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  background: var(--bg-surface);
+}
+
+.bench-fitdist-role {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.bench-fitdist-role-label {
+  min-width: 72px;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-align: right;
+  color: var(--text-primary);
+}
+
+.bench-fitdist-bar {
+  flex: 1;
+  display: flex;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  gap: 1px;
+}
+
+.bench-fitdist-seg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: width var(--dur-normal) var(--ease-out-expo);
+}
+
+.bench-fitdist-seg span {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: oklch(15% 0 0);
+}
+
+.bench-fitdist-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.bench-fitdist-legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+/* Role detail tab */
+.bench-role-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.bench-role-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.bench-role-kpi {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: var(--space-4);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.bench-role-kpi-val {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+.bench-role-kpi-label {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.bench-role-bars {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.bench-role-bar-row {
+  display: grid;
+  grid-template-columns: 140px 1fr 56px;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-1) 0;
+}
+
+.bench-role-bar-row.is-rec {
+  background: var(--accent-primary-bg);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  margin: 0 calc(-1 * var(--space-3));
+}
+
+.bench-role-bar-model {
+  font-size: var(--text-sm);
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bench-role-bar-model em {
+  font-style: normal;
+  font-size: var(--text-xs);
+  color: var(--accent-primary);
+  font-weight: 600;
+}
+
+.bench-role-bar-track {
+  height: 18px;
+  background: var(--bg-elevated);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.bench-role-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width var(--dur-normal) var(--ease-out-expo);
+}
+
+.bench-role-bar-fill.score-good { background: var(--success); }
+.bench-role-bar-fill.score-mid { background: var(--warning); }
+.bench-role-bar-fill.score-bad { background: var(--danger); }
+
+.bench-role-bar-score {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.bench-rec-row {
+  background: var(--accent-primary-bg);
+}
+
+.bench-fit-badge {
+  display: inline-block;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.bench-fit-badge.fit-primary { background: var(--success-bg); color: var(--success); border: 1px solid var(--success-border); }
+.bench-fit-badge.fit-strong { background: oklch(20% 0.04 155); color: oklch(68% 0.14 155); border: 1px solid oklch(35% 0.08 155); }
+.bench-fit-badge.fit-caution { background: var(--warning-bg); color: var(--warning); border: 1px solid var(--warning-border); }
+.bench-fit-badge.fit-unsafe { background: oklch(20% 0.04 55); color: oklch(68% 0.14 55); border: 1px solid oklch(35% 0.08 55); }
+.bench-fit-badge.fit-unavailable { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger-border); }
+
+/* Config health */
+.bench-health {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.bench-health-strip {
+  display: flex;
+  gap: var(--space-6);
+}
+
+.bench-health-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.bench-health-val {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.bench-health-stat span:last-child {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.bench-dash-artifacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.bench-dash-artifacts code {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-primary);
+}
+
+@media (max-width: 768px) {
+  .bench-dash-strip { flex-direction: column; }
+  .bench-role-kpis { grid-template-columns: repeat(2, 1fr); }
+  .bench-bar-group { grid-template-columns: 80px 1fr; }
+  .bench-role-bar-row { grid-template-columns: 80px 1fr 48px; }
 }
 
 /* ── Profile / Strategy Cards ──────────────────────────────── */
