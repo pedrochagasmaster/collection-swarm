@@ -12,17 +12,7 @@ const mainEl = $('#main-content');
 // ── Routing ────────────────────────────────────────────────────
 
 let currentPage = 'dashboard';
-let _lastFocusedBeforeSlideout = null;
-let _runsSortColumn = 'started_at';
-let _runsSortDirection = 'desc';
-let _runsSearchTimer = null;
 let _lastPageParams = {};
-let _runsSortColumn = 'started_at';
-let _runsSortDirection = 'desc';
-let _runsSearchDebounce = null;
-let _slideoutPreviousFocus = null;
-let _slideoutRunIds = [];
-let _currentSlideoutRunId = null;
 
 function navigateTo(page, params = {}) {
   currentPage = page;
@@ -1355,8 +1345,6 @@ window.showJob = async function(jobId, panelId, statusId) {
 };
 
 // ── Transcript slideout ────────────────────────────────────────
-
-let _slideoutPreviousFocus = null;
 
 window.openTranscript = async function(runId) {
   const overlay = $('#slideout-overlay');
