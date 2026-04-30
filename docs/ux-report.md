@@ -88,6 +88,18 @@ It returned two typography findings:
 
 For a product dashboard, these are mild findings. Inter is acceptable for dense product UI, but the broader point stands: the interface looks familiar and somewhat generic.
 
+## Test Evidence
+
+Evidence gathered during the audit:
+
+- Local endpoint smoke test: `/`, `/api/dashboard`, and `/api/runs?status=` returned HTTP 200 responses.
+- Seeded data check: `/api/dashboard` reported 24 total runs and 24 completed runs.
+- Browser walkthrough: the recorded session exercised dashboard review, run table filtering, transcript slideout behavior, a successful single-run launch, matrix setup, manual session setup, playbook, compliance, profiles, strategies, theme toggle, and a limited fullscreen responsive check.
+- Video artifact: `/opt/cursor/artifacts/collection_swarm_ux_walkthrough.mp4`.
+- Independent design review: produced a 22/40 Nielsen heuristic score and identified decision-support gaps as the dominant UX risk.
+- Automated detector: returned two typography findings, overused font and single-font usage.
+- Source inspection: found accessibility risks around dialog focus management, table row keyboard activation, tabs, SVG hiding, and reduced-motion behavior.
+
 ## Design Health Score
 
 Scale: 0 to 4 per Nielsen heuristic. A 4 means genuinely excellent, not merely functional.
@@ -541,6 +553,17 @@ Red flags:
 - Tabs need standard arrow-key behavior.
 - Reduced-motion support misses smooth scrolling.
 
+## Priority Issues
+
+The highest-impact issues are:
+
+1. First-time users do not get a guided path through the product's core workflow.
+2. The dashboard summarizes activity, but does not clearly prioritize strategic decisions.
+3. Launch and matrix controls ask users to choose profiles, strategies, models, reps, and concurrency without enough context.
+4. Transcript dialog, table row, tab, and reduced-motion behavior need accessibility hardening.
+5. Runs analysis lacks the expected power-user tools: search, sort, export, saved filters, and comparison.
+6. Compliance findings need stronger evidence, thresholds, and audit trail links.
+
 ## Severity-Ranked Recommendations
 
 ### P1: Add Guided First-Run Experience
@@ -654,7 +677,9 @@ Suggested implementation command:
 
 `$impeccable harden compliance monitor`
 
-## Suggested Next UX Iteration Plan
+## Recommended Roadmap
+
+Recommended order:
 
 1. `onboard`: add dashboard first-run guidance and empty-state workflow prompts.
 2. `layout`: reprioritize the dashboard around recommendations and risk.
