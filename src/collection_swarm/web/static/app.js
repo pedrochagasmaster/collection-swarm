@@ -708,7 +708,7 @@ window.submitManualTurn = async function(event) {
     const session = await apiPost(`/manual-sessions/${window._manualSessionId}/turn`, { content });
     renderManualSession(session);
   } catch (err) {
-    panel.innerHTML += `<div class="form-error">${escapeHTML(err.message)}</div>`;
+    appendFormError(panel, err.message);
   } finally {
     panel.classList.remove('is-loading');
   }
@@ -716,8 +716,13 @@ window.submitManualTurn = async function(event) {
 
 window.finishManualSession = async function() {
   if (!window._manualSessionId) return;
-  const session = await apiPost(`/manual-sessions/${window._manualSessionId}/finish`, {});
-  renderManualSession(session);
+  const panel = $('#manual-panel');
+  try {
+    const session = await apiPost(`/manual-sessions/${window._manualSessionId}/finish`, {});
+    renderManualSession(session);
+  } catch (err) {
+    appendFormError(panel, err.message);
+  }
 };
 
 function renderManualSession(session) {
@@ -773,6 +778,13 @@ function checkboxList(name, entries) {
 
 function checkedValues(name) {
   return $$(`input[name="${name}"]:checked`).map(input => input.value);
+}
+
+function appendFormError(container, message) {
+  if (!container) return;
+  const existing = $('.form-error', container);
+  if (existing) existing.remove();
+  container.insertAdjacentHTML('beforeend', `<div class="form-error" role="alert">${escapeHTML(message)}</div>`);
 }
 
 function clearPoll(key) {
