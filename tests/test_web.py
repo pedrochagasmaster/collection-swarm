@@ -251,7 +251,9 @@ class TestModelBenchmarks:
         data = resp.json()
         assert "gpt-5.5" in data["cursor_models"]
         assert data["roles"] == ["collector", "debtor", "judge"]
-        assert data["defaults"]["profile_id"] == "cooperative_hardship"
+        assert data["defaults"]["profile_ids"] == ["cooperative_hardship"]
+        assert data["defaults"]["strategy_ids"] == ["empathetic_payment_plan"]
+        assert data["defaults"]["judge_profile_ids"] == ["written_proof_disputer"]
 
     def test_launch_model_benchmark_job_saves_report(
         self,
@@ -271,9 +273,9 @@ class TestModelBenchmarks:
             json={
                 "cursor_model_names": ["gpt-5.5"],
                 "roles": ["collector", "debtor"],
-                "profile_id": "cooperative_hardship",
-                "strategy_id": "empathetic_payment_plan",
-                "judge_profile_id": "written_proof_disputer",
+                "profile_ids": ["cooperative_hardship"],
+                "strategy_ids": ["empathetic_payment_plan"],
+                "judge_profile_ids": ["written_proof_disputer"],
                 "concurrency": 1,
             },
         )
