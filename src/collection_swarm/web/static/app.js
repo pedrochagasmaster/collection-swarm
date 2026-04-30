@@ -784,8 +784,7 @@ function appendFormError(container, message) {
   if (!container) return;
   const existing = $('.form-error', container);
   if (existing) existing.remove();
-  const status = $('.status-line', container);
-  if (status) status.remove();
+  $$('.status-line', container).forEach(status => status.remove());
   container.insertAdjacentHTML('beforeend', `<div class="form-error" role="alert">${escapeHTML(message)}</div>`);
 }
 
