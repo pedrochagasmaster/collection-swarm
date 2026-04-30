@@ -42,6 +42,17 @@ def test_store_saves_and_reads_simulation(tmp_path) -> None:
     assert store.count_by_status() == {"completed": 1}
 
 
+def test_store_saves_runs_in_batch(tmp_path) -> None:
+    store = SimulationStore(tmp_path / "runs.sqlite")
+    first = _result()
+    second = _result().model_copy(update={"id": "sim_test_2", "strategy_id": "neutral_reminder"})
+
+    store.save_runs([first, second])
+
+    assert store.count_by_status() == {"completed": 2}
+    assert store.get_run("sim_test_2").strategy_id == "neutral_reminder"
+
+
 def test_strategy_comparison_and_best_transcript(tmp_path) -> None:
     store = SimulationStore(tmp_path / "runs.sqlite")
     store.save_run(_result())

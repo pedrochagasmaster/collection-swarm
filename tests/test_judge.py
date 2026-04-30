@@ -85,13 +85,13 @@ def test_parse_judgment_maps_pending_outcome_to_no_commitment() -> None:
     judgment = _parse_judgment(
         """{
   "reasoning": "Conversation is still ongoing.",
-  "payment_outcome": "pending",
-  "payment_probability": 0.85,
-  "debtor_satisfaction": 0.9,
-  "compliance_score": 1.0,
+  "payment_outcome": "pending_verification",
+  "payment_probability": 85,
+  "debtor_satisfaction": 90,
+  "compliance_score": 100,
   "conversation_efficiency": 0.85,
-  "rapport_built": 0.9,
-  "escalation_risk": 0.05,
+  "rapport_built": 90,
+  "escalation_risk": 5,
   "end_reason": "ongoing",
   "constraint_violations": []
 }""",
@@ -99,6 +99,9 @@ def test_parse_judgment_maps_pending_outcome_to_no_commitment() -> None:
     )
 
     assert judgment.payment_outcome == PaymentOutcome.NO_COMMITMENT
+    assert judgment.payment_probability == 0.85
+    assert judgment.compliance_score == 1.0
+    assert judgment.escalation_risk == 0.05
     assert judgment.conversation_efficiency == 6
 
 
@@ -121,3 +124,26 @@ def test_parse_judgment_maps_negotiating_outcome_to_no_commitment() -> None:
 
     assert judgment.payment_outcome == PaymentOutcome.NO_COMMITMENT
     assert judgment.end_reason == "Ongoing"
+
+
+def test_parse_judgment_accepts_live_aliases_and_ten_point_scores() -> None:
+    judgment = _parse_judgment(
+        """{
+  "reasoning": "The debtor promised to call back.",
+  "payment_outcome": "promised",
+  "payment_probability": 4,
+  "debtor_satisfaction": 5,
+  "compliance_score": 9,
+  "conversation_efficiency": 6,
+  "rapport_built": 4,
+  "escalation_risk": 5,
+  "end_reason": "debtor_promised_callback",
+  "constraint_violations": []
+}""",
+        turn_count=6,
+    )
+
+    assert judgment.payment_outcome == PaymentOutcome.PROMISE_TO_PAY
+    assert judgment.payment_probability == 0.4
+    assert judgment.compliance_score == 0.9
+    assert judgment.escalation_risk == 0.5

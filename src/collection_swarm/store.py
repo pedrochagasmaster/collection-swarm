@@ -19,8 +19,6 @@ from collection_swarm.models import (
     model_dump_jsonable,
 )
 
-from datetime import datetime
-
 
 class SimulationStore:
     def __init__(self, path: Path | str = "output/collection_swarm.sqlite") -> None:
@@ -68,9 +66,13 @@ class SimulationStore:
             )
 
     def save_run(self, result: SimulationResult) -> None:
-        judgment = result.judgment
+        self.save_runs([result])
+
+    def save_runs(self, results: list[SimulationResult]) -> None:
+        if not results:
+            return
         with self._connect() as connection:
-            connection.execute(
+            connection.executemany(
                 """
                 INSERT OR REPLACE INTO runs (
                     id, status, error_message, profile_id, strategy_id, conversation_model, judge_model,
@@ -80,33 +82,7 @@ class SimulationStore:
                     constraint_violations_json, total_input_tokens, total_output_tokens, estimated_cost_usd
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (
-                    result.id,
-                    result.status,
-                    result.error_message,
-                    result.profile_id,
-                    result.strategy_id,
-                    result.conversation_model,
-                    result.judge_model,
-                    result.started_at.isoformat(),
-                    result.ended_at.isoformat() if result.ended_at else None,
-                    result.turn_count,
-                    _enum_value(result.ended_by),
-                    json.dumps([model_dump_jsonable(message) for message in result.transcript]),
-                    judgment.reasoning if judgment else None,
-                    _enum_value(judgment.payment_outcome) if judgment else None,
-                    judgment.payment_probability if judgment else None,
-                    judgment.debtor_satisfaction if judgment else None,
-                    judgment.compliance_score if judgment else None,
-                    judgment.conversation_efficiency if judgment else None,
-                    judgment.rapport_built if judgment else None,
-                    judgment.escalation_risk if judgment else None,
-                    judgment.end_reason if judgment else None,
-                    json.dumps(judgment.constraint_violations if judgment else []),
-                    result.total_input_tokens,
-                    result.total_output_tokens,
-                    result.estimated_cost_usd,
-                ),
+                [_run_row(result) for result in results],
             )
 
     def get_run(self, run_id: str) -> SimulationResult:
@@ -243,6 +219,37 @@ def _enum_value(value: Any) -> str | None:
     if value is None:
         return None
     return getattr(value, "value", value)
+
+
+def _run_row(result: SimulationResult) -> tuple[Any, ...]:
+    judgment = result.judgment
+    return (
+        result.id,
+        result.status,
+        result.error_message,
+        result.profile_id,
+        result.strategy_id,
+        result.conversation_model,
+        result.judge_model,
+        result.started_at.isoformat(),
+        result.ended_at.isoformat() if result.ended_at else None,
+        result.turn_count,
+        _enum_value(result.ended_by),
+        json.dumps([model_dump_jsonable(message) for message in result.transcript]),
+        judgment.reasoning if judgment else None,
+        _enum_value(judgment.payment_outcome) if judgment else None,
+        judgment.payment_probability if judgment else None,
+        judgment.debtor_satisfaction if judgment else None,
+        judgment.compliance_score if judgment else None,
+        judgment.conversation_efficiency if judgment else None,
+        judgment.rapport_built if judgment else None,
+        judgment.escalation_risk if judgment else None,
+        judgment.end_reason if judgment else None,
+        json.dumps(judgment.constraint_violations if judgment else []),
+        result.total_input_tokens,
+        result.total_output_tokens,
+        result.estimated_cost_usd,
+    )
 
 
 def _result_from_row(row: sqlite3.Row) -> SimulationResult:

@@ -111,12 +111,17 @@ def _normalize_judgment_data(data: dict) -> None:
             "settled_in_full": PaymentOutcome.FULL_PAYMENT,
             "partial": PaymentOutcome.PARTIAL_PAYMENT,
             "pending": PaymentOutcome.NO_COMMITMENT,
+            "pending_verification": PaymentOutcome.NO_COMMITMENT,
+            "verification_pending": PaymentOutcome.NO_COMMITMENT,
             "in_progress": PaymentOutcome.NO_COMMITMENT,
             "ongoing": PaymentOutcome.NO_COMMITMENT,
             "no_resolution": PaymentOutcome.NO_COMMITMENT,
             "none": PaymentOutcome.NO_COMMITMENT,
+            "no_payment": PaymentOutcome.NO_COMMITMENT,
             "refused": PaymentOutcome.REFUSAL,
             "hangup": PaymentOutcome.HANG_UP,
+            "promised": PaymentOutcome.PROMISE_TO_PAY,
+            "promised_callback": PaymentOutcome.PROMISE_TO_PAY,
         }
         if normalized in aliases:
             data["payment_outcome"] = aliases[normalized]
@@ -129,11 +134,25 @@ def _normalize_judgment_data(data: dict) -> None:
         else:
             data["payment_outcome"] = normalized
 
+    score_fields = (
+        "payment_probability",
+        "debtor_satisfaction",
+        "compliance_score",
+        "rapport_built",
+        "escalation_risk",
+    )
+    scale = 100 if any(isinstance(data.get(field), (int, float)) and data[field] > 10 for field in score_fields) else 10
+    for field in score_fields:
+        value = data.get(field)
+        if isinstance(value, (int, float)) and value > 1:
+            data[field] = value / scale
+
 
 def _system_prompt() -> str:
     return (
         "You are the Judge evaluator for a synthetic debt collection simulation. "
-        "Assess only the transcript, profile constraints, and account data. Return JSON "
+        "Assess only the transcript, profile constraints, and account data. Return only a compact JSON object "
+        "with no Markdown fences or extra prose. Keep reasoning to at most two concise sentences. Include fields "
         "with reasoning, payment_outcome, payment_probability, debtor_satisfaction, "
         "compliance_score, conversation_efficiency, rapport_built, escalation_risk, "
         "end_reason, and constraint_violations."

@@ -98,15 +98,24 @@ def strip_end_signal(content: str, signal: str = "[END_CONVERSATION]") -> tuple[
 
 
 def stalemate_detected(transcript: list[Message], window: int = 3, threshold: float = 0.6) -> bool:
-    pairs = [(transcript[i], transcript[i + 1]) for i in range(0, len(transcript) - 1, 2)]
-    if len(pairs) < window:
+    pair_count = len(transcript) // 2
+    if pair_count < window:
         return False
-    recent_pairs = pairs[-window:]
-    baseline_collector = recent_pairs[0][0].content.lower()
-    baseline_debtor = recent_pairs[0][1].content.lower()
-    for collector_turn, debtor_turn in recent_pairs[1:]:
-        collector_ratio = SequenceMatcher(None, baseline_collector, collector_turn.content.lower()).ratio()
-        debtor_ratio = SequenceMatcher(None, baseline_debtor, debtor_turn.content.lower()).ratio()
-        if collector_ratio < threshold or debtor_ratio < threshold:
-            return False
+
+    start_pair = pair_count - window
+    baseline_collector = transcript[start_pair * 2].content.lower()
+    baseline_debtor = transcript[start_pair * 2 + 1].content.lower()
+    for pair_index in range(start_pair + 1, pair_count):
+        collector_text = transcript[pair_index * 2].content.lower()
+        debtor_text = transcript[pair_index * 2 + 1].content.lower()
+        if collector_text == baseline_collector and debtor_text == baseline_debtor:
+            continue
+        if collector_text != baseline_collector:
+            collector_ratio = SequenceMatcher(None, baseline_collector, collector_text).ratio()
+            if collector_ratio < threshold:
+                return False
+        if debtor_text != baseline_debtor:
+            debtor_ratio = SequenceMatcher(None, baseline_debtor, debtor_text).ratio()
+            if debtor_ratio < threshold:
+                return False
     return True

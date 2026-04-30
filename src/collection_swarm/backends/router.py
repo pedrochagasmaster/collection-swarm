@@ -3,10 +3,26 @@
 from __future__ import annotations
 
 from collection_swarm.backends.base import LLMBackend, LLMResponse
-from collection_swarm.backends.cursor_sdk import CursorSdkBackend
-from collection_swarm.backends.nim import NimBackend
 from collection_swarm.backends.scripted import ScriptedBackend
 from collection_swarm.models import LLMMessage, ModelConfig
+
+
+class _BackendRegistry(dict[str, LLMBackend]):
+    def __missing__(self, backend_name: str) -> LLMBackend:
+        if backend_name in {"cursor_sdk", "acp"}:
+            from collection_swarm.backends.cursor_sdk import CursorSdkBackend
+
+            backend = CursorSdkBackend()
+            self["cursor_sdk"] = backend
+            self["acp"] = backend
+            return backend
+        if backend_name == "nim":
+            from collection_swarm.backends.nim import NimBackend
+
+            backend = NimBackend()
+            self[backend_name] = backend
+            return backend
+        raise KeyError(backend_name)
 
 
 class LLMRouter:
@@ -14,14 +30,12 @@ class LLMRouter:
 
     def __init__(self, models: dict[str, ModelConfig], backends: dict[str, LLMBackend] | None = None) -> None:
         self.models = models
-        cursor_sdk = CursorSdkBackend()
-        self.backends = backends or {
-            "scripted": ScriptedBackend(),
-            "heuristic": ScriptedBackend(),
-            "nim": NimBackend(),
-            "cursor_sdk": cursor_sdk,
-            "acp": cursor_sdk,
-        }
+        self.backends = backends or _BackendRegistry(
+            {
+                "scripted": ScriptedBackend(),
+                "heuristic": ScriptedBackend(),
+            }
+        )
 
     async def complete(self, model_id: str, messages: list[LLMMessage]) -> LLMResponse:
         try:

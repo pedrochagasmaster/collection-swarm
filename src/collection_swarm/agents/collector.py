@@ -38,6 +38,7 @@ Account data visible to you:
 
 Compliance guardrails: be truthful, identify the account purpose, avoid threats,
 avoid harassment, do not misrepresent consequences, and offer validation when asked.
+Keep each reply to 2-4 concise sentences.
 When the conversation has reached a clear stopping point, append [END_CONVERSATION]."""
 
 

@@ -36,6 +36,7 @@ Backstory:
 Hard constraints you must not violate:
 {constraints}
 
+Keep each reply to 1-3 concise sentences.
 If the conversation reaches a natural stopping point, append [END_CONVERSATION].
 """
     return LLMMessage(role="system", content=content)

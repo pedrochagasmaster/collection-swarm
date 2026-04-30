@@ -78,11 +78,10 @@ async def run_matrix(
                 stalemate_window=settings.stalemate_window,
                 stalemate_similarity_threshold=settings.stalemate_similarity_threshold,
             )
-            result = await engine.run_simulation(config.profile(cell.profile_id), config.strategy(cell.strategy_id))
-            store.save_run(result)
-            return result
+            return await engine.run_simulation(config.profile(cell.profile_id), config.strategy(cell.strategy_id))
 
     results = await asyncio.gather(*(run_cell(cell) for cell in cells))
+    store.save_runs(list(results))
     completed = sum(1 for result in results if result.status == "completed")
     failed = len(results) - completed
     return RunSummary(completed=completed, failed=failed, total=len(results), results=list(results))
