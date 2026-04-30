@@ -26,3 +26,10 @@ def test_simulate_cli_offline_no_save() -> None:
     assert result.exit_code == 0
     assert "Simulation" in result.output
     assert "Payment probability" in result.output
+
+
+def test_serve_reload_reports_unsupported() -> None:
+    result = CliRunner().invoke(cli, ["serve", "--reload"])
+
+    assert result.exit_code != 0
+    assert "--reload is not supported" in result.output
