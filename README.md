@@ -113,22 +113,38 @@ Saved results go to `output/collection_swarm.sqlite` by default.
 
 ## Debtor Profiles & Collector Strategies
 
-### Included Profiles
+The bundled catalog is calibrated to **Will Bank's** real client base and the
+post-liquidation Brazilian context (BCB extrajudicial liquidation decreed
+2026-01-21). Sources, behavioral-economics references, and the rationale for
+every persona and strategy are documented in
+[`docs/willbank-research-dossier.md`](docs/willbank-research-dossier.md).
+
+### Included Profiles (R$ amounts)
 
 | ID | Archetype | Debt | Primary Objection |
 |----|-----------|------|-------------------|
-| `cooperative_hardship` | Cooperative | $4,200 medical | Inability to pay — strict $150/month ceiling |
-| `written_proof_disputer` | Disputer | $2,800 credit card | Disputes debt — requires written proof first |
-| `hostile_avoidant` | Hostile | $1,100 utility | Avoidance — reacts poorly to pressure |
+| `cooperative_hardship` | Cooperative | R$ 850 crédito pessoal Will | Inability to pay — strict R$ 80/mês ceiling |
+| `written_proof_disputer` | Disputer | R$ 612 cartão Will | Disputes fees — demands fatura detalhada + contrato |
+| `hostile_avoidant` | Hostile | R$ 1 900 cartão Will | Avoidance — refuses to share data on the call |
+| `liquidation_confused` | Confused | R$ 540 cartão Will | Questions whether debt still exists post-liquidation |
+| `scam_suspicious` | Skeptical | R$ 1 280 cartão Will | Suspects scam — needs liquidator validation first |
+| `feirao_serial_renegotiator` | Strategic | R$ 2 750 cartão Will | Anchors on Feirão-style 70%+ discounts |
+| `consignado_payroll_steady` | Cooperative | R$ 4 200 FGTS antecipado | Reassurance only; descontos seguem pela folha |
+| `superendividado_chronic` | Overwhelmed | R$ 980 cartão Will | Multi-credor — Lei 14.181/2021 candidate |
+| `young_first_credit_card` | Cooperative | R$ 320 cartão Will | Forgetful — first card; resolve via WhatsApp |
 
 ### Included Strategies
 
 | ID | Tone | Tactic | Follow-up |
 |----|------|--------|-----------|
-| `empathetic_payment_plan` | Empathetic | Payment plan | Written agreement |
-| `assertive_settlement` | Assertive | Settlement offer | Immediate payment |
-| `neutral_reminder` | Neutral | Deadline | Callback |
-| `problem_solving_callback` | Problem-solving | Empathy | Callback |
+| `empathetic_payment_plan` | Empathetic | Payment plan (parcela alinhada ao dia 5) | Written agreement |
+| `assertive_settlement` | Assertive | Loss-framed Feirão-style discount | Immediate boleto |
+| `neutral_reminder` | Neutral | Personalized digital reminder | Self-service link |
+| `problem_solving_callback` | Empathetic | Empathy + implementation intention | Scheduled callback |
+| `liquidation_explainer` | Calm informative | Defer until validated; cite liquidator | Callback after validation |
+| `whatsapp_self_service` | Friendly brief | Link to self-negotiation portal | Portal self-service |
+| `superendividamento_referral` | Empathetic | Refer to Lei 14.181 audiência | Hold pattern + referral |
+| `consignado_confirmation` | Calm informative | Confirm and inform; no ask | Written confirmation |
 
 Profiles and strategies are defined in YAML and are fully extensible — add your own in `config/debtor_profiles.yaml` and `config/collector_strategies.yaml`.
 

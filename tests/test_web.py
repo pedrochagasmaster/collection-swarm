@@ -44,8 +44,17 @@ class TestDashboard:
         assert data["total_runs"] == 12
         assert data["completed"] == 12
         assert data["failed"] == 0
-        assert len(data["profiles"]) == 3
-        assert len(data["strategies"]) == 4
+        # The seed dataset uses three profiles and four strategies; the catalog
+        # is wider (Will Bank context) but only seeded combinations appear here.
+        assert {"cooperative_hardship", "written_proof_disputer", "hostile_avoidant"}.issubset(
+            set(data["profiles"])
+        )
+        assert {
+            "empathetic_payment_plan",
+            "assertive_settlement",
+            "neutral_reminder",
+            "problem_solving_callback",
+        }.issubset(set(data["strategies"]))
         assert "outcome_distribution" in data
         assert "average_scores" in data
 
@@ -144,13 +153,24 @@ class TestConfig:
         resp = seeded_client.get("/api/config/profiles")
         assert resp.status_code == 200
         data = resp.json()
-        assert len(data) == 3
+        # Catalog grew with Will Bank persona research; ensure the original
+        # three profiles are still exposed and there is at least one extra.
+        ids = {profile["id"] for profile in data}
+        assert {"cooperative_hardship", "written_proof_disputer", "hostile_avoidant"}.issubset(ids)
+        assert len(data) >= 3
 
     def test_list_strategies(self, seeded_client: TestClient) -> None:
         resp = seeded_client.get("/api/config/strategies")
         assert resp.status_code == 200
         data = resp.json()
-        assert len(data) == 4
+        ids = {strategy["id"] for strategy in data}
+        assert {
+            "empathetic_payment_plan",
+            "assertive_settlement",
+            "neutral_reminder",
+            "problem_solving_callback",
+        }.issubset(ids)
+        assert len(data) >= 4
 
     def test_list_models(self, seeded_client: TestClient) -> None:
         resp = seeded_client.get("/api/config/models")
