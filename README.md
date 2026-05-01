@@ -115,20 +115,31 @@ Saved results go to `output/collection_swarm.sqlite` by default.
 
 ### Included Profiles
 
+The default config now includes Willbank liquidation personas grounded in public
+client and liquidation context, while keeping the original generic IDs for tests
+and examples.
+
 | ID | Archetype | Debt | Primary Objection |
 |----|-----------|------|-------------------|
-| `cooperative_hardship` | Cooperative | $4,200 medical | Inability to pay — strict $150/month ceiling |
-| `written_proof_disputer` | Disputer | $2,800 credit card | Disputes debt — requires written proof first |
-| `hostile_avoidant` | Hostile | $1,100 utility | Avoidance — reacts poorly to pressure |
+| `willbank_blocked_balance_hardship` | Anxious hardship | R$930 Will card invoice | Money is blocked by liquidation |
+| `willbank_fraud_anxious_disputer` | Fraud-anxious disputer | R$610 revolving balance | Requires official-channel validation |
+| `willbank_first_card_confused_young_adult` | Confused first-credit user | R$420 first-card installment | Does not understand why canceled-card debt remains due |
+| `willbank_micro_merchant_cashflow` | Pragmatic micro-merchant | R$1,480 business card spend | Needs weekly or payday-aligned cash-flow terms |
+| `willbank_benefit_dependent_household` | Vulnerable hardship | R$760 card/basic bills | Basic needs take priority |
+| `willbank_overindebted_behavioral_avoidant` | Ashamed avoidant | R$2,650 card and loan debt | Too many debts and decision overload |
+| `willbank_fgc_waiting_high_balance` | Angry reimbursement waiter | R$3,900 card installments | Will pay after FGC/liquidator release |
+| `willbank_low_digital_access` | Low digital access | R$520 card invoice | Cannot access app or generate boleto |
 
 ### Included Strategies
 
 | ID | Tone | Tactic | Follow-up |
 |----|------|--------|-----------|
-| `empathetic_payment_plan` | Empathetic | Payment plan | Written agreement |
-| `assertive_settlement` | Assertive | Settlement offer | Immediate payment |
-| `neutral_reminder` | Neutral | Deadline | Callback |
-| `problem_solving_callback` | Problem-solving | Empathy | Callback |
+| `official_channel_validation_first` | Reassuring and precise | Validation before payment | Official written summary and safe route |
+| `blocked_balance_hardship_plan` | Empathetic practical | Micro-installment with fee review | Low-entry plan after boleto confirmation |
+| `first_card_financial_education` | Simple supportive | Payday-aligned default plan | One-page summary and small default installment |
+| `micro_merchant_cashflow_alignment` | Collaborative businesslike | Weekly or payday installments | Written schedule with review date |
+| `overindebtedness_stabilization` | Nonjudgmental structured | One recommended option | Documented hardship review |
+| `reimbursement_milestone_callback` | Calm respectful | Bridge agreement until reimbursement | Callback tied to official milestone |
 
 Profiles and strategies are defined in YAML and are fully extensible — add your own in `config/debtor_profiles.yaml` and `config/collector_strategies.yaml`.
 

@@ -1,33 +1,87 @@
 strategies:
   - id: empathetic_payment_plan
     tone: empathetic
-    opening_approach: soft_intro
-    negotiation_tactic: payment_plan
+    opening_approach: liquidation_context_acknowledgment
+    negotiation_tactic: affordability_first_payment_plan
     escalation_style: none
     concession_willingness: flexible
     compliance_adherence: strict
-    follow_up_strategy: written_agreement
+    follow_up_strategy: written_agreement_with_official_boleto_path
   - id: assertive_settlement
-    tone: assertive
-    opening_approach: direct_ask
-    negotiation_tactic: settlement_offer
+    tone: firm_but_calm
+    opening_approach: debt_survives_liquidation_explanation
+    negotiation_tactic: discounted_settlement_after_validation
     escalation_style: gradual
     concession_willingness: moderate
     compliance_adherence: strict
-    follow_up_strategy: immediate_payment
+    follow_up_strategy: official_boleto_or_scheduled_payment
   - id: neutral_reminder
-    tone: neutral
-    opening_approach: reminder
-    negotiation_tactic: payment_plan
+    tone: neutral_clear
+    opening_approach: official_channel_reminder
+    negotiation_tactic: simple_default_payment_choice
     escalation_style: none
     concession_willingness: moderate
     compliance_adherence: standard
-    follow_up_strategy: callback
+    follow_up_strategy: documented_callback_or_boleto_generation
   - id: problem_solving_callback
     tone: empathetic
-    opening_approach: problem_solving
-    negotiation_tactic: empathy
+    opening_approach: hardship_triage
+    negotiation_tactic: bridge_callback_until_reimbursement
     escalation_style: none
     concession_willingness: flexible
     compliance_adherence: strict
-    follow_up_strategy: callback
+    follow_up_strategy: calendar_callback_after_official_updates
+
+  - id: official_channel_validation_first
+    tone: reassuring_and_precise
+    opening_approach: identity_and_liquidation_status_verification
+    negotiation_tactic: validation_before_payment_discussion
+    escalation_style: none
+    concession_willingness: flexible
+    compliance_adherence: strict
+    follow_up_strategy: send_official_written_summary_and_safe_payment_route
+
+  - id: blocked_balance_hardship_plan
+    tone: empathetic_practical
+    opening_approach: acknowledge_blocked_funds_and_basic_needs
+    negotiation_tactic: micro_installment_with_fee_review
+    escalation_style: none
+    concession_willingness: highly_flexible
+    compliance_adherence: strict
+    follow_up_strategy: low_entry_plan_after_boleto_confirmation
+
+  - id: first_card_financial_education
+    tone: simple_supportive
+    opening_approach: plain_language_explain_card_debt_vs_account_balance
+    negotiation_tactic: payday_aligned_default_plan
+    escalation_style: none
+    concession_willingness: flexible
+    compliance_adherence: strict
+    follow_up_strategy: one_page_summary_and_small_default_installment
+
+  - id: micro_merchant_cashflow_alignment
+    tone: collaborative_businesslike
+    opening_approach: cashflow_mapping
+    negotiation_tactic: weekly_or_payday_aligned_installments
+    escalation_style: gradual
+    concession_willingness: flexible
+    compliance_adherence: strict
+    follow_up_strategy: written_schedule_with_next_review_date
+
+  - id: overindebtedness_stabilization
+    tone: nonjudgmental_structured
+    opening_approach: reduce_cognitive_load
+    negotiation_tactic: one_recommended_option_with_interest_freeze_request
+    escalation_style: none
+    concession_willingness: highly_flexible
+    compliance_adherence: strict
+    follow_up_strategy: single_next_step_and_documented_hardship_review
+
+  - id: reimbursement_milestone_callback
+    tone: calm_respectful
+    opening_approach: acknowledge_fgc_or_liquidator_timing
+    negotiation_tactic: bridge_agreement_until_reimbursement
+    escalation_style: none
+    concession_willingness: moderate
+    compliance_adherence: strict
+    follow_up_strategy: callback_tied_to_official_reimbursement_milestone

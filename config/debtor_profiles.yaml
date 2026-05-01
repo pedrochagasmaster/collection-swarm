@@ -19,6 +19,7 @@ profiles:
           type: max_payment
           amount: 150
           frequency: monthly
+      - text: "Responds best when the collector documents options in writing and avoids urgency pressure."
   - id: written_proof_disputer
     archetype: disputer
     financial_situation: can_pay_partial
@@ -38,6 +39,7 @@ profiles:
         rule:
           type: required_action
           action: demand_written_proof
+      - text: "Will not provide passwords, verification codes, or personal documents in the conversation."
   - id: hostile_avoidant
     archetype: hostile
     financial_situation: can_pay_partial
@@ -54,3 +56,206 @@ profiles:
       the call unless the collector is brief and respectful.
     constraints:
       - text: "Will not provide card or bank details during the call."
+      - text: "Will end the interaction if the collector threatens, shames, or repeats contact after refusal."
+
+  - id: willbank_blocked_balance_hardship
+    archetype: anxious_hardship
+    financial_situation: temporary_liquidity_block
+    debt_amount: 930
+    debt_age_days: 35
+    debt_type: willbank_credit_card_invoice
+    prior_contact_count: 0
+    emotional_state: anxious_and_confused
+    primary_objection: money_blocked_by_liquidation
+    responsiveness: high
+    demographics: low_income_family_provider_northeast_small_city
+    backstory: >
+      Uses Will Bank as a main digital account and had salary or emergency savings
+      blocked after the Central Bank liquidation. Understands that card invoices may
+      still be due, but feels it is unfair to pay penalties while essential money is
+      unavailable. Wants a clear official boleto path, fee review, and a plan that
+      protects food, rent, utilities, and medicine first.
+    constraints:
+      - text: "Will never agree to more than R$80 per month until blocked funds are released."
+        rule:
+          type: max_payment
+          amount: 80
+          frequency: monthly
+      - text: "Will require an official boleto or in-app instruction; Pix is not acceptable for card invoices."
+        rule:
+          type: required_action
+          action: provide_official_boleto_path
+      - text: "Will document any app or boleto failure with screenshots before accepting interest or late fees."
+
+  - id: willbank_fraud_anxious_disputer
+    archetype: fraud_anxious_disputer
+    financial_situation: can_pay_partial
+    debt_amount: 610
+    debt_age_days: 48
+    debt_type: willbank_card_revolving_balance
+    prior_contact_count: 2
+    emotional_state: suspicious
+    primary_objection: scam_fear_and_requires_official_validation
+    responsiveness: medium
+    demographics: first_generation_digital_bank_customer
+    backstory: >
+      Has seen warnings that scammers are exploiting Will Bank liquidation and does
+      not trust outbound phone, social media, or messaging-app contacts. May have the
+      money for a small agreement, but will only proceed after the collector explains
+      how to verify the debt through official Will Bank, liquidator, or FGC channels
+      without sharing passwords, codes, or sensitive documents.
+    constraints:
+      - text: "Will not discuss payment until official-channel validation is offered."
+        rule:
+          type: required_action
+          action: verify_official_channel
+      - text: "Will refuse any request for passwords, app codes, full card data, or third-party intermediaries."
+      - text: "Will only accept written confirmation that names the creditor, CNPJ or official channel, amount, and payment route."
+
+  - id: willbank_first_card_confused_young_adult
+    archetype: confused_first_credit
+    financial_situation: low_income_can_pay_small
+    debt_amount: 420
+    debt_age_days: 22
+    debt_type: first_credit_card_installment
+    prior_contact_count: 1
+    emotional_state: embarrassed
+    primary_objection: does_not_understand_liquidation_or_installments
+    responsiveness: high
+    demographics: young_adult_northeast_first_card
+    backstory: >
+      Will Bank was the first card and first banking relationship. The debtor does
+      not understand why a canceled card still has installments due, confuses account
+      balance reimbursement with card debt, and may avoid the issue out of shame.
+      Responds to simple language, a one-page explanation, and small default options
+      tied to payday.
+    constraints:
+      - text: "Will never agree to more than R$60 per month."
+        rule:
+          type: max_payment
+          amount: 60
+          frequency: monthly
+      - text: "Will need the difference between blocked account balance and card invoice explained without jargon."
+
+  - id: willbank_micro_merchant_cashflow
+    archetype: pragmatic_micro_merchant
+    financial_situation: irregular_income
+    debt_amount: 1480
+    debt_age_days: 67
+    debt_type: willbank_credit_card_business_spend
+    prior_contact_count: 2
+    emotional_state: stressed_but_practical
+    primary_objection: irregular_cashflow_after_pix_and_card_disruption
+    responsiveness: medium
+    demographics: informal_worker_or_micro_entrepreneur_small_city
+    backstory: >
+      Used the Will card, Pix, and marketplace purchases to support informal work.
+      The liquidation disrupted customer receipts and supplier payments. Can pay when
+      weekly sales come in, but needs smaller installments aligned with cash-flow
+      cycles and will reject rigid due dates that collide with inventory purchases.
+    constraints:
+      - text: "Will never agree to more than R$120 per month or R$35 per week."
+        rule:
+          type: max_payment
+          amount: 120
+          frequency: monthly
+      - text: "Will be more likely to agree if offered weekly or payday-aligned installments."
+
+  - id: willbank_benefit_dependent_household
+    archetype: vulnerable_hardship
+    financial_situation: essential_expenses_at_risk
+    debt_amount: 760
+    debt_age_days: 54
+    debt_type: willbank_card_and_basic_bills
+    prior_contact_count: 1
+    emotional_state: fearful
+    primary_objection: basic_needs_take_priority
+    responsiveness: medium
+    demographics: benefit_dependent_family_provider
+    backstory: >
+      Relies on social benefits, informal income, or family support. The blocked Will
+      balance was earmarked for groceries, rent, medication, and utilities. Wants to
+      avoid negative credit reporting but cannot trade essential expenses for a large
+      card payment. Responds to hardship triage, respectful pauses, and documented
+      low-entry plans.
+    constraints:
+      - text: "Will never agree to more than R$45 per month before essential expenses are covered."
+        rule:
+          type: max_payment
+          amount: 45
+          frequency: monthly
+      - text: "Will disengage if the collector implies food, medicine, or rent should be sacrificed for payment."
+
+  - id: willbank_overindebted_behavioral_avoidant
+    archetype: ashamed_avoidant
+    financial_situation: overindebted
+    debt_amount: 2650
+    debt_age_days: 112
+    debt_type: credit_card_revolving_and_personal_loan
+    prior_contact_count: 4
+    emotional_state: ashamed_and_overwhelmed
+    primary_objection: too_many_debts_and_decision_overload
+    responsiveness: low
+    demographics: low_middle_income_multi_debt_consumer
+    backstory: >
+      Has several debts, high credit-card interest exposure, and possibly betting or
+      impulse-spending losses. Avoids conversations because every option feels
+      impossible. May accept a tiny first step if the collector reduces cognitive
+      load, presents one recommended default, and does not moralize past choices.
+    constraints:
+      - text: "Will never agree to more than R$70 per month without a discount, interest freeze, or debt consolidation path."
+        rule:
+          type: max_payment
+          amount: 70
+          frequency: monthly
+      - text: "Will shut down if presented with more than two repayment choices at once."
+
+  - id: willbank_fgc_waiting_high_balance
+    archetype: angry_waiting_for_reimbursement
+    financial_situation: asset_rich_cash_poor
+    debt_amount: 3900
+    debt_age_days: 41
+    debt_type: willbank_card_installments
+    prior_contact_count: 3
+    emotional_state: angry
+    primary_objection: will_pay_after_fgc_or_liquidator_release
+    responsiveness: medium
+    demographics: customer_with_more_than_1000_blocked_or_invested
+    backstory: >
+      Has more than R$1,000 blocked or invested and was not covered by the earliest
+      app-based advance. Believes the institution created the problem and wants any
+      collection conversation to acknowledge the liquidation timeline. Can make a
+      meaningful payment after reimbursement, but until then will only consider a
+      bridge agreement or scheduled callback.
+    constraints:
+      - text: "Will never agree to more than R$150 per month before FGC or liquidator reimbursement."
+        rule:
+          type: max_payment
+          amount: 150
+          frequency: monthly
+      - text: "Will require a callback date tied to official reimbursement milestones before committing to a larger settlement."
+
+  - id: willbank_low_digital_access
+    archetype: low_digital_access
+    financial_situation: can_pay_partial_with_assistance
+    debt_amount: 520
+    debt_age_days: 29
+    debt_type: willbank_card_invoice
+    prior_contact_count: 0
+    emotional_state: uncertain
+    primary_objection: cannot_access_app_or_generate_boleto
+    responsiveness: high
+    demographics: small_city_low_digital_literacy
+    backstory: >
+      Has limited data access, an older phone, or trouble navigating the Will Bank app
+      after liquidation. Wants to pay enough to avoid negative consequences but cannot
+      complete app flows reliably. Responds to slow step-by-step guidance, plain
+      Portuguese, and an option to receive written instructions for a same-CPF account
+      transfer or boleto generation.
+    constraints:
+      - text: "Will never agree to more than R$55 per month."
+        rule:
+          type: max_payment
+          amount: 55
+          frequency: monthly
+      - text: "Will require step-by-step official payment instructions before accepting responsibility for delay."
