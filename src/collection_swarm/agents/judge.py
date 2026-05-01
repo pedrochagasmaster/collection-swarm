@@ -46,28 +46,96 @@ def verify_constraints(transcript: list[Message], profile: Profile) -> list[str]
             for amount in _agreed_amounts(debtor_text):
                 if amount > rule.amount:
                     violations.append(
-                        f"Debtor agreed to ${amount:.0f}, exceeding max payment constraint of ${rule.amount:.0f}."
+                        f"Debtor agreed to {amount:.0f}, exceeding max payment constraint of {rule.amount:.0f}."
                     )
                     break
         elif rule.type == "required_action" and rule.action:
             if rule.action == "demand_written_proof" and not _mentions_written_proof(lower_debtor_text):
                 violations.append("Debtor never demanded written proof despite required_action constraint.")
+            elif rule.action == "cite_liquidator_and_official_channel" and not _mentions_liquidator(
+                "\n".join(turn.content for turn in transcript if turn.role == "collector").lower()
+            ):
+                violations.append(
+                    "Collector never disclosed the liquidator or an official channel despite required_action constraint."
+                )
     return violations
+
+
+# Match agreement utterances expressed in Brazilian Portuguese ("posso pagar
+# R$ 80", "topo R$ 100", "fechado em 150 reais") or in English ("I can do
+# $200", "I will pay 50"). Currency symbol is optional so values written in
+# Portuguese without "R$" are still detected.
+_AGREEMENT_PATTERN = re.compile(
+    r"\b(?:i can|i could|i will|i'll|i agree|agree to|can do|will pay|"
+    r"posso pagar|consigo pagar|aceito pagar|topo|combinado em|fechado em|"
+    r"vou pagar|pago)\b"
+    r"[^.\n]{0,80}?"
+    r"(?:r\$\s*|\$\s*)?"
+    r"(\d[\d.,]*)"
+    r"(?:\s*reais)?",
+    re.IGNORECASE,
+)
 
 
 def _agreed_amounts(text: str) -> list[float]:
     amounts: list[float] = []
-    agreement_patterns = re.compile(
-        r"\b(?:i can|i could|i will|i'll|i agree|agree to|can do|will pay|pay)\b[^.\n$]{0,80}\$([0-9][0-9,]*(?:\.\d{1,2})?)",
-        re.IGNORECASE,
-    )
-    for match in agreement_patterns.finditer(text):
-        amounts.append(float(match.group(1).replace(",", "")))
+    for match in _AGREEMENT_PATTERN.finditer(text):
+        raw = match.group(1)
+        amounts.append(_parse_brazilian_or_us_number(raw))
     return amounts
 
 
+def _parse_brazilian_or_us_number(raw: str) -> float:
+    """Parse a number that may use either US (1,234.56) or BR (1.234,56) format."""
+
+    cleaned = raw.strip().rstrip(".,")
+    if "," in cleaned and "." in cleaned:
+        # Whichever separator appears last is the decimal separator.
+        if cleaned.rfind(",") > cleaned.rfind("."):
+            cleaned = cleaned.replace(".", "").replace(",", ".")
+        else:
+            cleaned = cleaned.replace(",", "")
+    elif "," in cleaned:
+        # Lone commas are decimal separators only when followed by exactly two
+        # digits (typical Brazilian "80,00"); otherwise they are thousands.
+        decimal_part = cleaned.rsplit(",", 1)[1]
+        if len(decimal_part) == 2:
+            cleaned = cleaned.replace(",", ".")
+        else:
+            cleaned = cleaned.replace(",", "")
+    return float(cleaned)
+
+
 def _mentions_written_proof(text: str) -> bool:
-    return any(phrase in text for phrase in ["written proof", "written validation", "validate", "validation notice"])
+    return any(
+        phrase in text
+        for phrase in [
+            "written proof",
+            "written validation",
+            "validate",
+            "validation notice",
+            "fatura detalhada",
+            "contrato",
+            "comprovante",
+            "documenta\u00e7\u00e3o",
+            "prova documental",
+            "por escrito",
+        ]
+    )
+
+
+def _mentions_liquidator(text: str) -> bool:
+    return any(
+        phrase in text
+        for phrase in [
+            "liquidante",
+            "liquida\u00e7\u00e3o",
+            "efb regimes",
+            "willbank.com.br",
+            "bcb.gov.br",
+            "banco central",
+        ]
+    )
 
 
 def _parse_judgment(content: str, turn_count: int) -> Judgment:

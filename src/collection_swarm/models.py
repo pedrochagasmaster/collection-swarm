@@ -28,7 +28,16 @@ class EndedBy(StrEnum):
 
 
 class ConstraintRule(BaseModel):
-    """Machine-readable profile invariant used by the Judge."""
+    """Machine-readable profile invariant used by the Judge.
+
+    Supported `action` values for ``type == "required_action"``:
+
+    - ``demand_written_proof`` — debtor must mention written proof / fatura
+      detalhada / contrato before discussing payment.
+    - ``cite_liquidator_and_official_channel`` — collector must reference the
+      liquidator (EFB Regimes Especiais de Empresas) or an official channel
+      (willbank.com.br, bcb.gov.br, Banco Central) before requesting payment.
+    """
 
     type: Literal["max_payment", "required_action"]
     amount: float | None = None
@@ -82,6 +91,18 @@ class Profile(BaseModel):
 
 
 class Strategy(BaseModel):
+    """Behavioral configuration for the Collector participant.
+
+    The first eight fields are required and define the core behavioral knobs
+    used by every strategy. The remaining optional fields are descriptive
+    refinements introduced for the Will Bank / Brazilian context (see
+    docs/willbank-research-dossier.md). They are surfaced to the LLM and to
+    analysis when present, but legacy strategies that omit them keep working
+    unchanged.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
     id: str
     tone: str
     opening_approach: str
@@ -90,6 +111,14 @@ class Strategy(BaseModel):
     concession_willingness: str
     compliance_adherence: str
     follow_up_strategy: str
+    payment_channel: str | None = None
+    primary_anchor: str | None = None
+    discovery_questions: str | None = None
+    framing: str | None = None
+    discount_authority: str | None = None
+    liquidation_disclosure: str | None = None
+    cultural_register: str | None = None
+    rationale: str | None = None
 
 
 class Message(BaseModel):
