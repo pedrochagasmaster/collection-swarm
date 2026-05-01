@@ -32,7 +32,15 @@ class ScriptedBackend:
         )
 
     def _collector_response(self, system: str, history: str) -> str:
-        if "payment_plan" in system or "payment plan" in system:
+        if "documentation_first" in system or "liquidation" in system:
+            tactic = "confirm the account in writing and explain the liquidation context clearly"
+        elif "official_self_service" in system or "secure_official_channel" in system:
+            tactic = "send a secure official self-service path without taking sensitive data here"
+        elif "cash_flow_aligned" in system:
+            tactic = "match any installment to your cash flow and essential expenses"
+        elif "complaint_acknowledgment" in system or "pause_and_review" in system:
+            tactic = "acknowledge the complaint and schedule a no-pressure review"
+        elif "payment_plan" in system or "payment plan" in system:
             tactic = "set up a manageable payment plan"
         elif "settlement" in system:
             tactic = "review a possible settlement"
@@ -46,6 +54,18 @@ class ScriptedBackend:
             )
         if any(term in history for term in ["agree", "can do", "will pay", "plan works", "per month", "acceptable"]):
             return "Thank you. I will document the arrangement and send confirmation. [END_CONVERSATION]"
+        if any(term in history for term in ["liquidation", "cancelled", "official channel"]):
+            return (
+                "Liquidation does not automatically cancel a valid balance, but you should not have to rely on a call. "
+                "I can send an official written account summary and payment-channel instructions for your review."
+            )
+        if any(term in history for term in ["scam", "cpf", "pix", "card details"]):
+            return (
+                "I will not ask for CPF, card, bank, or Pix details in this conversation. "
+                "Please use only the official written channel after you verify the account summary."
+            )
+        if any(term in history for term in ["complaint", "banco central", "unfair", "betrayed"]):
+            return "I hear the concern. I can document the complaint, pause pressure, and send the account details for review before any payment discussion."
         if any(term in history for term in ["can't", "hardship", "afford", "written proof", "verify"]):
             return (
                 "I understand. We can send written validation and discuss options after you review it. "
@@ -54,6 +74,20 @@ class ScriptedBackend:
         return "What amount or date would feel realistic for you so we can keep the account moving forward?"
 
     def _debtor_response(self, system: str, history: str) -> str:
+        if "liquidation_confusion" in system or "liquidation context" in system:
+            if "liquidation does not automatically cancel" not in history:
+                return "I heard Will Bank was liquidated, so I thought this card balance might be cancelled or frozen."
+            return "If you send the official written summary and safe payment channel, I can review it before deciding. [END_CONVERSATION]"
+        if "scam_concern" in system or "suspicious" in system:
+            if "official written channel" not in history and "secure official" not in history:
+                return "How do I know this is not a scam? I am not giving CPF, Pix, card, or bank details on this call."
+            return "Send it through the official channel. If it matches my records, I can pay there. [END_CONVERSATION]"
+        if "overindebtedness" in system or "80 per month" in system:
+            return "I want to avoid more credit problems, but I can only manage about $80 per month after rent and groceries."
+        if "bank_mistrust" in system or "complaint" in system or "indignant" in system:
+            if "document the complaint" not in history:
+                return "Will Bank failed customers first, and now you are calling me for money? I may file another complaint."
+            return "Send the documentation and note my complaint. I am not agreeing today, but I will review it. [END_CONVERSATION]"
         if "dispute" in system or "written proof" in system:
             if "written validation" not in history and "written proof" not in history:
                 return "Before I talk about payment, I need written proof that this debt is mine."
