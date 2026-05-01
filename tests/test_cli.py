@@ -8,6 +8,7 @@ def test_list_profiles_cli() -> None:
 
     assert result.exit_code == 0
     assert "cooperative_hardship" in result.output
+    assert "willbank_blocked_balance_hardship" in result.output
 
 
 def test_simulate_cli_offline_no_save() -> None:

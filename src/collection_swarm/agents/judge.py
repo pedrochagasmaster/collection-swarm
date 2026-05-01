@@ -52,12 +52,14 @@ def verify_constraints(transcript: list[Message], profile: Profile) -> list[str]
         elif rule.type == "required_action" and rule.action:
             if rule.action == "demand_written_proof" and not _mentions_written_proof(lower_debtor_text):
                 violations.append("Debtor never demanded written proof despite required_action constraint.")
-            elif rule.action == "cite_liquidator_and_official_channel" and not _mentions_liquidator(
+            elif rule.action in {
+                "cite_liquidator_and_official_channel",
+                "provide_official_boleto_path",
+                "verify_official_channel",
+            } and not _mentions_official_channel(
                 "\n".join(turn.content for turn in transcript if turn.role == "collector").lower()
             ):
-                violations.append(
-                    "Collector never disclosed the liquidator or an official channel despite required_action constraint."
-                )
+                violations.append("Collector never disclosed an official validation or payment channel.")
     return violations
 
 
@@ -124,7 +126,7 @@ def _mentions_written_proof(text: str) -> bool:
     )
 
 
-def _mentions_liquidator(text: str) -> bool:
+def _mentions_official_channel(text: str) -> bool:
     return any(
         phrase in text
         for phrase in [
@@ -134,6 +136,9 @@ def _mentions_liquidator(text: str) -> bool:
             "willbank.com.br",
             "bcb.gov.br",
             "banco central",
+            "boleto registrado",
+            "canal oficial",
+            "canais oficiais",
         ]
     )
 

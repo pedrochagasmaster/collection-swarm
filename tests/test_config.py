@@ -8,6 +8,9 @@ def test_load_default_config() -> None:
 
     assert "cooperative_hardship" in config.profiles
     assert "empathetic_payment_plan" in config.strategies
+    assert "willbank_blocked_balance_hardship" in config.profiles
+    assert "blocked_balance_hardship_plan" in config.strategies
+    assert "liquidation_confusion" in config.simulation.objection_taxonomy
     assert config.default_conversation_model == "local-scripted"
     # Prompts are Brazilian-Portuguese and Will-Bank-aware after the
     # liquidation context redesign (see docs/willbank-research-dossier.md).

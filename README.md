@@ -132,6 +132,16 @@ every persona and strategy are documented in
 | `consignado_payroll_steady` | Cooperative | R$ 4 200 FGTS antecipado | Reassurance only; descontos seguem pela folha |
 | `superendividado_chronic` | Overwhelmed | R$ 980 cartão Will | Multi-credor — Lei 14.181/2021 candidate |
 | `young_first_credit_card` | Cooperative | R$ 320 cartão Will | Forgetful — first card; resolve via WhatsApp |
+| `willbank_blocked_balance_hardship` | Anxious hardship | R$ 930 cartão Will | Salary/reserve blocked by liquidation; protects essentials |
+| `willbank_micro_merchant_cashflow` | Pragmatic micro-merchant | R$ 1 480 card spend | Irregular sales cash flow after Pix/card disruption |
+| `willbank_benefit_dependent_household` | Vulnerable hardship | R$ 760 card + bills | Benefits and essential expenses take priority |
+| `willbank_fgc_waiting_high_balance` | Angry reimbursement-waiting | R$ 3 900 card installments | Will pay after FGC/liquidator milestone |
+| `willbank_low_digital_access` | Low digital access | R$ 520 card invoice | Cannot access app or generate boleto unaided |
+| `willbank_blocked_balance_hardship` | Anxious hardship | R$ 930 cartão Will | Blocked salary/reserve — needs low-entry boleto plan |
+| `willbank_micro_merchant_cashflow` | Pragmatic merchant | R$ 1 480 cartão Will | Irregular post-liquidation cash flow |
+| `willbank_benefit_dependent_household` | Vulnerable hardship | R$ 760 cartão/basic bills | Essential expenses take priority |
+| `willbank_fgc_waiting_high_balance` | Angry/high balance | R$ 3 900 cartão Will | Will pay after FGC/liquidator milestone |
+| `willbank_low_digital_access` | Low digital access | R$ 520 cartão Will | Cannot access app or generate boleto |
 
 ### Included Strategies
 
@@ -145,6 +155,16 @@ every persona and strategy are documented in
 | `whatsapp_self_service` | Friendly brief | Link to self-negotiation portal | Portal self-service |
 | `superendividamento_referral` | Empathetic | Refer to Lei 14.181 audiência | Hold pattern + referral |
 | `consignado_confirmation` | Calm informative | Confirm and inform; no ask | Written confirmation |
+| `blocked_balance_hardship_plan` | Empathetic practical | Micro-installment with fee review | Low-entry plan after boleto confirmation |
+| `micro_merchant_cashflow_alignment` | Collaborative businesslike | Weekly/payday-aligned installments | Written schedule with review date |
+| `overindebtedness_stabilization` | Nonjudgmental structured | One recommended option | Documented hardship review |
+| `reimbursement_milestone_callback` | Calm respectful | Bridge agreement until reimbursement | Callback tied to official milestone |
+| `low_digital_access_guidance` | Patient step-by-step | Assisted official-channel resolution | Written step-by-step instructions |
+| `blocked_balance_hardship_plan` | Empathetic practical | Micro-installment + fee review | Low-entry boleto path |
+| `micro_merchant_cashflow_alignment` | Collaborative | Weekly/payday-aligned installments | Written schedule review |
+| `overindebtedness_stabilization` | Nonjudgmental | One recommended default option | Documented hardship review |
+| `reimbursement_milestone_callback` | Calm respectful | Bridge until reimbursement | Official-milestone callback |
+| `low_digital_access_guidance` | Patient | Step-by-step boleto guidance | Written instructions |
 
 Profiles and strategies are defined in YAML and are fully extensible — add your own in `config/debtor_profiles.yaml` and `config/collector_strategies.yaml`.
 
@@ -335,7 +355,7 @@ config/
 └── simulation.yaml             # Turn limits, repetitions, compliance thresholds
 ```
 
-A key design choice: debtor profiles include **machine-readable constraints**. For example, `cooperative_hardship` will never agree above `$150/month`. The Judge verifies that constraint deterministically in addition to LLM scoring — if the debtor violates its own constraints, the simulation data is flagged as unreliable.
+A key design choice: debtor profiles include **machine-readable constraints**. For example, `cooperative_hardship` will never agree above R$ 80/mês. The Judge verifies that constraint deterministically in addition to LLM scoring — if the debtor violates its own constraints, the simulation data is flagged as unreliable.
 
 ## Development
 

@@ -37,6 +37,9 @@ class ConstraintRule(BaseModel):
     - ``cite_liquidator_and_official_channel`` — collector must reference the
       liquidator (EFB Regimes Especiais de Empresas) or an official channel
       (willbank.com.br, bcb.gov.br, Banco Central) before requesting payment.
+    - ``provide_official_boleto_path`` / ``verify_official_channel`` —
+      collector must mention an official boleto, liquidator, or validation
+      channel before the debtor is expected to engage.
     """
 
     type: Literal["max_payment", "required_action"]

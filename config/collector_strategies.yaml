@@ -1,241 +1,225 @@
-# Collector strategies tailored for Will Bank's post-liquidation context and
-# the Brazilian regulatory environment. See docs/willbank-research-dossier.md
-# for sources, including peer-reviewed RCTs (Medina 2021, Karlan et al. 2016,
-# Roll 2019, Oxford RoF 2024), McKinsey behavioral-collections research,
-# and Brazilian regulation (CDC art. 42 & 71, Lei 14.181/2021,
-# Resolução CMN 4.949/2021, Normativo SARB nº 27/2023).
-#
-# Every strategy MUST respect:
-#   - CDC art. 42/71 — no humiliação, ameaça ou interferência indevida.
-#   - Lei 14.181/2021 — preservar o mínimo existencial; não assediar.
-#   - SARB nº 27/2023 — chamadas seg–sex 07h–21h, sáb 09h–16h.
-#   - Liquidação extrajudicial — identificar o liquidante (EFB Regimes
-#     Especiais de Empresas Ltda.) e direcionar para canais oficiais
-#     (willbank.com.br / bcb.gov.br).
-#   - Pix do Will Bank desativado — toda cobrança se materializa em
-#     boleto registrado em nome da Will Financeira / liquidante.
-
 strategies:
+- id: empathetic_payment_plan
+  tone: empathetic
+  opening_approach: soft_intro
+  negotiation_tactic: payment_plan
+  escalation_style: none
+  concession_willingness: flexible
+  compliance_adherence: strict
+  follow_up_strategy: written_agreement
+  payment_channel: boleto_registrado
+  primary_anchor: parcela_alinhada_ao_dia_5
+  discovery_questions: motivational_interviewing
+  framing: gain_preservation_score_cpf
+  discount_authority: low
+  liquidation_disclosure: proactive
+  cultural_register: brasileiro_acessivel_neutro
+  rationale: 'Para perfis de hardship (cooperative_hardship, young_first_credit_card) o default deve ser empático, alinhado com o que o devedor já quer (regularizar) e com economia comportamental (rapport antes de oferta).
 
-  # ──────────────────────────────────────────────────────────────────────
-  # Empathetic payment plan — motivational-interviewing default
-  # Strongest evidence base for hardship cases (ACB +20% recovery, McKinsey,
-  # Carta Capital 77% want-to-pay finding). Aligns parcela com 5º dia útil.
-  # ──────────────────────────────────────────────────────────────────────
-  - id: empathetic_payment_plan
-    tone: empathetic
-    opening_approach: soft_intro
-    negotiation_tactic: payment_plan
-    escalation_style: none
-    concession_willingness: flexible
-    compliance_adherence: strict
-    follow_up_strategy: written_agreement
-    payment_channel: boleto_registrado
-    primary_anchor: parcela_alinhada_ao_dia_5
-    discovery_questions: motivational_interviewing
-    framing: gain_preservation_score_cpf
-    discount_authority: low
-    liquidation_disclosure: proactive
-    cultural_register: brasileiro_acessivel_neutro
-    rationale: >
-      Para perfis de hardship (cooperative_hardship, young_first_credit_card)
-      o default deve ser empático, alinhado com o que o devedor já quer
-      (regularizar) e com economia comportamental (rapport antes de oferta).
+    '
+- id: assertive_settlement
+  tone: assertive
+  opening_approach: direct_ask
+  negotiation_tactic: settlement_offer
+  escalation_style: gradual
+  concession_willingness: moderate
+  compliance_adherence: strict
+  follow_up_strategy: immediate_payment
+  payment_channel: boleto_registrado
+  primary_anchor: desconto_unico_a_vista
+  discovery_questions: minimal
+  framing: loss_aversion_perda_de_desconto
+  discount_authority: medium
+  liquidation_disclosure: proactive
+  cultural_register: brasileiro_acessivel_assertivo
+  rationale: 'Adequado quando o devedor pode pagar à vista (feirao_serial_renegotiator, young_first_credit_card, scam_suspicious depois de validada a chamada). Apresenta um único número grande, prazo curto e enquadramento "você perde o desconto se não fechar hoje" — evita o anti-padrão de menu de mínimas que o BehavioralEconomics.com identifica como contraproducente.
 
-  # ──────────────────────────────────────────────────────────────────────
-  # Assertive settlement (Feirão-style) — loss-framed discount with deadline
-  # McKinsey: loss framing ~2× mais efetivo que gain. Feirão Limpa Nome
-  # 2026: 2.200+ parceiros, descontos até 99%, Pix limpa nome imediato.
-  # ──────────────────────────────────────────────────────────────────────
-  - id: assertive_settlement
-    tone: assertive
-    opening_approach: direct_ask
-    negotiation_tactic: settlement_offer
-    escalation_style: gradual
-    concession_willingness: moderate
-    compliance_adherence: strict
-    follow_up_strategy: immediate_payment
-    payment_channel: boleto_registrado
-    primary_anchor: desconto_unico_a_vista
-    discovery_questions: minimal
-    framing: loss_aversion_perda_de_desconto
-    discount_authority: medium
-    liquidation_disclosure: proactive
-    cultural_register: brasileiro_acessivel_assertivo
-    rationale: >
-      Adequado quando o devedor pode pagar à vista (feirao_serial_renegotiator,
-      young_first_credit_card, scam_suspicious depois de validada a chamada).
-      Apresenta um único número grande, prazo curto e enquadramento
-      "você perde o desconto se não fechar hoje" — evita o anti-padrão
-      de menu de mínimas que o BehavioralEconomics.com identifica como
-      contraproducente.
+    '
+- id: neutral_reminder
+  tone: neutral
+  opening_approach: reminder
+  negotiation_tactic: payment_reminder
+  escalation_style: none
+  concession_willingness: low
+  compliance_adherence: strict
+  follow_up_strategy: digital_link_to_self_service
+  payment_channel: link_boleto_registrado
+  primary_anchor: valor_e_vencimento_explicitos
+  discovery_questions: none
+  framing: factual_personalized
+  discount_authority: none
+  liquidation_disclosure: proactive
+  cultural_register: brasileiro_acessivel_breve
+  rationale: 'Primeira camada de cobrança para qualquer perfil. Mensagem curta, personalizada com primeiro nome, valor e data, com um único CTA (link para portal do liquidante / boleto) e um aviso sobre golpes (FGC alert). Custos baixíssimos, evidência forte.
 
-  # ──────────────────────────────────────────────────────────────────────
-  # Personalized digital reminder — SMS / WhatsApp / e-mail
-  # Karlan et al. 2016, Medina 2021, Roll 2019: lembretes automatizados
-  # personalizados (com nome, valor, vencimento) reduzem inadimplência
-  # 60d em ~21% e batem appeals "morais" / pro-sociais (PMC #11443582).
-  # ──────────────────────────────────────────────────────────────────────
-  - id: neutral_reminder
-    tone: neutral
-    opening_approach: reminder
-    negotiation_tactic: payment_reminder
-    escalation_style: none
-    concession_willingness: low
-    compliance_adherence: strict
-    follow_up_strategy: digital_link_to_self_service
-    payment_channel: link_boleto_registrado
-    primary_anchor: valor_e_vencimento_explicitos
-    discovery_questions: none
-    framing: factual_personalized
-    discount_authority: none
-    liquidation_disclosure: proactive
-    cultural_register: brasileiro_acessivel_breve
-    rationale: >
-      Primeira camada de cobrança para qualquer perfil. Mensagem curta,
-      personalizada com primeiro nome, valor e data, com um único CTA
-      (link para portal do liquidante / boleto) e um aviso sobre golpes
-      (FGC alert). Custos baixíssimos, evidência forte.
+    '
+- id: problem_solving_callback
+  tone: empathetic
+  opening_approach: problem_solving
+  negotiation_tactic: empathy_then_planning_prompt
+  escalation_style: none
+  concession_willingness: flexible
+  compliance_adherence: strict
+  follow_up_strategy: callback_with_implementation_intention
+  payment_channel: boleto_registrado
+  primary_anchor: data_hora_canal_combinados
+  discovery_questions: motivational_interviewing
+  framing: gain_progress_recovery
+  discount_authority: low
+  liquidation_disclosure: proactive
+  cultural_register: brasileiro_acessivel_acolhedor
+  rationale: 'Para devedores que claramente querem mas não podem agora, ou que precisam consultar cônjuge / extrato. Em vez de forçar fechamento, sai com um agendamento concreto: "Te ligo terça às 19h para fechar pelo WhatsApp, você confirma?" — evidência forte de aderência.
 
-  # ──────────────────────────────────────────────────────────────────────
-  # Problem-solving callback — empathy + implementation intention
-  # Implementation intention (BehavioralEconomics.com) — pedir para o
-  # devedor escolher data/hora/canal específicos eleva muito a taxa de
-  # cumprimento das promises-to-pay.
-  # ──────────────────────────────────────────────────────────────────────
-  - id: problem_solving_callback
-    tone: empathetic
-    opening_approach: problem_solving
-    negotiation_tactic: empathy_then_planning_prompt
-    escalation_style: none
-    concession_willingness: flexible
-    compliance_adherence: strict
-    follow_up_strategy: callback_with_implementation_intention
-    payment_channel: boleto_registrado
-    primary_anchor: data_hora_canal_combinados
-    discovery_questions: motivational_interviewing
-    framing: gain_progress_recovery
-    discount_authority: low
-    liquidation_disclosure: proactive
-    cultural_register: brasileiro_acessivel_acolhedor
-    rationale: >
-      Para devedores que claramente querem mas não podem agora, ou que
-      precisam consultar cônjuge / extrato. Em vez de forçar fechamento,
-      sai com um agendamento concreto: "Te ligo terça às 19h para fechar
-      pelo WhatsApp, você confirma?" — evidência forte de aderência.
+    '
+- id: liquidation_explainer
+  tone: calm_informative
+  opening_approach: identification_and_disclosure
+  negotiation_tactic: defer_until_validated
+  escalation_style: none
+  concession_willingness: moderate
+  compliance_adherence: strict
+  follow_up_strategy: callback_after_validation
+  payment_channel: boleto_registrado
+  primary_anchor: legitimidade_da_cobranca
+  discovery_questions: none
+  framing: factual_protective
+  discount_authority: low
+  liquidation_disclosure: leading
+  cultural_register: brasileiro_acessivel_didatico
+  rationale: 'Abre apresentando a empresa de cobrança, citando a liquidação extrajudicial (BCB 2026-01-21), o liquidante (EFB Regimes Especiais de Empresas Ltda.) e oferecendo o canal oficial willbank.com.br / bcb.gov.br para o devedor confirmar antes de continuar. Só avança para cobrança após o devedor sinalizar que validou ou que aceita prosseguir. Equivalente operacional do "scam-safety brief" recomendado pelo FGC e Procon-SP em 2026.
 
-  # ──────────────────────────────────────────────────────────────────────
-  # Liquidation explainer — credibility-first opening
-  # Necessário para liquidation_confused e scam_suspicious. Sem
-  # estabelecer legitimidade primeiro, qualquer pedido de pagamento é
-  # justamente o vetor que FGC e Procon-SP advertem como golpe.
-  # ──────────────────────────────────────────────────────────────────────
-  - id: liquidation_explainer
-    tone: calm_informative
-    opening_approach: identification_and_disclosure
-    negotiation_tactic: defer_until_validated
-    escalation_style: none
-    concession_willingness: moderate
-    compliance_adherence: strict
-    follow_up_strategy: callback_after_validation
-    payment_channel: boleto_registrado
-    primary_anchor: legitimidade_da_cobranca
-    discovery_questions: none
-    framing: factual_protective
-    discount_authority: low
-    liquidation_disclosure: leading
-    cultural_register: brasileiro_acessivel_didatico
-    rationale: >
-      Abre apresentando a empresa de cobrança, citando a liquidação
-      extrajudicial (BCB 2026-01-21), o liquidante (EFB Regimes Especiais
-      de Empresas Ltda.) e oferecendo o canal oficial willbank.com.br /
-      bcb.gov.br para o devedor confirmar antes de continuar. Só
-      avança para cobrança após o devedor sinalizar que validou ou que
-      aceita prosseguir. Equivalente operacional do "scam-safety brief"
-      recomendado pelo FGC e Procon-SP em 2026.
+    '
+- id: whatsapp_self_service
+  tone: friendly_brief
+  opening_approach: whatsapp_template
+  negotiation_tactic: link_to_self_negotiation_portal
+  escalation_style: none
+  concession_willingness: flexible
+  compliance_adherence: strict
+  follow_up_strategy: portal_self_service
+  payment_channel: boleto_registrado
+  primary_anchor: link_unico_para_resolver_em_segundos
+  discovery_questions: minimal
+  framing: gain_resolve_now
+  discount_authority: medium
+  liquidation_disclosure: proactive
+  cultural_register: brasileiro_jovem_will_voice
+  rationale: 'Pensada para young_first_credit_card e qualquer devedor digital-native. Mensagem curta com o nome do cliente, valor, três opções pré-aprovadas (à vista com desconto, parcelamento curto, agendar para o dia 5), e um link para o portal do liquidante. Mantém o tom "Will original" (próximo, sem julgamento) sem violar art. 42 do CDC.
 
-  # ──────────────────────────────────────────────────────────────────────
-  # WhatsApp self-service — mobile-first chatbot deal flow
-  # Voll Solutions / Vindi / Blip / Recash / PG Mais documentam o
-  # WhatsApp Business API como o canal hegemônico de cobrança no Brasil.
-  # 99% dos smartphones brasileiros têm WhatsApp.
-  # ──────────────────────────────────────────────────────────────────────
-  - id: whatsapp_self_service
-    tone: friendly_brief
-    opening_approach: whatsapp_template
-    negotiation_tactic: link_to_self_negotiation_portal
-    escalation_style: none
-    concession_willingness: flexible
-    compliance_adherence: strict
-    follow_up_strategy: portal_self_service
-    payment_channel: boleto_registrado
-    primary_anchor: link_unico_para_resolver_em_segundos
-    discovery_questions: minimal
-    framing: gain_resolve_now
-    discount_authority: medium
-    liquidation_disclosure: proactive
-    cultural_register: brasileiro_jovem_will_voice
-    rationale: >
-      Pensada para young_first_credit_card e qualquer devedor digital-native.
-      Mensagem curta com o nome do cliente, valor, três opções pré-aprovadas
-      (à vista com desconto, parcelamento curto, agendar para o dia 5),
-      e um link para o portal do liquidante. Mantém o tom "Will original"
-      (próximo, sem julgamento) sem violar art. 42 do CDC.
+    '
+- id: superendividamento_referral
+  tone: empathetic
+  opening_approach: soft_intro
+  negotiation_tactic: refer_to_global_renegotiation
+  escalation_style: none
+  concession_willingness: flexible
+  compliance_adherence: strict
+  follow_up_strategy: hold_pattern_with_referral
+  payment_channel: boleto_registrado
+  primary_anchor: caminho_via_audiencia_conciliatoria
+  discovery_questions: motivational_interviewing
+  framing: gain_organize_all_debts
+  discount_authority: low
+  liquidation_disclosure: proactive
+  cultural_register: brasileiro_acessivel_acolhedor
+  rationale: 'Reconhece o devedor como candidato à Lei 14.181/2021. Em vez de pressionar por um acordo individual que sabidamente quebrará, oferece o caminho via Procon / Defensoria / audiência conciliatória e marca uma cobrança simbólica que respeita o mínimo existencial. Reduz risco de judicialização, melhora rapport e protege a reputação do liquidante.
 
-  # ──────────────────────────────────────────────────────────────────────
-  # Superendividamento referral — Lei 14.181/2021 pathway
-  # Para superendividado_chronic, qualquer "fechamento" individual é
-  # estatisticamente fadado a quebrar e é incompatível com a Lei do
-  # Superendividamento. O caminho responsável é o referral.
-  # ──────────────────────────────────────────────────────────────────────
-  - id: superendividamento_referral
-    tone: empathetic
-    opening_approach: soft_intro
-    negotiation_tactic: refer_to_global_renegotiation
-    escalation_style: none
-    concession_willingness: flexible
-    compliance_adherence: strict
-    follow_up_strategy: hold_pattern_with_referral
-    payment_channel: boleto_registrado
-    primary_anchor: caminho_via_audiencia_conciliatoria
-    discovery_questions: motivational_interviewing
-    framing: gain_organize_all_debts
-    discount_authority: low
-    liquidation_disclosure: proactive
-    cultural_register: brasileiro_acessivel_acolhedor
-    rationale: >
-      Reconhece o devedor como candidato à Lei 14.181/2021. Em vez de
-      pressionar por um acordo individual que sabidamente quebrará,
-      oferece o caminho via Procon / Defensoria / audiência conciliatória
-      e marca uma cobrança simbólica que respeita o mínimo existencial.
-      Reduz risco de judicialização, melhora rapport e protege a
-      reputação do liquidante.
+    '
+- id: consignado_confirmation
+  tone: calm_informative
+  opening_approach: reassurance
+  negotiation_tactic: confirm_and_inform
+  escalation_style: none
+  concession_willingness: low
+  compliance_adherence: strict
+  follow_up_strategy: written_confirmation
+  payment_channel: nao_aplicavel_descontos_automaticos
+  primary_anchor: nada_para_o_cliente_fazer
+  discovery_questions: none
+  framing: factual_protective
+  discount_authority: none
+  liquidation_disclosure: proactive
+  cultural_register: brasileiro_acessivel_breve
+  rationale: 'Confirma que os descontos do FGTS-saque-aniversário / consignado seguem ocorrendo normalmente, identifica o liquidante e os canais oficiais, e responde a quaisquer dúvidas. Sem qualquer pedido de Pix, dados, ou assinatura. É uma estratégia, ainda que sem ask direto, porque é o comportamento correto para esse perfil — e o simulador deve aprender que essa é a melhor jogada para ele.
 
-  # ──────────────────────────────────────────────────────────────────────
-  # Consignado confirmation — reassurance-only, no ask
-  # Para consignado_payroll_steady. Os descontos seguem automáticos pela
-  # folha. Pedir algo aqui é pedir mais do que o devedor já está pagando
-  # e parece predatório / golpe.
-  # ──────────────────────────────────────────────────────────────────────
-  - id: consignado_confirmation
-    tone: calm_informative
-    opening_approach: reassurance
-    negotiation_tactic: confirm_and_inform
-    escalation_style: none
-    concession_willingness: low
-    compliance_adherence: strict
-    follow_up_strategy: written_confirmation
-    payment_channel: nao_aplicavel_descontos_automaticos
-    primary_anchor: nada_para_o_cliente_fazer
-    discovery_questions: none
-    framing: factual_protective
-    discount_authority: none
-    liquidation_disclosure: proactive
-    cultural_register: brasileiro_acessivel_breve
-    rationale: >
-      Confirma que os descontos do FGTS-saque-aniversário / consignado
-      seguem ocorrendo normalmente, identifica o liquidante e os canais
-      oficiais, e responde a quaisquer dúvidas. Sem qualquer pedido de
-      Pix, dados, ou assinatura. É uma estratégia, ainda que sem ask
-      direto, porque é o comportamento correto para esse perfil — e o
-      simulador deve aprender que essa é a melhor jogada para ele.
+    '
+- id: blocked_balance_hardship_plan
+  tone: empathetic_practical
+  opening_approach: acknowledge_blocked_funds_and_basic_needs
+  negotiation_tactic: micro_installment_with_fee_review
+  escalation_style: none
+  concession_willingness: highly_flexible
+  compliance_adherence: strict
+  follow_up_strategy: low_entry_plan_after_boleto_confirmation
+  payment_channel: boleto_registrado
+  primary_anchor: necessidades_essenciais_primeiro
+  discovery_questions: hardship_triage
+  framing: protective_minimo_existencial
+  discount_authority: medium
+  liquidation_disclosure: leading
+  cultural_register: brasileiro_acessivel_acolhedor
+  rationale: Para devedores com saldo ou salário bloqueado, começa reconhecendo a assimetria criada pela liquidação, valida canal oficial e propõe entrada muito baixa com revisão de encargos, sem pressionar despesas essenciais.
+- id: micro_merchant_cashflow_alignment
+  tone: collaborative_businesslike
+  opening_approach: cashflow_mapping
+  negotiation_tactic: weekly_or_payday_aligned_installments
+  escalation_style: gradual
+  concession_willingness: flexible
+  compliance_adherence: strict
+  follow_up_strategy: written_schedule_with_next_review_date
+  payment_channel: boleto_registrado
+  primary_anchor: calendario_de_vendas_e_estoque
+  discovery_questions: cashflow_mapping
+  framing: business_continuity
+  discount_authority: medium
+  liquidation_disclosure: proactive
+  cultural_register: brasileiro_pratico_microempreendedor
+  rationale: Para renda irregular de microempreendedor, troca a data fixa por parcelas menores ligadas a vendas ou pagamento de clientes; isso reduz quebra de promessa sem forçar capital de giro.
+- id: overindebtedness_stabilization
+  tone: nonjudgmental_structured
+  opening_approach: reduce_cognitive_load
+  negotiation_tactic: one_recommended_option_with_interest_freeze_request
+  escalation_style: none
+  concession_willingness: highly_flexible
+  compliance_adherence: strict
+  follow_up_strategy: single_next_step_and_documented_hardship_review
+  payment_channel: boleto_registrado
+  primary_anchor: uma_opcao_padrao_sem_sobrecarga
+  discovery_questions: minimal_ability_to_pay
+  framing: reduce_decision_overload
+  discount_authority: medium
+  liquidation_disclosure: proactive
+  cultural_register: brasileiro_acessivel_sem_julgamento
+  rationale: 'Complementa o referral legal com uma abordagem operacional para perfis evitativos: poucas escolhas, uma recomendação padrão, possível congelamento de encargos e próximo passo documentado.'
+- id: reimbursement_milestone_callback
+  tone: calm_respectful
+  opening_approach: acknowledge_fgc_or_liquidator_timing
+  negotiation_tactic: bridge_agreement_until_reimbursement
+  escalation_style: none
+  concession_willingness: moderate
+  compliance_adherence: strict
+  follow_up_strategy: callback_tied_to_official_reimbursement_milestone
+  payment_channel: boleto_registrado
+  primary_anchor: retorno_vinculado_a_marco_oficial
+  discovery_questions: reimbursement_status
+  framing: fairness_and_timing
+  discount_authority: low
+  liquidation_disclosure: leading
+  cultural_register: brasileiro_respeitoso_formal
+  rationale: 'Para clientes com valores bloqueados relevantes, evita transformar frustração legítima em conflito: reconhece o marco de ressarcimento, combina ponte pequena ou apenas callback, e não inventa prazo do liquidante.'
+- id: low_digital_access_guidance
+  tone: patient_step_by_step
+  opening_approach: plain_language_boleto_guidance
+  negotiation_tactic: assisted_official_channel_resolution
+  escalation_style: none
+  concession_willingness: flexible
+  compliance_adherence: strict
+  follow_up_strategy: send_written_step_by_step_instructions
+  payment_channel: boleto_registrado
+  primary_anchor: instrucoes_oficiais_passo_a_passo
+  discovery_questions: digital_access_check
+  framing: confidence_and_control
+  discount_authority: low
+  liquidation_disclosure: proactive
+  cultural_register: brasileiro_simples_paciente
+  rationale: 'Para baixa literacia digital, o ganho está em reduzir erro operacional: fala devagar, evita jargão, não pede dados sensíveis e envia instruções verificáveis para gerar boleto oficial.'

@@ -40,7 +40,20 @@ class ScriptedBackend:
         )
 
     def _collector_response(self, system: str, history: str) -> str:
-        if any(term in system for term in ["payment_plan", "payment plan", "parcelamento", "parcela"]):
+        if any(
+            term in system
+            for term in [
+                "payment_plan",
+                "payment plan",
+                "parcelamento",
+                "parcela",
+                "micro_installment",
+                "cashflow",
+                "cash_flow",
+                "low_entry",
+                "assisted_official_channel",
+            ]
+        ):
             tactic = "combinar uma parcela que caiba no seu bolso"
         elif any(term in system for term in ["settlement", "settlement_offer", "acordo", "à vista", "a vista"]):
             tactic = "ver um acordo com desconto à vista"
@@ -71,7 +84,8 @@ class ScriptedBackend:
             ]
         ):
             return (
-                "Combinado. Vou registrar o acordo e te enviar a confirmação por escrito. "
+                "Combinado. Vou registrar o acordo por boleto oficial do liquidante, sem Pix, "
+                "e te enviar a confirmação por escrito. "
                 "[END_CONVERSATION]"
             )
         if any(
@@ -89,7 +103,13 @@ class ScriptedBackend:
                 "golpe",
                 "desconfio",
             ]
-        ):
+        ) or any(term in system for term in ["micro_installment", "low_entry", "blocked_funds"]):
+            if any(term in system for term in ["micro_installment", "low_entry", "blocked_funds"]):
+                return (
+                    "Entendi o impacto do saldo bloqueado. Posso enviar pelos canais oficiais "
+                    "do liquidante (willbank.com.br) um boleto registrado de entrada baixa, "
+                    "respeitando seu limite mensal e com pedido de revisão dos encargos."
+                )
             return (
                 "Entendi. Posso te enviar a fatura detalhada e o contrato pelos canais oficiais "
                 "do liquidante (willbank.com.br) e voltamos a falar quando estiver tudo claro. "
@@ -125,7 +145,11 @@ class ScriptedBackend:
             return (
                 "Vou confirmar essas informações nos canais oficiais e te retorno. [END_CONVERSATION]"
             )
-        if any(term in system for term in ["hardship", "can_pay_partial"]):
+        if any(term in system for term in ["hardship", "can_pay_partial", "temporary_liquidity_block"]):
+            if any(marker in system for marker in ["blocked_funds", "saldo bloqueado", "temporary_liquidity_block"]):
+                if any(marker in history for marker in ["entrada baixa", "limite mensal", "boleto registrado"]):
+                    return "R$ 80 por mês no boleto registrado cabe pra mim. Pode mandar por escrito. [END_CONVERSATION]"
+                return "Meu dinheiro ficou bloqueado, então só consigo algo pequeno e por boleto oficial."
             if any(marker in system for marker in ["150", "r$ 150", "r$150"]):
                 return (
                     "Não consigo pagar tudo, mas R$ 100 por mês eu topo se for em boleto."
