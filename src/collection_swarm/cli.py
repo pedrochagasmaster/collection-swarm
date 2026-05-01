@@ -28,7 +28,7 @@ from collection_swarm.model_evaluation import (
 from collection_swarm.runner import build_matrix, run_matrix
 from collection_swarm.store import SimulationStore
 
-console = Console()
+console = Console(_environ={"COLUMNS": "160"})
 
 
 def _split_csv(value: str | None) -> list[str] | None:
@@ -54,7 +54,7 @@ def list_profiles(ctx: click.Context) -> None:
     """List configured Profiles."""
     config = load_app_config(ctx.obj["config_dir"])
     table = Table(title="Profiles")
-    table.add_column("ID")
+    table.add_column("ID", overflow="fold")
     table.add_column("Archetype")
     table.add_column("Debt")
     table.add_column("Primary Objection")
@@ -74,7 +74,7 @@ def list_strategies(ctx: click.Context) -> None:
     """List configured Strategies."""
     config = load_app_config(ctx.obj["config_dir"])
     table = Table(title="Strategies")
-    table.add_column("ID")
+    table.add_column("ID", overflow="fold")
     table.add_column("Tone")
     table.add_column("Tactic")
     table.add_column("Follow-up")

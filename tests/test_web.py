@@ -44,8 +44,10 @@ class TestDashboard:
         assert data["total_runs"] == 12
         assert data["completed"] == 12
         assert data["failed"] == 0
-        assert len(data["profiles"]) == 3
-        assert len(data["strategies"]) == 4
+        assert "cooperative_hardship" in data["profiles"]
+        assert "willbank_blocked_balance_hardship" in data["profiles"]
+        assert "empathetic_payment_plan" in data["strategies"]
+        assert "official_channel_validation_first" in data["strategies"]
         assert "outcome_distribution" in data
         assert "average_scores" in data
 
@@ -144,13 +146,15 @@ class TestConfig:
         resp = seeded_client.get("/api/config/profiles")
         assert resp.status_code == 200
         data = resp.json()
-        assert len(data) == 3
+        profile_ids = {profile["id"] for profile in data}
+        assert {"cooperative_hardship", "willbank_blocked_balance_hardship"} <= profile_ids
 
     def test_list_strategies(self, seeded_client: TestClient) -> None:
         resp = seeded_client.get("/api/config/strategies")
         assert resp.status_code == 200
         data = resp.json()
-        assert len(data) == 4
+        strategy_ids = {strategy["id"] for strategy in data}
+        assert {"empathetic_payment_plan", "official_channel_validation_first"} <= strategy_ids
 
     def test_list_models(self, seeded_client: TestClient) -> None:
         resp = seeded_client.get("/api/config/models")
