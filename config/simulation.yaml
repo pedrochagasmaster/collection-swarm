@@ -20,3 +20,9 @@ objection_taxonomy:
   - wants_written_proof
   - avoidance
   - requests_callback
+  - liquidation_confusion
+  - scam_concern
+  - overindebtedness
+  - bank_mistrust
+  - privacy_concern
+  - official_channel_request

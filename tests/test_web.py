@@ -9,6 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from collection_swarm.model_evaluation import RoleProbe
+from collection_swarm.config import load_app_config
 from collection_swarm.web.app import create_app
 from collection_swarm.web.seed import generate_seed_data
 
@@ -41,11 +42,12 @@ class TestDashboard:
         resp = seeded_client.get("/api/dashboard")
         assert resp.status_code == 200
         data = resp.json()
+        config = load_app_config("config")
         assert data["total_runs"] == 12
         assert data["completed"] == 12
         assert data["failed"] == 0
-        assert len(data["profiles"]) == 3
-        assert len(data["strategies"]) == 4
+        assert len(data["profiles"]) == len(config.profiles)
+        assert len(data["strategies"]) == len(config.strategies)
         assert "outcome_distribution" in data
         assert "average_scores" in data
 
@@ -144,13 +146,13 @@ class TestConfig:
         resp = seeded_client.get("/api/config/profiles")
         assert resp.status_code == 200
         data = resp.json()
-        assert len(data) == 3
+        assert len(data) == len(load_app_config("config").profiles)
 
     def test_list_strategies(self, seeded_client: TestClient) -> None:
         resp = seeded_client.get("/api/config/strategies")
         assert resp.status_code == 200
         data = resp.json()
-        assert len(data) == 4
+        assert len(data) == len(load_app_config("config").strategies)
 
     def test_list_models(self, seeded_client: TestClient) -> None:
         resp = seeded_client.get("/api/config/models")

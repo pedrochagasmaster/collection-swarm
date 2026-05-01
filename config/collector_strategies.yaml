@@ -31,3 +31,35 @@ strategies:
     concession_willingness: flexible
     compliance_adherence: strict
     follow_up_strategy: callback
+  - id: liquidation_clarity_validation
+    tone: transparent
+    opening_approach: identity_and_context_validation
+    negotiation_tactic: documentation_first
+    escalation_style: none
+    concession_willingness: moderate
+    compliance_adherence: strict
+    follow_up_strategy: official_channel_written_summary
+  - id: low_income_budget_fit_plan
+    tone: empathetic
+    opening_approach: permission_based_budget_check
+    negotiation_tactic: cash_flow_aligned_installments
+    escalation_style: none
+    concession_willingness: flexible
+    compliance_adherence: strict
+    follow_up_strategy: written_agreement
+  - id: scam_sensitive_self_service
+    tone: calm
+    opening_approach: minimal_data_verification
+    negotiation_tactic: official_self_service_payment_path
+    escalation_style: none
+    concession_willingness: moderate
+    compliance_adherence: strict
+    follow_up_strategy: secure_official_channel
+  - id: complaint_deescalation_review
+    tone: respectful
+    opening_approach: complaint_acknowledgment
+    negotiation_tactic: pause_and_review_options
+    escalation_style: none
+    concession_willingness: flexible
+    compliance_adherence: strict
+    follow_up_strategy: no_pressure_callback
