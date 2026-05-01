@@ -113,22 +113,58 @@ Saved results go to `output/collection_swarm.sqlite` by default.
 
 ## Debtor Profiles & Collector Strategies
 
-### Included Profiles
+The bundled catalog is calibrated to **Will Bank's** real client base and the
+post-liquidation Brazilian context (BCB extrajudicial liquidation decreed
+2026-01-21). Sources, behavioral-economics references, and the rationale for
+every persona and strategy are documented in
+[`docs/willbank-research-dossier.md`](docs/willbank-research-dossier.md).
+
+### Included Profiles (R$ amounts)
 
 | ID | Archetype | Debt | Primary Objection |
 |----|-----------|------|-------------------|
-| `cooperative_hardship` | Cooperative | $4,200 medical | Inability to pay — strict $150/month ceiling |
-| `written_proof_disputer` | Disputer | $2,800 credit card | Disputes debt — requires written proof first |
-| `hostile_avoidant` | Hostile | $1,100 utility | Avoidance — reacts poorly to pressure |
+| `cooperative_hardship` | Cooperative | R$ 850 crédito pessoal Will | Inability to pay — strict R$ 80/mês ceiling |
+| `written_proof_disputer` | Disputer | R$ 612 cartão Will | Disputes fees — demands fatura detalhada + contrato |
+| `hostile_avoidant` | Hostile | R$ 1 900 cartão Will | Avoidance — refuses to share data on the call |
+| `liquidation_confused` | Confused | R$ 540 cartão Will | Questions whether debt still exists post-liquidation |
+| `scam_suspicious` | Skeptical | R$ 1 280 cartão Will | Suspects scam — needs liquidator validation first |
+| `feirao_serial_renegotiator` | Strategic | R$ 2 750 cartão Will | Anchors on Feirão-style 70%+ discounts |
+| `consignado_payroll_steady` | Cooperative | R$ 4 200 FGTS antecipado | Reassurance only; descontos seguem pela folha |
+| `superendividado_chronic` | Overwhelmed | R$ 980 cartão Will | Multi-credor — Lei 14.181/2021 candidate |
+| `young_first_credit_card` | Cooperative | R$ 320 cartão Will | Forgetful — first card; resolve via WhatsApp |
+| `willbank_blocked_balance_hardship` | Anxious hardship | R$ 930 cartão Will | Salary/reserve blocked by liquidation; protects essentials |
+| `willbank_micro_merchant_cashflow` | Pragmatic micro-merchant | R$ 1 480 card spend | Irregular sales cash flow after Pix/card disruption |
+| `willbank_benefit_dependent_household` | Vulnerable hardship | R$ 760 card + bills | Benefits and essential expenses take priority |
+| `willbank_fgc_waiting_high_balance` | Angry reimbursement-waiting | R$ 3 900 card installments | Will pay after FGC/liquidator milestone |
+| `willbank_low_digital_access` | Low digital access | R$ 520 card invoice | Cannot access app or generate boleto unaided |
+| `willbank_blocked_balance_hardship` | Anxious hardship | R$ 930 cartão Will | Blocked salary/reserve — needs low-entry boleto plan |
+| `willbank_micro_merchant_cashflow` | Pragmatic merchant | R$ 1 480 cartão Will | Irregular post-liquidation cash flow |
+| `willbank_benefit_dependent_household` | Vulnerable hardship | R$ 760 cartão/basic bills | Essential expenses take priority |
+| `willbank_fgc_waiting_high_balance` | Angry/high balance | R$ 3 900 cartão Will | Will pay after FGC/liquidator milestone |
+| `willbank_low_digital_access` | Low digital access | R$ 520 cartão Will | Cannot access app or generate boleto |
 
 ### Included Strategies
 
 | ID | Tone | Tactic | Follow-up |
 |----|------|--------|-----------|
-| `empathetic_payment_plan` | Empathetic | Payment plan | Written agreement |
-| `assertive_settlement` | Assertive | Settlement offer | Immediate payment |
-| `neutral_reminder` | Neutral | Deadline | Callback |
-| `problem_solving_callback` | Problem-solving | Empathy | Callback |
+| `empathetic_payment_plan` | Empathetic | Payment plan (parcela alinhada ao dia 5) | Written agreement |
+| `assertive_settlement` | Assertive | Loss-framed Feirão-style discount | Immediate boleto |
+| `neutral_reminder` | Neutral | Personalized digital reminder | Self-service link |
+| `problem_solving_callback` | Empathetic | Empathy + implementation intention | Scheduled callback |
+| `liquidation_explainer` | Calm informative | Defer until validated; cite liquidator | Callback after validation |
+| `whatsapp_self_service` | Friendly brief | Link to self-negotiation portal | Portal self-service |
+| `superendividamento_referral` | Empathetic | Refer to Lei 14.181 audiência | Hold pattern + referral |
+| `consignado_confirmation` | Calm informative | Confirm and inform; no ask | Written confirmation |
+| `blocked_balance_hardship_plan` | Empathetic practical | Micro-installment with fee review | Low-entry plan after boleto confirmation |
+| `micro_merchant_cashflow_alignment` | Collaborative businesslike | Weekly/payday-aligned installments | Written schedule with review date |
+| `overindebtedness_stabilization` | Nonjudgmental structured | One recommended option | Documented hardship review |
+| `reimbursement_milestone_callback` | Calm respectful | Bridge agreement until reimbursement | Callback tied to official milestone |
+| `low_digital_access_guidance` | Patient step-by-step | Assisted official-channel resolution | Written step-by-step instructions |
+| `blocked_balance_hardship_plan` | Empathetic practical | Micro-installment + fee review | Low-entry boleto path |
+| `micro_merchant_cashflow_alignment` | Collaborative | Weekly/payday-aligned installments | Written schedule review |
+| `overindebtedness_stabilization` | Nonjudgmental | One recommended default option | Documented hardship review |
+| `reimbursement_milestone_callback` | Calm respectful | Bridge until reimbursement | Official-milestone callback |
+| `low_digital_access_guidance` | Patient | Step-by-step boleto guidance | Written instructions |
 
 Profiles and strategies are defined in YAML and are fully extensible — add your own in `config/debtor_profiles.yaml` and `config/collector_strategies.yaml`.
 
@@ -319,7 +355,7 @@ config/
 └── simulation.yaml             # Turn limits, repetitions, compliance thresholds
 ```
 
-A key design choice: debtor profiles include **machine-readable constraints**. For example, `cooperative_hardship` will never agree above `$150/month`. The Judge verifies that constraint deterministically in addition to LLM scoring — if the debtor violates its own constraints, the simulation data is flagged as unreliable.
+A key design choice: debtor profiles include **machine-readable constraints**. For example, `cooperative_hardship` will never agree above R$ 80/mês. The Judge verifies that constraint deterministically in addition to LLM scoring — if the debtor violates its own constraints, the simulation data is flagged as unreliable.
 
 ## Development
 

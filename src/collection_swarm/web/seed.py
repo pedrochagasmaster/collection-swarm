@@ -15,12 +15,17 @@ from collection_swarm.models import (
 )
 from collection_swarm.store import SimulationStore
 
-PROFILE_IDS = ["cooperative_hardship", "written_proof_disputer", "hostile_avoidant"]
-STRATEGY_IDS = [
-    "empathetic_payment_plan",
-    "assertive_settlement",
-    "neutral_reminder",
-    "problem_solving_callback",
+SEED_COMBOS = [
+    ("cooperative_hardship", "empathetic_payment_plan"),
+    ("written_proof_disputer", "problem_solving_callback"),
+    ("hostile_avoidant", "neutral_reminder"),
+    ("liquidation_confused", "liquidation_explainer"),
+    ("scam_suspicious", "whatsapp_self_service"),
+    ("superendividado_chronic", "superendividamento_referral"),
+    ("willbank_blocked_balance_hardship", "blocked_balance_hardship_plan"),
+    ("willbank_micro_merchant_cashflow", "micro_merchant_cashflow_alignment"),
+    ("willbank_fgc_waiting_high_balance", "reimbursement_milestone_callback"),
+    ("willbank_low_digital_access", "low_digital_access_guidance"),
 ]
 
 SAMPLE_CONVERSATIONS: dict[tuple[str, str], list[dict]] = {
@@ -113,13 +118,11 @@ def _make_transcript(profile_id: str, strategy_id: str) -> list[Message]:
 
 def _generate_generic_transcript(profile_id: str, strategy_id: str) -> list[Message]:
     return [
-        Message(role="collector", content=f"Hello, I'm calling from Meridian Financial Services regarding your account. I'd like to discuss resolution options with you using our {strategy_id.replace('_', ' ')} approach."),
-        Message(role="debtor", content="Okay, I'm listening. What are my options?"),
-        Message(role="collector", content="We have several flexible options available. Based on your account, I'd recommend we find something that works for your current situation. What does your budget look like?"),
-        Message(role="debtor", content="Things are tight right now but I want to get this resolved. What's the minimum you can work with?"),
-        Message(role="collector", content="I understand. We can work with smaller amounts to get started. Let me put together some options and send them to you in writing so you can review at your convenience."),
-        Message(role="debtor", content="That sounds fair. Go ahead and send it over."),
-        Message(role="collector", content="I'll get that out to you today. Thank you for taking the time to speak with me. [END_CONVERSATION]"),
+        Message(role="collector", content=f"Ola, falo em nome do liquidante do Will Bank sobre sua conta. Quero explicar o canal oficial e usar a abordagem {strategy_id.replace('_', ' ')} sem pedir Pix, senha ou dados sensiveis."),
+        Message(role="debtor", content=f"Estou preocupado com essa situacao de liquidacao e meu caso de {profile_id.replace('_', ' ')}. Preciso entender antes de aceitar qualquer pagamento."),
+        Message(role="collector", content="A cobranca legitima segue por boleto registrado e canais oficiais como willbank.com.br ou informacoes do Banco Central. Podemos ajustar um proximo passo ao seu orcamento e enviar tudo por escrito."),
+        Message(role="debtor", content="Se vier por canal oficial e couber no meu bolso, eu consigo revisar com calma."),
+        Message(role="collector", content="Combinado. Vou registrar o encaminhamento por escrito e deixar um retorno em data segura. [END_CONVERSATION]"),
     ]
 
 
@@ -131,61 +134,57 @@ def generate_seed_data(
     results: list[SimulationResult] = []
     base_time = datetime.now(timezone.utc) - timedelta(hours=num_runs)
 
-    combos = [(p, s) for p in PROFILE_IDS for s in STRATEGY_IDS]
-    reps_per_combo = max(1, num_runs // len(combos))
+    for idx in range(num_runs):
+        profile_id, strategy_id = SEED_COMBOS[idx % len(SEED_COMBOS)]
+        started = base_time + timedelta(hours=idx * 0.5)
+        transcript = _make_transcript(profile_id, strategy_id)
+        duration_minutes = random.uniform(3, 12)
+        ended = started + timedelta(minutes=duration_minutes)
 
-    for combo_idx, (profile_id, strategy_id) in enumerate(combos):
-        for rep in range(reps_per_combo):
-            idx = combo_idx * reps_per_combo + rep
-            started = base_time + timedelta(hours=idx * 0.5)
-            transcript = _make_transcript(profile_id, strategy_id)
-            duration_minutes = random.uniform(3, 12)
-            ended = started + timedelta(minutes=duration_minutes)
+        key = (profile_id, strategy_id)
+        base_vals = OUTCOMES_BY_COMBO.get(
+            key,
+            ("no_commitment", 0.30, 0.50, 0.85, 0.40, 0.20, "no_resolution"),
+        )
+        outcome_str, pp, ds, cs, rb, er, end_reason = base_vals
+        jitter = lambda v: max(0.0, min(1.0, v + random.uniform(-0.08, 0.08)))
 
-            key = (profile_id, strategy_id)
-            base_vals = OUTCOMES_BY_COMBO.get(
-                key,
-                ("no_commitment", 0.30, 0.50, 0.85, 0.40, 0.20, "no_resolution"),
-            )
-            outcome_str, pp, ds, cs, rb, er, end_reason = base_vals
-            jitter = lambda v: max(0.0, min(1.0, v + random.uniform(-0.08, 0.08)))
+        judgment = Judgment(
+            reasoning=f"The collector used a {strategy_id.replace('_', ' ')} approach with the {profile_id.replace('_', ' ')} profile. "
+            f"The conversation {'showed good rapport and progress toward resolution' if pp > 0.5 else 'had limited progress toward payment commitment'}. "
+            f"{'Compliance was well maintained throughout.' if cs > 0.85 else 'Some compliance concerns were noted.'}",
+            payment_outcome=PaymentOutcome(outcome_str),
+            payment_probability=jitter(pp),
+            debtor_satisfaction=jitter(ds),
+            compliance_score=jitter(cs),
+            conversation_efficiency=len(transcript),
+            rapport_built=jitter(rb),
+            escalation_risk=jitter(er),
+            end_reason=end_reason,
+            constraint_violations=(
+                ["excessive_pressure"]
+                if er > 0.5 and random.random() < 0.4
+                else []
+            ),
+        )
 
-            judgment = Judgment(
-                reasoning=f"The collector used a {strategy_id.replace('_', ' ')} approach with the {profile_id.replace('_', ' ')} profile. "
-                f"The conversation {'showed good rapport and progress toward resolution' if pp > 0.5 else 'had limited progress toward payment commitment'}. "
-                f"{'Compliance was well maintained throughout.' if cs > 0.85 else 'Some compliance concerns were noted.'}",
-                payment_outcome=PaymentOutcome(outcome_str),
-                payment_probability=jitter(pp),
-                debtor_satisfaction=jitter(ds),
-                compliance_score=jitter(cs),
-                conversation_efficiency=len(transcript),
-                rapport_built=jitter(rb),
-                escalation_risk=jitter(er),
-                end_reason=end_reason,
-                constraint_violations=(
-                    ["excessive_pressure"]
-                    if er > 0.5 and random.random() < 0.4
-                    else []
-                ),
-            )
-
-            result = SimulationResult(
-                status="completed",
-                profile_id=profile_id,
-                strategy_id=strategy_id,
-                conversation_model="scripted_echo",
-                judge_model="heuristic_judge",
-                started_at=started,
-                ended_at=ended,
-                turn_count=len([m for m in transcript if m.role == "collector"]),
-                ended_by=EndedBy.COLLECTOR,
-                transcript=transcript,
-                judgment=judgment,
-                total_input_tokens=random.randint(800, 2500),
-                total_output_tokens=random.randint(600, 1800),
-                estimated_cost_usd=round(random.uniform(0.001, 0.015), 4),
-            )
-            results.append(result)
+        result = SimulationResult(
+            status="completed",
+            profile_id=profile_id,
+            strategy_id=strategy_id,
+            conversation_model="scripted_echo",
+            judge_model="heuristic_judge",
+            started_at=started,
+            ended_at=ended,
+            turn_count=len([m for m in transcript if m.role == "collector"]),
+            ended_by=EndedBy.COLLECTOR,
+            transcript=transcript,
+            judgment=judgment,
+            total_input_tokens=random.randint(800, 2500),
+            total_output_tokens=random.randint(600, 1800),
+            estimated_cost_usd=round(random.uniform(0.001, 0.015), 4),
+        )
+        results.append(result)
 
     store.save_runs(results)
     return len(results)

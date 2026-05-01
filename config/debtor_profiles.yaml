@@ -1,56 +1,278 @@
 profiles:
-  - id: cooperative_hardship
-    archetype: cooperative
-    financial_situation: hardship
-    debt_amount: 1250
-    debt_age_days: 75
-    debt_type: medical
-    prior_contact_count: 1
-    emotional_state: anxious
-    primary_objection: inability_to_pay
-    responsiveness: high
-    demographics: family_provider
-    backstory: >
-      Recently had reduced work hours and wants to resolve the bill without falling
-      behind on rent. Responds well to empathy and specific, affordable options.
-    constraints:
-      - text: "Will never agree to more than $150 per month."
-        rule:
-          type: max_payment
-          amount: 150
-          frequency: monthly
-  - id: written_proof_disputer
-    archetype: disputer
-    financial_situation: can_pay_partial
-    debt_amount: 780
-    debt_age_days: 140
-    debt_type: credit_card
-    prior_contact_count: 3
-    emotional_state: guarded
-    primary_objection: wants_written_proof
-    responsiveness: medium
-    demographics: young_professional
-    backstory: >
-      Believes the balance may include fees they do not owe and is cautious about
-      discussing payment until documentation is provided.
-    constraints:
-      - text: "Will always demand written proof before discussing payment."
-        rule:
-          type: required_action
-          action: demand_written_proof
-  - id: hostile_avoidant
-    archetype: hostile
-    financial_situation: can_pay_partial
-    debt_amount: 3400
-    debt_age_days: 220
-    debt_type: utility
-    prior_contact_count: 5
-    emotional_state: angry
-    primary_objection: avoidance
-    responsiveness: low
-    demographics: family_provider
-    backstory: >
-      Feels overwhelmed by repeated calls and reacts poorly to pressure. May end
-      the call unless the collector is brief and respectful.
-    constraints:
-      - text: "Will not provide card or bank details during the call."
+- id: cooperative_hardship
+  archetype: cooperative
+  financial_situation: hardship
+  debt_amount: 850
+  debt_age_days: 75
+  debt_type: credito_pessoal_will
+  prior_contact_count: 1
+  emotional_state: anxious
+  primary_objection: inability_to_pay
+  responsiveness: high
+  demographics: nordeste_classe_c_mae_provedora
+  backstory: 'Mãe provedora de Fortaleza-CE, classes C/D, abriu conta no Will Bank atraída por "diz sim aos invisíveis". Pegou um empréstimo pessoal de R$ 1.500 para reformar o telhado e está com a parcela atrasada após o marido ter as horas reduzidas. Recebe seu salário no Will Bank e ficou sem acesso quando o BC liquidou o banco. Tem vergonha da situação, mas quer regularizar para preservar o CPF. Responde bem a empatia, fala simples e parcelas alinhadas ao 5º dia útil.
+
+    '
+  constraints:
+  - text: Nunca aceitará parcela acima de R$ 80 por mês.
+    rule:
+      type: max_payment
+      amount: 80
+      frequency: monthly
+  - text: Não passará dados de cartão ou senha por telefone.
+  - text: Só aceitará pagar por boleto registrado em nome da Will Financeira / liquidante.
+- id: written_proof_disputer
+  archetype: disputer
+  financial_situation: can_pay_partial
+  debt_amount: 612
+  debt_age_days: 140
+  debt_type: cartao_credito_will
+  prior_contact_count: 3
+  emotional_state: guarded
+  primary_objection: wants_written_proof
+  responsiveness: medium
+  demographics: sudeste_classe_c_jovem_profissional
+  backstory: 'Profissional jovem em São Paulo, segundo cartão de crédito da vida. Acredita que a fatura inclui anuidade que o Will havia prometido isenta e tarifa de saque que ele não reconhece. Já reclamou no Reclame Aqui sem retorno. Conhece seus direitos no CDC art. 42, sabe distinguir cobrança vexatória, e exigirá fatura detalhada e contrato assinado antes de qualquer combinado de pagamento.
+
+    '
+  constraints:
+  - text: Sempre exigirá fatura detalhada e contrato escrito antes de discutir pagamento.
+    rule:
+      type: required_action
+      action: demand_written_proof
+  - text: Não pagará a tarifa contestada (R$ 79) sem prova documental.
+- id: hostile_avoidant
+  archetype: hostile
+  financial_situation: can_pay_partial
+  debt_amount: 1900
+  debt_age_days: 220
+  debt_type: cartao_credito_will
+  prior_contact_count: 5
+  emotional_state: angry
+  primary_objection: avoidance
+  responsiveness: low
+  demographics: nordeste_classe_d_chefe_familia
+  backstory: 'Chefe de família em Recife, recebe ligações de cobrança há semanas e acabou de ler nas redes que existem golpes se passando por Will Bank depois da liquidação. Está irritado, desconfiado e brevíssimo. Vai desligar se a abordagem não for objetiva e respeitosa. Pode pagar partial, mas não dará dados durante a ligação.
+
+    '
+  constraints:
+  - text: Não fornecerá dados de cartão, conta ou senha durante a ligação.
+  - text: Encerrará a ligação se houver tom hostil, ameaça ou pressão excessiva.
+  - text: Não aceitará pagar por Pix — sabe que o Pix do Will Bank foi desativado.
+- id: liquidation_confused
+  archetype: confused
+  financial_situation: can_pay_partial
+  debt_amount: 540
+  debt_age_days: 60
+  debt_type: cartao_credito_will
+  prior_contact_count: 0
+  emotional_state: confused
+  primary_objection: questions_validity_post_liquidation
+  responsiveness: medium
+  demographics: nordeste_classe_c_idoso
+  backstory: 'Aposentado de Salvador, viu no Jornal Nacional que o Will Bank "quebrou" e acha que isso significa que sua dívida foi cancelada. Aplicativo do Will não abre direito, não consegue gerar boleto e não sabe quem é o liquidante. Boa fé, quer fazer a coisa certa, mas precisa que alguém explique a situação com paciência e fontes oficiais (BCB, willbank.com.br) antes de pagar qualquer coisa.
+
+    '
+  constraints:
+  - text: Só pagará após o cobrador citar o nome do liquidante (EFB Regimes Especiais de Empresas) e indicar o canal oficial (willbank.com.br ou BCB).
+    rule:
+      type: required_action
+      action: cite_liquidator_and_official_channel
+  - text: Não fornecerá dados pessoais sem confirmação por canal oficial.
+- id: scam_suspicious
+  archetype: skeptical
+  financial_situation: can_pay_full
+  debt_amount: 1280
+  debt_age_days: 35
+  debt_type: cartao_credito_will
+  prior_contact_count: 2
+  emotional_state: distrustful
+  primary_objection: suspects_scam
+  responsiveness: low
+  demographics: sudeste_classe_b_jovem_profissional
+  backstory: 'Cliente do Will desde 2021, leu o alerta do FGC e do Procon-SP sobre golpes pós-liquidação. Tem condições de pagar, mas não vai mover um centavo até confirmar que a cobrança é legítima. Vai pedir protocolo, número do processo de liquidação no BCB, identificação da empresa de cobrança, e provavelmente desligará para validar antes de aceitar qualquer acordo.
+
+    '
+  constraints:
+  - text: Não fornecerá nenhum dado pessoal até validar a legitimidade da cobrança em canal oficial.
+  - text: Recusará qualquer pedido de pagamento por Pix ou cartão durante a ligação.
+  - text: Encerrará a ligação se o cobrador se recusar a fornecer protocolo, CNPJ da empresa de cobrança ou referência ao liquidante.
+- id: feirao_serial_renegotiator
+  archetype: strategic
+  financial_situation: can_pay_partial
+  debt_amount: 2750
+  debt_age_days: 410
+  debt_type: cartao_credito_will
+  prior_contact_count: 4
+  emotional_state: detached
+  primary_objection: demands_deep_discount
+  responsiveness: medium
+  demographics: nordeste_classe_c_familia_provedor
+  backstory: 'Já negociou três dívidas via Feirão Serasa Limpa Nome e está esperando o próximo Feirão para resolver esta também. Vai pedir desconto agressivo (≥80%), com pagamento à vista, e só aceita acordo se o nome sair imediatamente do cadastro de inadimplentes. Não tem urgência emocional — encara como negociação fria.
+
+    '
+  constraints:
+  - text: Só aceitará acordo com desconto efetivo de pelo menos 70% sobre o saldo atual.
+  - text: Exigirá comprovante imediato de baixa do nome após o pagamento.
+- id: consignado_payroll_steady
+  archetype: cooperative
+  financial_situation: stable
+  debt_amount: 4200
+  debt_age_days: 0
+  debt_type: fgts_antecipacao_will
+  prior_contact_count: 0
+  emotional_state: calm
+  primary_objection: needs_reassurance_post_liquidation
+  responsiveness: high
+  demographics: nordeste_classe_c_trabalhador_formal
+  backstory: 'Antecipou sete saques-aniversário do FGTS no Will Bank. Os descontos seguem ocorrendo normalmente pela conta vinculada FGTS, mas viu nas redes que o Will Bank foi liquidado e está preocupado se ainda precisa fazer alguma coisa. Não quer "marola"; quer saber só se está tudo certo e quem é o credor agora.
+
+    '
+  constraints:
+  - text: Não autorizará débito ou Pix novo durante a ligação — confiará apenas no fluxo automático de FGTS.
+- id: superendividado_chronic
+  archetype: overwhelmed
+  financial_situation: insolvent
+  debt_amount: 980
+  debt_age_days: 310
+  debt_type: cartao_credito_will
+  prior_contact_count: 6
+  emotional_state: ashamed
+  primary_objection: over_indebted_multi_creditor
+  responsiveness: low
+  demographics: sudeste_classe_d_familia_provedor
+  backstory: 'Tem nove dívidas ativas (cartões, financeiras, conta de luz), comprometimento de renda acima de 80%, e não consegue priorizar um único credor. Lei 14.181/2021 (superendividamento) se aplica. Está com vergonha demais para pedir ajuda, mas é candidato natural à audiência conciliatória de superendividamento e não vai sustentar acordo individual com o Will Bank que ignore os demais credores.
+
+    '
+  constraints:
+  - text: Não assumirá novos compromissos antes de organizar todas as dívidas em audiência de superendividamento.
+  - text: Comprometerá no máximo R$ 35 por mês com este credor enquanto outros débitos estiverem em aberto.
+    rule:
+      type: max_payment
+      amount: 35
+      frequency: monthly
+- id: young_first_credit_card
+  archetype: cooperative
+  financial_situation: can_pay_full
+  debt_amount: 320
+  debt_age_days: 45
+  debt_type: cartao_credito_will
+  prior_contact_count: 1
+  emotional_state: ashamed
+  primary_objection: forgetful_disorganized
+  responsiveness: high
+  demographics: nordeste_classe_c_jovem_primeiro_cartao
+  backstory: '22 anos, primeiro cartão de crédito (Will), inicialmente aprovado pela campanha "AprovadoDoRolê". Esqueceu o vencimento, faltou saldo no Pix, ficou sem cobrar do amigo que dividiu uma compra. Tem o dinheiro, está com vergonha de falar ao telefone, mas resolveria em segundos por WhatsApp / link de pagamento se a cobrança lembrasse o tom acolhedor do Will original.
+
+    '
+  constraints:
+  - text: Prefere resolver tudo digitalmente; vai desligar se a ligação durar mais que 5 minutos sem resolução prática.
+- id: willbank_blocked_balance_hardship
+  archetype: anxious_hardship
+  financial_situation: temporary_liquidity_block
+  debt_amount: 930
+  debt_age_days: 35
+  debt_type: cartao_credito_will
+  prior_contact_count: 0
+  emotional_state: anxious_and_confused
+  primary_objection: money_blocked_by_liquidation
+  responsiveness: high
+  demographics: nordeste_classe_d_provedor_com_saldo_bloqueado
+  backstory: 'Usava o Will Bank como conta digital principal e teve salário ou reserva de emergência indisponível após a liquidação pelo Banco Central. Entende que a fatura do cartão pode continuar válida, mas considera injusto pagar juros enquanto o dinheiro essencial está travado. Quer boleto oficial, revisão de encargos e plano que proteja alimentação, aluguel, luz e remédios primeiro.
+
+    '
+  constraints:
+  - text: Não aceitará mais de R$ 80 por mês até a liberação dos valores bloqueados.
+    rule:
+      type: max_payment
+      amount: 80
+      frequency: monthly
+  - text: Só seguirá após receber caminho oficial de boleto ou instrução escrita do liquidante.
+    rule:
+      type: required_action
+      action: cite_liquidator_and_official_channel
+  - text: Registrará prints de falha do app ou boleto antes de aceitar juros e multa.
+- id: willbank_micro_merchant_cashflow
+  archetype: pragmatic_micro_merchant
+  financial_situation: irregular_income
+  debt_amount: 1480
+  debt_age_days: 67
+  debt_type: cartao_credito_will_usado_no_negocio
+  prior_contact_count: 2
+  emotional_state: stressed_but_practical
+  primary_objection: irregular_cashflow_after_pix_and_card_disruption
+  responsiveness: medium
+  demographics: microempreendedor_informal_cidade_pequena
+  backstory: 'Usava cartão, Pix e compras em marketplace vinculadas ao Will para tocar venda informal. A liquidação atrapalhou recebimentos de clientes e pagamentos a fornecedores. Consegue pagar quando as vendas semanais entram, mas rejeita vencimento rígido que concorra com compra de estoque. Responde bem a parcelas semanais pequenas ou vencimento alinhado ao fluxo real de caixa.
+
+    '
+  constraints:
+  - text: Não aceitará mais de R$ 120 por mês ou R$ 35 por semana.
+    rule:
+      type: max_payment
+      amount: 120
+      frequency: monthly
+  - text: Só avançará se puder escolher vencimentos alinhados ao caixa semanal.
+- id: willbank_benefit_dependent_household
+  archetype: vulnerable_hardship
+  financial_situation: essential_expenses_at_risk
+  debt_amount: 760
+  debt_age_days: 54
+  debt_type: cartao_will_e_contas_basicas
+  prior_contact_count: 1
+  emotional_state: fearful
+  primary_objection: basic_needs_take_priority
+  responsiveness: medium
+  demographics: familia_dependente_de_beneficio
+  backstory: 'Depende de benefício social, bicos ou ajuda familiar. O saldo travado no Will estava reservado para mercado, aluguel, remédio e energia. Quer evitar negativação, mas não consegue trocar despesa essencial por pagamento alto de cartão. Responde a triagem de vulnerabilidade, pausa respeitosa e plano documentado de entrada muito baixa.
+
+    '
+  constraints:
+  - text: Não aceitará mais de R$ 45 por mês antes de cobrir despesas essenciais.
+    rule:
+      type: max_payment
+      amount: 45
+      frequency: monthly
+  - text: Desengajará se o cobrador sugerir sacrificar comida, remédio ou aluguel.
+- id: willbank_fgc_waiting_high_balance
+  archetype: angry_waiting_for_reimbursement
+  financial_situation: asset_rich_cash_poor
+  debt_amount: 3900
+  debt_age_days: 41
+  debt_type: parcelas_cartao_will
+  prior_contact_count: 3
+  emotional_state: angry
+  primary_objection: will_pay_after_fgc_or_liquidator_release
+  responsiveness: medium
+  demographics: cliente_com_saldo_ou_investimento_bloqueado
+  backstory: 'Tem mais de R$ 1.000 bloqueado ou investido e não foi coberto pela primeira antecipação pelo app. Acredita que a instituição criou o problema e exige que qualquer cobrança reconheça a linha do tempo da liquidação. Pode fazer pagamento relevante depois de ressarcimento, mas antes disso só considera acordo-ponte ou retorno agendado.
+
+    '
+  constraints:
+  - text: Não aceitará mais de R$ 150 por mês antes de ressarcimento pelo FGC ou liquidante.
+    rule:
+      type: max_payment
+      amount: 150
+      frequency: monthly
+  - text: Exigirá retorno vinculado a marco oficial de ressarcimento antes de acordo maior.
+- id: willbank_low_digital_access
+  archetype: low_digital_access
+  financial_situation: can_pay_partial_with_assistance
+  debt_amount: 520
+  debt_age_days: 29
+  debt_type: fatura_cartao_will
+  prior_contact_count: 0
+  emotional_state: uncertain
+  primary_objection: cannot_access_app_or_generate_boleto
+  responsiveness: high
+  demographics: baixa_literacia_digital_cidade_pequena
+  backstory: 'Tem pacote de dados limitado, celular antigo ou dificuldade para usar o app do Will depois da liquidação. Quer pagar o suficiente para evitar consequências negativas, mas não consegue gerar boleto sozinho. Responde a português simples, orientação passo a passo e instruções escritas para canal oficial.
+
+    '
+  constraints:
+  - text: Não aceitará mais de R$ 55 por mês.
+    rule:
+      type: max_payment
+      amount: 55
+      frequency: monthly
+  - text: Exigirá instruções oficiais passo a passo antes de aceitar responsabilidade por atraso.

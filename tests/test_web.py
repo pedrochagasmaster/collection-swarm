@@ -44,8 +44,17 @@ class TestDashboard:
         assert data["total_runs"] == 12
         assert data["completed"] == 12
         assert data["failed"] == 0
-        assert len(data["profiles"]) == 3
-        assert len(data["strategies"]) == 4
+        # Seed data covers representative Will Bank scenarios while respecting
+        # the requested run count.
+        assert {"cooperative_hardship", "liquidation_confused", "willbank_blocked_balance_hardship"}.issubset(
+            set(data["profiles"])
+        )
+        assert {
+            "empathetic_payment_plan",
+            "liquidation_explainer",
+            "blocked_balance_hardship_plan",
+            "micro_merchant_cashflow_alignment",
+        }.issubset(set(data["strategies"]))
         assert "outcome_distribution" in data
         assert "average_scores" in data
 
@@ -144,13 +153,25 @@ class TestConfig:
         resp = seeded_client.get("/api/config/profiles")
         assert resp.status_code == 200
         data = resp.json()
-        assert len(data) == 3
+        # Catalog grew with Will Bank persona research; ensure original and
+        # complementary liquidation profiles are exposed.
+        ids = {profile["id"] for profile in data}
+        assert {"cooperative_hardship", "written_proof_disputer", "hostile_avoidant"}.issubset(ids)
+        assert {"liquidation_confused", "willbank_low_digital_access"} <= ids
+        assert len(data) >= 14
 
     def test_list_strategies(self, seeded_client: TestClient) -> None:
         resp = seeded_client.get("/api/config/strategies")
         assert resp.status_code == 200
         data = resp.json()
-        assert len(data) == 4
+        ids = {strategy["id"] for strategy in data}
+        assert {
+            "empathetic_payment_plan",
+            "liquidation_explainer",
+            "blocked_balance_hardship_plan",
+            "low_digital_access_guidance",
+        }.issubset(ids)
+        assert len(data) >= 13
 
     def test_list_models(self, seeded_client: TestClient) -> None:
         resp = seeded_client.get("/api/config/models")

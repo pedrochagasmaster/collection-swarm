@@ -16,9 +16,17 @@ class ScriptedBackend:
     async def complete(self, model: ModelConfig, messages: list[LLMMessage]) -> LLMResponse:
         system = messages[0].content.lower() if messages else ""
         history = "\n".join(message.content for message in messages)
-        if "judge" in system or "evaluator" in system:
+        # Role detection: judge first (most distinctive), then debtor
+        # (matches "you are the debtor" / "voc\u00ea \u00e9 o devedor"), and
+        # finally collector as the default. We anchor the debtor match on the
+        # opening phrase so it does not get triggered by passing references
+        # to "devedor" inside the collector's system prompt.
+        if any(marker in system for marker in ("judge", "evaluator", "juiz avaliador")):
             content = self._judge_response(history)
-        elif "debtor" in system:
+        elif (
+            "you are the debtor" in system
+            or "voc\u00ea \u00e9 o devedor" in system
+        ):
             content = self._debtor_response(system, history.lower())
         else:
             content = self._collector_response(system, history.lower())
@@ -32,49 +40,160 @@ class ScriptedBackend:
         )
 
     def _collector_response(self, system: str, history: str) -> str:
-        if "payment_plan" in system or "payment plan" in system:
-            tactic = "set up a manageable payment plan"
-        elif "settlement" in system:
-            tactic = "review a possible settlement"
+        if any(
+            term in system
+            for term in [
+                "payment_plan",
+                "payment plan",
+                "parcelamento",
+                "parcela",
+                "micro_installment",
+                "cashflow",
+                "cash_flow",
+                "low_entry",
+                "assisted_official_channel",
+            ]
+        ):
+            tactic = "combinar uma parcela que caiba no seu bolso"
+        elif any(term in system for term in ["settlement", "settlement_offer", "acordo", "à vista", "a vista"]):
+            tactic = "ver um acordo com desconto à vista"
         else:
-            tactic = "find the next practical payment step"
+            tactic = "encontrar o próximo passo de pagamento que faça sentido"
 
         if "debtor:" not in history:
             return (
-                "Hello, this is Alex calling about your account. I want to understand your situation "
-                f"and see if we can {tactic} while keeping this affordable."
+                "Olá, aqui é Alex falando em nome do liquidante do Will Bank. "
+                "Quero entender sua situação e ver se conseguimos "
+                f"{tactic}, sem pressão."
             )
-        if any(term in history for term in ["agree", "can do", "will pay", "plan works", "per month", "acceptable"]):
-            return "Thank you. I will document the arrangement and send confirmation. [END_CONVERSATION]"
-        if any(term in history for term in ["can't", "hardship", "afford", "written proof", "verify"]):
+        if any(
+            term in history
+            for term in [
+                "agree",
+                "can do",
+                "will pay",
+                "plan works",
+                "per month",
+                "acceptable",
+                "topo",
+                "fechado",
+                "posso pagar",
+                "consigo pagar",
+                "aceito",
+                "por mês",
+            ]
+        ):
             return (
-                "I understand. We can send written validation and discuss options after you review it. "
-                "If it helps, we can also look at a smaller first payment or a callback date."
+                "Combinado. Vou registrar o acordo por boleto oficial do liquidante, sem Pix, "
+                "e te enviar a confirmação por escrito. "
+                "[END_CONVERSATION]"
             )
-        return "What amount or date would feel realistic for you so we can keep the account moving forward?"
+        if any(
+            term in history
+            for term in [
+                "can't",
+                "hardship",
+                "afford",
+                "written proof",
+                "verify",
+                "n\u00e3o consigo",
+                "n\u00e3o posso",
+                "fatura detalhada",
+                "contrato",
+                "golpe",
+                "desconfio",
+            ]
+        ) or any(term in system for term in ["micro_installment", "low_entry", "blocked_funds"]):
+            if any(term in system for term in ["micro_installment", "low_entry", "blocked_funds"]):
+                return (
+                    "Entendi o impacto do saldo bloqueado. Posso enviar pelos canais oficiais "
+                    "do liquidante (willbank.com.br) um boleto registrado de entrada baixa, "
+                    "respeitando seu limite mensal e com pedido de revisão dos encargos."
+                )
+            return (
+                "Entendi. Posso te enviar a fatura detalhada e o contrato pelos canais oficiais "
+                "do liquidante (willbank.com.br) e voltamos a falar quando estiver tudo claro. "
+                "Se ajudar, também consigo um primeiro valor menor ou um retorno em data combinada."
+            )
+        return (
+            "Que valor ou data ficaria realista pra você pra darmos um próximo passo?"
+        )
 
     def _debtor_response(self, system: str, history: str) -> str:
-        if "dispute" in system or "written proof" in system:
-            if "written validation" not in history and "written proof" not in history:
-                return "Before I talk about payment, I need written proof that this debt is mine."
-            return "Once I receive and review the proof, I can talk again, but I am not committing today. [END_CONVERSATION]"
-        if "hardship" in system or "can_pay_partial" in system:
-            if "$150" in system or "150" in system:
-                return "I cannot pay the full balance, but I could manage $100 per month if that is acceptable."
-            return "I am in a tough spot, but I can make a small monthly payment plan."
-        if "angry" in system or "hostile" in system:
-            return "I am tired of these calls. Send me everything in writing. [END_CONVERSATION]"
-        return "I forgot about this bill. If you send confirmation, I can make a payment this week."
+        if any(term in system for term in ["dispute", "written proof", "wants_written_proof", "disputer"]):
+            if not any(
+                marker in history
+                for marker in ["written validation", "written proof", "fatura detalhada", "contrato"]
+            ):
+                return (
+                    "Antes de falar de pagamento, preciso da fatura detalhada e do contrato "
+                    "por escrito pra confirmar essa cobrança."
+                )
+            return (
+                "Quando eu receber e revisar a documentação a gente fala. "
+                "Hoje eu não vou me comprometer. [END_CONVERSATION]"
+            )
+        if any(term in system for term in ["scam", "suspects_scam", "distrustful", "skeptical"]):
+            if not any(
+                marker in history
+                for marker in ["liquidante", "willbank.com.br", "bcb.gov.br", "banco central"]
+            ):
+                return (
+                    "Como sei que isso não é golpe? Me passe o nome do liquidante e o canal oficial "
+                    "antes de qualquer coisa."
+                )
+            return (
+                "Vou confirmar essas informações nos canais oficiais e te retorno. [END_CONVERSATION]"
+            )
+        if any(term in system for term in ["hardship", "can_pay_partial", "temporary_liquidity_block"]):
+            if any(marker in system for marker in ["blocked_funds", "saldo bloqueado", "temporary_liquidity_block"]):
+                if any(marker in history for marker in ["entrada baixa", "limite mensal", "boleto registrado"]):
+                    return "R$ 80 por mês no boleto registrado cabe pra mim. Pode mandar por escrito. [END_CONVERSATION]"
+                return "Meu dinheiro ficou bloqueado, então só consigo algo pequeno e por boleto oficial."
+            if any(marker in system for marker in ["150", "r$ 150", "r$150"]):
+                return (
+                    "Não consigo pagar tudo, mas R$ 100 por mês eu topo se for em boleto."
+                )
+            return (
+                "Tô numa fase apertada, mas consigo segurar uma parcela pequena no boleto."
+            )
+        if any(term in system for term in ["angry", "hostile", "avoidance", "avoidant"]):
+            return (
+                "Cansei dessas ligações. Manda tudo por escrito. [END_CONVERSATION]"
+            )
+        if any(term in system for term in ["confused", "questions_validity"]):
+            return (
+                "Achei que com o Will tendo quebrado eu nem precisava pagar. Você pode me explicar "
+                "como funciona agora?"
+            )
+        return (
+            "Esqueci esse boleto. Se me mandarem a confirmação por escrito, "
+            "eu pago essa semana."
+        )
 
     def _judge_response(self, history: str) -> str:
         lower_history = history.lower()
-        if "payment plan" in lower_history or "per month" in lower_history:
+        if any(
+            marker in lower_history
+            for marker in ["payment plan", "per month", "por m\u00eas", "parcela", "boleto registrado"]
+        ):
             outcome = "payment_plan"
             probability = 0.72
-        elif "payment this week" in lower_history or "will pay" in lower_history:
+        elif any(
+            marker in lower_history
+            for marker in ["payment this week", "will pay", "vou pagar", "pago essa semana"]
+        ):
             outcome = "promise_to_pay"
             probability = 0.65
-        elif "not committing" in lower_history or "send me everything in writing" in lower_history:
+        elif any(
+            marker in lower_history
+            for marker in [
+                "not committing",
+                "send me everything in writing",
+                "manda tudo por escrito",
+                "n\u00e3o vou me comprometer",
+            ]
+        ):
             outcome = "no_commitment"
             probability = 0.25
         else:

@@ -54,18 +54,21 @@ def list_profiles(ctx: click.Context) -> None:
     """List configured Profiles."""
     config = load_app_config(ctx.obj["config_dir"])
     table = Table(title="Profiles")
-    table.add_column("ID")
-    table.add_column("Archetype")
-    table.add_column("Debt")
-    table.add_column("Primary Objection")
+    table.add_column("ID", no_wrap=False, overflow="fold")
+    table.add_column("Archetype", overflow="fold")
+    table.add_column("Debt (R$)", overflow="fold")
+    table.add_column("Primary Objection", overflow="fold")
     for profile in config.profiles.values():
         table.add_row(
             profile.id,
             profile.archetype,
-            f"${profile.debt_amount:,.0f} {profile.debt_type}",
+            f"R$ {profile.debt_amount:,.0f} ({profile.debt_type})",
             profile.primary_objection,
         )
     console.print(table)
+    # Plain-text mirror so IDs are always parseable from automation contexts
+    # where Rich may truncate to fit narrow terminals.
+    console.print("Profile IDs: " + ", ".join(config.profiles.keys()))
 
 
 @cli.command("list-strategies")
@@ -74,13 +77,14 @@ def list_strategies(ctx: click.Context) -> None:
     """List configured Strategies."""
     config = load_app_config(ctx.obj["config_dir"])
     table = Table(title="Strategies")
-    table.add_column("ID")
-    table.add_column("Tone")
-    table.add_column("Tactic")
-    table.add_column("Follow-up")
+    table.add_column("ID", no_wrap=False, overflow="fold")
+    table.add_column("Tone", overflow="fold")
+    table.add_column("Tactic", overflow="fold")
+    table.add_column("Follow-up", overflow="fold")
     for strategy in config.strategies.values():
         table.add_row(strategy.id, strategy.tone, strategy.negotiation_tactic, strategy.follow_up_strategy)
     console.print(table)
+    console.print("Strategy IDs: " + ", ".join(config.strategies.keys()))
 
 
 @cli.command()
