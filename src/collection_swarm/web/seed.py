@@ -15,12 +15,24 @@ from collection_swarm.models import (
 )
 from collection_swarm.store import SimulationStore
 
-PROFILE_IDS = ["cooperative_hardship", "written_proof_disputer", "hostile_avoidant"]
+PROFILE_IDS = [
+    "cooperative_hardship",
+    "written_proof_disputer",
+    "hostile_avoidant",
+    "liquidation_confused_cardholder",
+    "overindebted_northeast_worker",
+    "fraud_and_scam_sensitive",
+    "reputationally_angry_former_customer",
+]
 STRATEGY_IDS = [
     "empathetic_payment_plan",
     "assertive_settlement",
     "neutral_reminder",
     "problem_solving_callback",
+    "liquidation_clarity_validation",
+    "low_income_budget_fit_plan",
+    "scam_sensitive_self_service",
+    "complaint_deescalation_review",
 ]
 
 SAMPLE_CONVERSATIONS: dict[tuple[str, str], list[dict]] = {
@@ -101,6 +113,10 @@ OUTCOMES_BY_COMBO: dict[tuple[str, str], tuple[str, float, float, float, float, 
     ("hostile_avoidant", "assertive_settlement"): ("refusal", 0.10, 0.18, 0.72, 0.10, 0.68, "debtor_ended_call"),
     ("hostile_avoidant", "neutral_reminder"): ("no_commitment", 0.20, 0.35, 0.88, 0.22, 0.32, "written_followup"),
     ("hostile_avoidant", "problem_solving_callback"): ("promise_to_pay", 0.38, 0.52, 0.90, 0.45, 0.20, "callback_scheduled"),
+    ("liquidation_confused_cardholder", "liquidation_clarity_validation"): ("promise_to_pay", 0.62, 0.82, 0.96, 0.72, 0.08, "liquidation_context_explained"),
+    ("overindebted_northeast_worker", "low_income_budget_fit_plan"): ("payment_plan", 0.76, 0.86, 0.95, 0.80, 0.07, "cash_flow_plan_agreed"),
+    ("fraud_and_scam_sensitive", "scam_sensitive_self_service"): ("full_payment", 0.84, 0.80, 0.96, 0.68, 0.06, "official_channel_payment"),
+    ("reputationally_angry_former_customer", "complaint_deescalation_review"): ("no_commitment", 0.38, 0.70, 0.94, 0.58, 0.12, "complaint_acknowledged_review_scheduled"),
 }
 
 
@@ -135,7 +151,11 @@ def generate_seed_data(
     reps_per_combo = max(1, num_runs // len(combos))
 
     for combo_idx, (profile_id, strategy_id) in enumerate(combos):
+        if len(results) >= num_runs:
+            break
         for rep in range(reps_per_combo):
+            if len(results) >= num_runs:
+                break
             idx = combo_idx * reps_per_combo + rep
             started = base_time + timedelta(hours=idx * 0.5)
             transcript = _make_transcript(profile_id, strategy_id)

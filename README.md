@@ -117,9 +117,13 @@ Saved results go to `output/collection_swarm.sqlite` by default.
 
 | ID | Archetype | Debt | Primary Objection |
 |----|-----------|------|-------------------|
-| `cooperative_hardship` | Cooperative | $4,200 medical | Inability to pay — strict $150/month ceiling |
-| `written_proof_disputer` | Disputer | $2,800 credit card | Disputes debt — requires written proof first |
-| `hostile_avoidant` | Hostile | $1,100 utility | Avoidance — reacts poorly to pressure |
+| `cooperative_hardship` | Cooperative | $1,250 Willbank credit card | Inability to pay — strict $150/month ceiling |
+| `written_proof_disputer` | Disputer | $780 Willbank credit card | Disputes debt — requires written proof first |
+| `hostile_avoidant` | Hostile | $3,400 personal loan | Avoidance — reacts poorly to pressure |
+| `liquidation_confused_cardholder` | Confused | $620 Willbank credit card | Believes liquidation may cancel the balance |
+| `overindebted_northeast_worker` | Cooperative | $2,100 personal loan | Overindebtedness — strict $80/month ceiling |
+| `fraud_and_scam_sensitive` | Guarded | $460 Willbank credit card | Scam concern and official-channel verification |
+| `reputationally_angry_former_customer` | Hostile | $1,550 personal loan | Bank mistrust and complaint escalation |
 
 ### Included Strategies
 
@@ -129,6 +133,10 @@ Saved results go to `output/collection_swarm.sqlite` by default.
 | `assertive_settlement` | Assertive | Settlement offer | Immediate payment |
 | `neutral_reminder` | Neutral | Deadline | Callback |
 | `problem_solving_callback` | Problem-solving | Empathy | Callback |
+| `liquidation_clarity_validation` | Transparent | Documentation first | Official-channel written summary |
+| `low_income_budget_fit_plan` | Empathetic | Cash-flow aligned installments | Written agreement |
+| `scam_sensitive_self_service` | Calm | Official self-service payment path | Secure official channel |
+| `complaint_deescalation_review` | Respectful | Pause and review options | No-pressure callback |
 
 Profiles and strategies are defined in YAML and are fully extensible — add your own in `config/debtor_profiles.yaml` and `config/collector_strategies.yaml`.
 

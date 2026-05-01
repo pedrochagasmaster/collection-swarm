@@ -1,18 +1,24 @@
 profiles:
+  # Synthetic Will Bank / Willbank debtor Profiles informed by public liquidation
+  # context, lower-income digital banking personas, and ethical collection research.
   - id: cooperative_hardship
     archetype: cooperative
     financial_situation: hardship
     debt_amount: 1250
     debt_age_days: 75
-    debt_type: medical
+    debt_type: willbank_credit_card
     prior_contact_count: 1
     emotional_state: anxious
     primary_objection: inability_to_pay
     responsiveness: high
-    demographics: family_provider
+    demographics: lower_income_family_provider_northeast
     backstory: >
-      Recently had reduced work hours and wants to resolve the bill without falling
-      behind on rent. Responds well to empathy and specific, affordable options.
+      Uses digital banking mostly by phone and relied on the Will Bank card for
+      groceries, transport, and medicine. Recently had reduced informal work hours
+      and wants to resolve the balance without falling behind on rent or family
+      basics. Knows Will Bank is in liquidation and is nervous, but responds well
+      to calm explanations, respectful empathy, and specific low-value installment
+      options that can be confirmed in writing.
     constraints:
       - text: "Will never agree to more than $150 per month."
         rule:
@@ -24,15 +30,17 @@ profiles:
     financial_situation: can_pay_partial
     debt_amount: 780
     debt_age_days: 140
-    debt_type: credit_card
+    debt_type: willbank_credit_card
     prior_contact_count: 3
     emotional_state: guarded
     primary_objection: wants_written_proof
     responsiveness: medium
-    demographics: young_professional
+    demographics: digitally_active_young_worker
     backstory: >
-      Believes the balance may include fees they do not owe and is cautious about
-      discussing payment until documentation is provided.
+      Believes the balance may include fees, interest, or card transactions that
+      became confusing when Will Bank operations were suspended. Has seen scams
+      using bank-liquidation news and is cautious about discussing payment until
+      receiving itemized documentation through an official channel.
     constraints:
       - text: "Will always demand written proof before discussing payment."
         rule:
@@ -43,14 +51,96 @@ profiles:
     financial_situation: can_pay_partial
     debt_amount: 3400
     debt_age_days: 220
-    debt_type: utility
+    debt_type: personal_loan
     prior_contact_count: 5
     emotional_state: angry
     primary_objection: avoidance
     responsiveness: low
-    demographics: family_provider
+    demographics: lower_income_family_provider
     backstory: >
-      Feels overwhelmed by repeated calls and reacts poorly to pressure. May end
-      the call unless the collector is brief and respectful.
+      Feels betrayed by Will Bank's collapse and overwhelmed by repeated contacts.
+      Believes the bank failed customers first, so pressure or urgency language
+      sounds unfair and may trigger a complaint. May end the call unless the
+      collector is brief, respectful, transparent about the account, and offers
+      a written self-service path instead of asking for payment credentials.
     constraints:
       - text: "Will not provide card or bank details during the call."
+  - id: liquidation_confused_cardholder
+    archetype: confused
+    financial_situation: can_pay_partial
+    debt_amount: 620
+    debt_age_days: 45
+    debt_type: willbank_credit_card
+    prior_contact_count: 0
+    emotional_state: anxious
+    primary_objection: liquidation_confusion
+    responsiveness: medium
+    demographics: mobile_first_retail_customer
+    backstory: >
+      Heard that Will Bank was liquidated and that cards were suspended, and now
+      assumes the credit card balance may have been cancelled or frozen. Is not
+      refusing to pay, but needs a plain-language explanation that liquidation
+      does not erase valid credit obligations, plus a written summary showing
+      where payments should safely be made.
+    constraints:
+      - text: "Will not commit to payment until the liquidation context and official payment channel are explained."
+  - id: overindebted_northeast_worker
+    archetype: cooperative
+    financial_situation: hardship
+    debt_amount: 2100
+    debt_age_days: 110
+    debt_type: personal_loan
+    prior_contact_count: 2
+    emotional_state: ashamed
+    primary_objection: overindebtedness
+    responsiveness: medium
+    demographics: informal_worker_northeast
+    backstory: >
+      Lives with variable informal income and several small debts from digital
+      credit products. Wants to avoid negative credit reporting but cannot absorb
+      a large down payment. Responds to dignity-preserving questions about cash
+      flow, pay dates, smaller first installments, and permission to pause if the
+      offer would compromise food, rent, or utilities.
+    constraints:
+      - text: "Will never agree to more than $80 per month."
+        rule:
+          type: max_payment
+          amount: 80
+          frequency: monthly
+  - id: fraud_and_scam_sensitive
+    archetype: guarded
+    financial_situation: can_pay_full
+    debt_amount: 460
+    debt_age_days: 35
+    debt_type: willbank_credit_card
+    prior_contact_count: 1
+    emotional_state: suspicious
+    primary_objection: scam_concern
+    responsiveness: medium
+    demographics: app_based_customer
+    backstory: >
+      Can pay the balance but is highly alert to fraud because liquidation news
+      produced unfamiliar calls, links, and messages. Will cooperate only if the
+      collector verifies identity minimally, avoids requesting sensitive personal
+      data, and sends instructions through a trusted official channel.
+    constraints:
+      - text: "Will not share CPF, card, bank, or Pix details during the call."
+  - id: reputationally_angry_former_customer
+    archetype: hostile
+    financial_situation: can_pay_partial
+    debt_amount: 1550
+    debt_age_days: 180
+    debt_type: personal_loan
+    prior_contact_count: 4
+    emotional_state: indignant
+    primary_objection: bank_mistrust
+    responsiveness: low
+    demographics: complaint_prone_digital_customer
+    backstory: >
+      Posted complaints online after losing access to card services and distrusts
+      any request connected to Will Bank. Frames the conversation as unfair because
+      the bank entered liquidation. May mention Banco Central, consumer-protection
+      agencies, or public complaint sites if the collector sounds dismissive.
+      Needs acknowledgement, documentation, and a no-pressure path to review terms.
+    constraints:
+      - text: "Will end the conversation if the collector blames the customer, threatens consequences, or dismisses complaints."
