@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any
 from uuid import uuid4
@@ -9,6 +10,8 @@ from uuid import uuid4
 import yaml
 
 from collection_swarm.models import EvolutionConfig, LLMMessage, Strategy, StrategyLineage
+
+logger = logging.getLogger(__name__)
 
 
 def _parse_evolved_strategies(llm_output: str) -> list[dict[str, Any]]:
@@ -36,7 +39,11 @@ async def evolve_strategies(
         raise ValueError("EvolutionConfig.evolver_model_id is required")
     response = await router.complete(
         config.evolver_model_id,
-        [LLMMessage(role="user", content=_build_evolver_prompt(top_strategies, bottom_strategies, failure_transcripts))],
+        [
+            LLMMessage(
+                role="user", content=_build_evolver_prompt(top_strategies, bottom_strategies, failure_transcripts)
+            )
+        ],
     )
     evolved: list[Strategy] = []
     for index, item in enumerate(_parse_evolved_strategies(response.content), start=1):
@@ -46,6 +53,7 @@ async def evolve_strategies(
         try:
             evolved.append(Strategy.model_validate(item))
         except Exception:
+            logger.warning("Skipping invalid evolved strategy entry %d: %s", index, item.get("id", "<no id>"))
             continue
     if evolved:
         return evolved
@@ -59,7 +67,9 @@ def cull_strategies(
     lineages: dict[str, StrategyLineage] | None = None,
 ) -> list[Strategy]:
     lineages = lineages or {}
-    seeds = [strategy for strategy in strategy_pool if strategy.id not in lineages or lineages[strategy.id].generation == 0]
+    seeds = [
+        strategy for strategy in strategy_pool if strategy.id not in lineages or lineages[strategy.id].generation == 0
+    ]
     evolved = [strategy for strategy in strategy_pool if strategy not in seeds]
     evolved.sort(key=lambda strategy: elo_ratings.get(strategy.id, 1500.0), reverse=True)
     kept: list[Strategy] = []

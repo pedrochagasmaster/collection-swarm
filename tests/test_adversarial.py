@@ -4,7 +4,7 @@ import pytest
 
 from collection_swarm.adversarial import HardeningConfig, harden_profiles
 from collection_swarm.backends.base import LLMResponse
-from collection_swarm.models import LLMMessage, ModelConfig, Profile, ProfileLineage
+from collection_swarm.models import LLMMessage, Profile, ProfileLineage
 from collection_swarm.store import SimulationStore
 
 
@@ -52,7 +52,9 @@ def _profile() -> Profile:
 
 @pytest.mark.asyncio
 async def test_harden_profiles_produces_valid_profiles() -> None:
-    profiles = await harden_profiles([_profile()], [], HardeningConfig(hardener_model_id="local-scripted"), CannedRouter())
+    profiles = await harden_profiles(
+        [_profile()], [], HardeningConfig(hardener_model_id="local-scripted"), CannedRouter()
+    )
 
     assert profiles[0].id == "hardened_cooperative"
     assert profiles[0].archetype == "cooperative"

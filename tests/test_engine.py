@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import pytest
-
 from collection_swarm.agents.collector import CollectorAgent
 from collection_swarm.agents.debtor import DebtorAgent
 from collection_swarm.agents.judge import Judge

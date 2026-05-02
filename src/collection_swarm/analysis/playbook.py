@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from collection_swarm.analysis.compliance import ComplianceExclusion
 from collection_swarm.analysis.objections import extract_objections
@@ -19,7 +19,7 @@ def generate_playbook(
     lines = [
         "# Collection Playbook",
         "",
-        f"Generated: {datetime.now(timezone.utc).isoformat()} | Simulations analyzed: {total}",
+        f"Generated: {datetime.now(UTC).isoformat()} | Simulations analyzed: {total}",
         "",
         "## Compliance Notice",
     ]

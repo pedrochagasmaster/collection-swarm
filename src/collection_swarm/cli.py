@@ -41,7 +41,13 @@ def _split_csv(value: str | None) -> list[str] | None:
 
 @click.group()
 @click.option("--config-dir", type=click.Path(path_type=Path), default=Path("config"), show_default=True)
-@click.option("--db", "db_path", type=click.Path(path_type=Path), default=Path("output/collection_swarm.sqlite"), show_default=True)
+@click.option(
+    "--db",
+    "db_path",
+    type=click.Path(path_type=Path),
+    default=Path("output/collection_swarm.sqlite"),
+    show_default=True,
+)
 @click.pass_context
 def cli(ctx: click.Context, config_dir: Path, db_path: Path) -> None:
     """Run and analyze synthetic debt collection simulations."""
@@ -197,7 +203,9 @@ def tournament(
             concurrency=concurrency,
         )
     )
-    console.print(f"Tournament {result.id} completed: {result.total_games} games across {result.rounds_completed} rounds.")
+    console.print(
+        f"Tournament {result.id} completed: {result.total_games} games across {result.rounds_completed} rounds."
+    )
 
 
 @cli.command()
@@ -293,7 +301,9 @@ def calibrate(ctx: click.Context, labels: Path, optimize: bool) -> None:
 
 
 @cli.command()
-@click.option("--output", "output_path", type=click.Path(path_type=Path), default=Path("output/playbook.md"), show_default=True)
+@click.option(
+    "--output", "output_path", type=click.Path(path_type=Path), default=Path("output/playbook.md"), show_default=True
+)
 @click.pass_context
 def analyze(ctx: click.Context, output_path: Path) -> None:
     """Generate a Markdown Playbook from completed Simulations."""
@@ -321,8 +331,12 @@ def analyze(ctx: click.Context, output_path: Path) -> None:
     show_default=True,
     help="Report destination.",
 )
-@click.option("--format", "report_format", type=click.Choice(["markdown", "json"]), default="markdown", show_default=True)
-@click.option("--live-probes", is_flag=True, help="Run live Cursor SDK probes instead of using the checked-in baseline.")
+@click.option(
+    "--format", "report_format", type=click.Choice(["markdown", "json"]), default="markdown", show_default=True
+)
+@click.option(
+    "--live-probes", is_flag=True, help="Run live Cursor SDK probes instead of using the checked-in baseline."
+)
 @click.option(
     "--cursor-models",
     default=None,

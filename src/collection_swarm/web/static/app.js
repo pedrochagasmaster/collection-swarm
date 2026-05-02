@@ -2321,9 +2321,14 @@ window.toggleArenaHistory = async function(entityId) {
   if (!row) return;
   row.hidden = !row.hidden;
   if (row.hidden || row.dataset.loaded) return;
-  const history = await api(`/arena/history/${pathPart(entityId)}`);
-  row.dataset.loaded = 'true';
-  row.innerHTML = `<td colspan="5">${history.length ? arenaHistoryHTML(history) : '<div class="status-line">No history for this entity.</div>'}</td>`;
+  try {
+    row.innerHTML = '<td colspan="5"><div class="status-line">Loading history…</div></td>';
+    const history = await api(`/arena/history/${pathPart(entityId)}`);
+    row.dataset.loaded = 'true';
+    row.innerHTML = `<td colspan="5">${history.length ? arenaHistoryHTML(history) : '<div class="status-line">No history for this entity.</div>'}</td>`;
+  } catch (err) {
+    row.innerHTML = `<td colspan="5">${emptyState('Failed to load history', err.message)}</td>`;
+  }
 };
 
 function arenaHistoryHTML(history) {

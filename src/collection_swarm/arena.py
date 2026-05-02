@@ -79,7 +79,9 @@ def swiss_pairings(
     history: set[tuple[str, str]],
 ) -> list[tuple[str, str]]:
     strategies = sorted(strategy_ratings, key=lambda item: (item.games_played, -item.rating, item.entity_id))
-    profiles = sorted(profile_ratings, key=lambda item: (_bye_priority(item.games_played), -item.rating, item.entity_id))
+    profiles = sorted(
+        profile_ratings, key=lambda item: (_bye_priority(item.games_played), -item.rating, item.entity_id)
+    )
     target = min(len(strategies), len(profiles))
     matched = _match_without_repeats(strategies[:target], profiles, history)
     if len(matched) == target:

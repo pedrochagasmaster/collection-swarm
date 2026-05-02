@@ -1,6 +1,15 @@
 from __future__ import annotations
 
-from collection_swarm.models import EndedBy, EloUpdate, Judgment, Message, PaymentOutcome, SimulationResult, TournamentConfig, TournamentResult
+from collection_swarm.models import (
+    EloUpdate,
+    EndedBy,
+    Judgment,
+    Message,
+    PaymentOutcome,
+    SimulationResult,
+    TournamentConfig,
+    TournamentResult,
+)
 from collection_swarm.store import SimulationStore
 
 

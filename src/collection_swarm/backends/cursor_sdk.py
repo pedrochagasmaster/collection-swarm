@@ -34,8 +34,7 @@ class CursorSdkBackend(LLMBackend):
         api_key = os.getenv("CURSOR_API_KEY")
         if not api_key:
             raise RuntimeError(
-                "CURSOR_API_KEY is required for Cursor SDK models. "
-                "Create a key in the Cursor integrations dashboard."
+                "CURSOR_API_KEY is required for Cursor SDK models. Create a key in the Cursor integrations dashboard."
             )
 
         script = _bridge_script()
@@ -105,6 +104,4 @@ class CursorSdkBackend(LLMBackend):
 
 
 def _estimate_cost(model: ModelConfig, input_tokens: int, output_tokens: int) -> float:
-    return (input_tokens / 1_000_000 * model.input_cost_per_m) + (
-        output_tokens / 1_000_000 * model.output_cost_per_m
-    )
+    return (input_tokens / 1_000_000 * model.input_cost_per_m) + (output_tokens / 1_000_000 * model.output_cost_per_m)

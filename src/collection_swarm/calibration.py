@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import math
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from pydantic import BaseModel, Field, field_validator
@@ -16,7 +16,7 @@ class CalibrationLabel(BaseModel):
     transcript_id: str
     human_scores: dict[str, float]
     labeler_id: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     @field_validator("human_scores")
     @classmethod
