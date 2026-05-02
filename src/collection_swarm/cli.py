@@ -16,6 +16,7 @@ from collection_swarm.analysis.compliance import check_exclusions
 from collection_swarm.analysis.playbook import generate_playbook
 from collection_swarm.analysis.statistics import compare_strategies
 from collection_swarm.backends.router import LLMRouter
+from collection_swarm.calibration import evaluate_judge, load_calibration_labels
 from collection_swarm.config import load_app_config
 from collection_swarm.engine import SimulationEngine
 from collection_swarm.model_evaluation import (
@@ -25,7 +26,8 @@ from collection_swarm.model_evaluation import (
     run_live_role_probes,
     write_report,
 )
-from collection_swarm.runner import build_matrix, run_matrix
+from collection_swarm.models import EvolutionConfig, TournamentConfig
+from collection_swarm.runner import build_matrix, run_evolution_cycle, run_matrix, run_tournament
 from collection_swarm.store import SimulationStore
 
 console = Console()
@@ -152,6 +154,142 @@ def run_command(
     )
     summary = asyncio.run(run_matrix(config, SimulationStore(ctx.obj["db_path"]), cells, concurrency=concurrency))
     console.print(f"Completed {summary.completed}/{summary.total} simulations; failed {summary.failed}.")
+
+
+@cli.command()
+@click.option("--format", "tournament_format", type=click.Choice(["swiss", "round_robin"]), default=None)
+@click.option("--rounds", default=None, type=int)
+@click.option("--profiles", default=None, help="Comma-separated profile IDs. Defaults to all.")
+@click.option("--strategies", default=None, help="Comma-separated strategy IDs. Defaults to all.")
+@click.option("--conversation-model", default=None, help="Model ID for Collector and Debtor.")
+@click.option("--judge-model", default=None, help="Model ID for the Judge.")
+@click.option("--concurrency", default=2, show_default=True, type=int)
+@click.pass_context
+def tournament(
+    ctx: click.Context,
+    tournament_format: str | None,
+    rounds: int | None,
+    profiles: str | None,
+    strategies: str | None,
+    conversation_model: str | None,
+    judge_model: str | None,
+    concurrency: int,
+) -> None:
+    """Run an Elo-rated strategy/profile tournament."""
+    config = load_app_config(ctx.obj["config_dir"])
+    arena_settings = config.simulation.arena
+    result = asyncio.run(
+        run_tournament(
+            config,
+            SimulationStore(ctx.obj["db_path"]),
+            TournamentConfig(
+                format=tournament_format or arena_settings.default_format,
+                rounds=rounds or arena_settings.default_rounds,
+                k_factor_initial=arena_settings.k_factor_initial,
+                k_factor_stable=arena_settings.k_factor_stable,
+                k_factor_threshold=arena_settings.k_factor_threshold,
+                scoring=arena_settings.scoring,
+            ),
+            profile_ids=_split_csv(profiles),
+            strategy_ids=_split_csv(strategies),
+            conversation_model=conversation_model,
+            judge_model=judge_model,
+            concurrency=concurrency,
+        )
+    )
+    console.print(f"Tournament {result.id} completed: {result.total_games} games across {result.rounds_completed} rounds.")
+
+
+@cli.command()
+@click.option("--type", "entity_type", type=click.Choice(["strategy", "profile", "all"]), default="all")
+@click.pass_context
+def leaderboard(ctx: click.Context, entity_type: str) -> None:
+    """Show current Elo rankings."""
+    store = SimulationStore(ctx.obj["db_path"])
+    ratings = store.get_elo_ratings(None if entity_type == "all" else entity_type)
+    if not ratings:
+        console.print("No Elo ratings yet.")
+        return
+    table = Table(title="Elo Leaderboard")
+    table.add_column("Type")
+    table.add_column("ID", no_wrap=False, overflow="fold")
+    table.add_column("Elo", justify="right")
+    table.add_column("Games", justify="right")
+    table.add_column("W-L-D", justify="right")
+    for rating in ratings:
+        table.add_row(
+            rating.entity_type,
+            rating.entity_id,
+            f"{rating.rating:.1f}",
+            str(rating.games_played),
+            f"{rating.wins}-{rating.losses}-{rating.draws}",
+        )
+    console.print(table)
+
+
+@cli.command("reset-elo")
+@click.pass_context
+def reset_elo(ctx: click.Context) -> None:
+    """Reset all Elo ratings and history."""
+    SimulationStore(ctx.obj["db_path"]).reset_elo_ratings()
+    console.print("Reset Elo ratings.")
+
+
+@cli.command("evolve")
+@click.option("--generations", default=5, type=int, show_default=True)
+@click.option("--population-size", default=20, type=int, show_default=True)
+@click.option("--evolver-model", default=None, help="Model ID for the strategy evolver LLM.")
+@click.option("--tournament-rounds", default=4, type=int, show_default=True)
+@click.option("--profiles", default=None, help="Comma-separated profile IDs. Defaults to all.")
+@click.option("--strategies", default=None, help="Comma-separated strategy IDs. Defaults to all.")
+@click.option("--concurrency", default=2, type=int, show_default=True)
+@click.pass_context
+def evolve(
+    ctx: click.Context,
+    generations: int,
+    population_size: int,
+    evolver_model: str | None,
+    tournament_rounds: int,
+    profiles: str | None,
+    strategies: str | None,
+    concurrency: int,
+) -> None:
+    """Run tournament-driven strategy evolution."""
+    config = load_app_config(ctx.obj["config_dir"])
+    model_id = evolver_model or config.default_conversation_model
+    results = asyncio.run(
+        run_evolution_cycle(
+            config,
+            SimulationStore(ctx.obj["db_path"]),
+            EvolutionConfig(population_size=population_size, evolver_model_id=model_id),
+            TournamentConfig(format=config.simulation.arena.default_format, rounds=tournament_rounds),
+            generations=generations,
+            profile_ids=_split_csv(profiles),
+            strategy_ids=_split_csv(strategies),
+            concurrency=concurrency,
+        )
+    )
+    console.print(f"Evolution completed: {len(results)} generation{'s' if len(results) != 1 else ''}.")
+
+
+@cli.command("calibrate")
+@click.option("--labels", type=click.Path(path_type=Path), required=True, help="Path to calibration labels JSON.")
+@click.option("--optimize", is_flag=True, help="Store the current judge prompt as a scored variant.")
+@click.pass_context
+def calibrate(ctx: click.Context, labels: Path, optimize: bool) -> None:
+    """Evaluate stored judge scores against human calibration labels."""
+    config = load_app_config(ctx.obj["config_dir"])
+    store = SimulationStore(ctx.obj["db_path"])
+    loaded = load_calibration_labels(labels)
+    store.save_calibration_labels(loaded)
+    result = evaluate_judge(loaded, store)
+    if optimize:
+        store.save_judge_variant(
+            config.prompts.judge.system,
+            config.prompts.judge.transcript,
+            calibration_score=result.overall_score,
+        )
+    console.print(f"Calibration labels: {result.label_count}; score: {result.overall_score:.2f}.")
 
 
 @cli.command()

@@ -16,6 +16,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
+from collection_swarm import arena
 from collection_swarm.agents.collector import CollectorAgent
 from collection_swarm.agents.debtor import DebtorAgent
 from collection_swarm.agents.judge import Judge
@@ -37,7 +38,7 @@ from collection_swarm.model_evaluation import (
     run_live_role_probes,
     write_report,
 )
-from collection_swarm.models import EndedBy, MatrixCell, Message, SimulationResult, model_dump_jsonable, utc_now
+from collection_swarm.models import EndedBy, MatrixCell, Message, SimulationResult, TournamentConfig, TournamentResult, model_dump_jsonable, utc_now
 from collection_swarm.runner import build_matrix
 from collection_swarm.store import SimulationStore
 
@@ -58,6 +59,24 @@ class MatrixLaunchRequest(BaseModel):
     judge_models: list[str] | None = None
     reps: int = Field(default=1, ge=1, le=100)
     concurrency: int = Field(default=2, ge=1, le=10)
+
+
+class TournamentLaunchRequest(BaseModel):
+    format: str = "swiss"
+    rounds: int = Field(default=4, ge=1, le=20)
+    profile_ids: list[str] | None = None
+    strategy_ids: list[str] | None = None
+    conversation_model: str | None = None
+    judge_model: str | None = None
+    reps_per_pairing: int = Field(default=1, ge=1, le=10)
+    concurrency: int = Field(default=2, ge=1, le=10)
+
+    @field_validator("format")
+    @classmethod
+    def validate_format(cls, value: str) -> str:
+        if value not in {"swiss", "round_robin"}:
+            raise ValueError("format must be swiss or round_robin")
+        return value
 
 
 class BenchmarkLaunchRequest(BaseModel):
@@ -98,6 +117,11 @@ class ManualSessionRequest(BaseModel):
 
 class ManualTurnRequest(BaseModel):
     content: str = Field(min_length=1)
+
+
+class CalibrationJobRequest(BaseModel):
+    labels: list[dict[str, Any]] = Field(default_factory=list)
+    optimize: bool = True
 
 
 @dataclass
@@ -173,6 +197,7 @@ def create_app(
     app.state.manual_sessions = {}
     app.state.benchmark_reports = {}
     app.state.tasks = {}
+    app.state.db_path = db_path
 
     def _store() -> SimulationStore:
         return SimulationStore(db_path)
@@ -198,7 +223,14 @@ def create_app(
 
     _load_saved_benchmark_reports()
 
+    def _entity_pools(config, store: SimulationStore) -> tuple[dict[str, Any], dict[str, Any]]:
+        return (
+            {**config.profiles, **store.get_evolved_profile_pool()},
+            {**config.strategies, **store.get_evolved_strategy_pool()},
+        )
+
     def _model_options(config) -> dict[str, Any]:
+        profiles, strategies = _entity_pools(config, _store())
         conversation = []
         judge = []
         for model in config.models.values():
@@ -208,8 +240,8 @@ def create_app(
             if model.backend in {"heuristic", "scripted"} or model.id.startswith("cursor-"):
                 judge.append(item)
         return {
-            "profiles": [model_dump_jsonable(profile) for profile in config.profiles.values()],
-            "strategies": [model_dump_jsonable(strategy) for strategy in config.strategies.values()],
+            "profiles": [model_dump_jsonable(profile) for profile in profiles.values()],
+            "strategies": [model_dump_jsonable(strategy) for strategy in strategies.values()],
             "conversation_models": conversation,
             "judge_models": judge,
             "defaults": {
@@ -458,6 +490,91 @@ def create_app(
     def run_options() -> dict[str, Any]:
         return _model_options(_config())
 
+    # ── Arena / Tournament APIs ─────────────────────────────────────
+
+    @app.get("/api/arena/leaderboard")
+    def arena_leaderboard(
+        entity_type: str | None = Query(None),
+        conversation_model: str | None = Query(None),
+        judge_model: str | None = Query(None),
+    ) -> dict[str, list[dict[str, Any]]]:
+        if entity_type not in {None, "strategy", "profile"}:
+            raise HTTPException(status_code=400, detail="entity_type must be strategy or profile")
+        store = _store()
+        config = _config()
+        conversation_model = conversation_model or config.default_conversation_model
+        judge_model = judge_model or config.default_judge_model
+        strategies = (
+            []
+            if entity_type == "profile"
+            else store.get_elo_ratings("strategy", conversation_model, judge_model)
+        )
+        profiles = [] if entity_type == "strategy" else store.get_elo_ratings("profile", conversation_model, judge_model)
+        return {
+            "strategies": [model_dump_jsonable(rating) for rating in strategies],
+            "profiles": [model_dump_jsonable(rating) for rating in profiles],
+        }
+
+    @app.get("/api/arena/history/{entity_id}")
+    def arena_history(entity_id: str) -> list[dict[str, Any]]:
+        return [model_dump_jsonable(update) for update in _store().get_elo_history(entity_id)]
+
+    @app.get("/api/arena/tournaments")
+    def list_tournaments() -> list[dict[str, Any]]:
+        return [model_dump_jsonable(result) for result in _store().list_tournaments()]
+
+    @app.get("/api/arena/tournaments/{tournament_id}")
+    def get_tournament(tournament_id: str) -> dict[str, Any]:
+        try:
+            return model_dump_jsonable(_store().get_tournament(tournament_id))
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @app.get("/api/evolution/pool")
+    def evolution_pool() -> dict[str, list[dict[str, Any]]]:
+        strategies = []
+        for strategy, lineage in _store().list_evolved_strategies():
+            item = model_dump_jsonable(strategy)
+            item["lineage"] = model_dump_jsonable(lineage)
+            strategies.append(item)
+        profiles = []
+        for profile, lineage in _store().list_evolved_profiles():
+            item = model_dump_jsonable(profile)
+            item["lineage"] = model_dump_jsonable(lineage)
+            profiles.append(item)
+        return {"strategies": strategies, "profiles": profiles}
+
+    @app.get("/api/calibration/results")
+    def calibration_results() -> dict[str, Any]:
+        from collection_swarm.calibration import evaluate_judge
+
+        return model_dump_jsonable(evaluate_judge(_store().list_calibration_labels(), _store()))
+
+    @app.post("/api/calibration/labels")
+    def upload_calibration_labels(payload: list[dict[str, Any]]) -> dict[str, Any]:
+        from collection_swarm.calibration import CalibrationLabel
+
+        labels = [CalibrationLabel.model_validate(item) for item in payload]
+        _store().save_calibration_labels(labels)
+        return {"saved": len(labels)}
+
+    @app.post("/api/jobs/calibration")
+    async def launch_calibration(payload: CalibrationJobRequest) -> dict[str, Any]:
+        job = WebRunJob(
+            id=f"calib_{uuid4().hex[:10]}",
+            kind="calibration",
+            status="queued",
+            total=1,
+            message="Queued calibration evaluation.",
+        )
+        app.state.jobs[job.id] = job
+        app.state.tasks[job.id] = asyncio.create_task(_run_calibration_job(job, _config(), _store(), payload))
+        return job.snapshot()
+
+    @app.get("/api/calibration/variants")
+    def calibration_variants() -> list[dict[str, Any]]:
+        return _store().list_judge_variants()
+
     # ── Model benchmark APIs ────────────────────────────────────────
 
     @app.get("/api/model-benchmarks/options")
@@ -559,6 +676,68 @@ def create_app(
         )
         app.state.jobs[job.id] = job
         app.state.tasks[job.id] = asyncio.create_task(_run_matrix_job(job, config, _store(), cells, payload.concurrency))
+        return job.snapshot()
+
+    @app.post("/api/jobs/tournaments")
+    async def launch_tournament(payload: TournamentLaunchRequest) -> dict[str, Any]:
+        config = _config()
+        store = _store()
+        profiles = {**config.profiles, **store.get_evolved_profile_pool()}
+        strategies = {**config.strategies, **store.get_evolved_strategy_pool()}
+        profile_ids = payload.profile_ids if payload.profile_ids is not None else list(profiles)
+        strategy_ids = payload.strategy_ids if payload.strategy_ids is not None else list(strategies)
+        conversation_model = payload.conversation_model or config.default_conversation_model
+        judge_model = payload.judge_model or config.default_judge_model
+        if not profile_ids:
+            raise HTTPException(status_code=400, detail="Select at least one profile")
+        if not strategy_ids:
+            raise HTTPException(status_code=400, detail="Select at least one strategy")
+        try:
+            for profile_id in profile_ids:
+                if profile_id not in profiles:
+                    config.profile(profile_id)
+            for strategy_id in strategy_ids:
+                if strategy_id not in strategies:
+                    config.strategy(strategy_id)
+            config.model(conversation_model)
+            config.model(judge_model)
+        except KeyError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        if payload.format == "round_robin":
+            pairings_per_round = len(strategy_ids) * len(profile_ids)
+        else:
+            pairings_per_round = min(len(strategy_ids), len(profile_ids))
+        total = pairings_per_round * payload.rounds * payload.reps_per_pairing
+        job = WebRunJob(
+            id=f"tournjob_{uuid4().hex[:10]}",
+            kind="tournament",
+            status="queued",
+            total=total,
+            message=f"Queued {total} tournament simulations.",
+        )
+        app.state.jobs[job.id] = job
+        app.state.tasks[job.id] = asyncio.create_task(
+            _run_tournament_job(
+                job,
+                config,
+                store,
+                TournamentConfig(
+                    format=payload.format,  # type: ignore[arg-type]
+                    rounds=payload.rounds,
+                    reps_per_pairing=payload.reps_per_pairing,
+                    k_factor_initial=config.simulation.arena.k_factor_initial,
+                    k_factor_stable=config.simulation.arena.k_factor_stable,
+                    k_factor_threshold=config.simulation.arena.k_factor_threshold,
+                    scoring=config.simulation.arena.scoring,
+                ),
+                profile_ids,
+                strategy_ids,
+                conversation_model,
+                judge_model,
+                payload.concurrency,
+            )
+        )
         return job.snapshot()
 
     @app.post("/api/jobs/model-benchmarks")
@@ -854,6 +1033,157 @@ async def _run_matrix_job(
         await asyncio.gather(*(run_cell(cell) for cell in cells))
         job.status = "completed" if job.failed == 0 else "failed"
         job.message = f"Matrix finished: {job.completed} completed, {job.failed} failed."
+        job.ended_at = utc_now().isoformat()
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        _fail_job(job, exc)
+
+
+async def _run_tournament_job(
+    job: WebRunJob,
+    config,
+    store: SimulationStore,
+    tournament_config: TournamentConfig,
+    profile_ids: list[str],
+    strategy_ids: list[str],
+    conversation_model: str,
+    judge_model: str,
+    concurrency: int,
+) -> None:
+    try:
+        job.status = "running"
+        job.message = "Tournament in progress."
+        history: set[tuple[str, str]] = set()
+        semaphore = asyncio.Semaphore(concurrency)
+        lock = asyncio.Lock()
+        result = TournamentResult(config=tournament_config)
+        total_cost = 0.0
+        profiles = {**config.profiles, **store.get_evolved_profile_pool()}
+        strategies = {**config.strategies, **store.get_evolved_strategy_pool()}
+
+        async def run_cell(cell: MatrixCell) -> SimulationResult:
+            async with semaphore:
+                engine = _make_engine(config, cell.conversation_model, cell.judge_model)
+
+                async def on_progress(partial: SimulationResult) -> None:
+                    partial.turn_count = len(partial.transcript)
+                    async with lock:
+                        job.current_run = partial.model_copy(
+                            update={"status": "running" if partial.ended_at is None else partial.status}
+                        )
+                        job.message = f"Running round {result.rounds_completed + 1}: {cell.strategy_id} x {cell.profile_id}."
+
+                return await engine.run_simulation(
+                    profiles[cell.profile_id],
+                    strategies[cell.strategy_id],
+                    on_progress=on_progress,
+                )
+
+        for round_number in range(1, tournament_config.rounds + 1):
+            strategy_ratings = [
+                store.get_elo_rating("strategy", strategy_id, conversation_model, judge_model)
+                for strategy_id in strategy_ids
+            ]
+            profile_ratings = [
+                store.get_elo_rating("profile", profile_id, conversation_model, judge_model)
+                for profile_id in profile_ids
+            ]
+            pairings = (
+                arena.round_robin_pairings(strategy_ids, profile_ids)
+                if tournament_config.format == "round_robin"
+                else arena.swiss_pairings(strategy_ratings, profile_ratings, history)
+            )
+            cells = [
+                MatrixCell(
+                    profile_id=profile_id,
+                    strategy_id=strategy_id,
+                    conversation_model=conversation_model,
+                    judge_model=judge_model,
+                )
+                for strategy_id, profile_id in pairings
+                for _ in range(tournament_config.reps_per_pairing)
+            ]
+            simulations = await asyncio.gather(*(run_cell(cell) for cell in cells), return_exceptions=True)
+            for item in simulations:
+                async with lock:
+                    if isinstance(item, Exception):
+                        job.failed += 1
+                        job.errors.append(str(item))
+                        continue
+                    simulation = item
+                    store.save_run(simulation)
+                    job.result_ids.append(simulation.id)
+                    job.current_run = simulation
+                    total_cost += simulation.estimated_cost_usd
+                    history.add((simulation.strategy_id, simulation.profile_id))
+                    if simulation.status == "completed":
+                        job.completed += 1
+                    else:
+                        job.failed += 1
+                        job.errors.append(simulation.error_message or f"{simulation.id} failed")
+                    if simulation.judgment is not None:
+                        updates = arena.update_ratings(
+                            store.get_elo_rating(
+                                "strategy",
+                                simulation.strategy_id,
+                                simulation.conversation_model,
+                                simulation.judge_model,
+                            ),
+                            store.get_elo_rating(
+                                "profile",
+                                simulation.profile_id,
+                                simulation.conversation_model,
+                                simulation.judge_model,
+                            ),
+                            simulation.judgment,
+                            simulation.id,
+                            scoring=tournament_config.scoring,
+                            k_factor_initial=tournament_config.k_factor_initial,
+                            k_factor_stable=tournament_config.k_factor_stable,
+                            k_factor_threshold=tournament_config.k_factor_threshold,
+                        )
+                        for update in updates:
+                            store.save_elo_update(update, tournament_id=result.id)
+                    job.message = f"{job.completed + job.failed}/{job.total} tournament simulations finished."
+            result.rounds_completed = round_number
+            result.total_games = job.completed + job.failed
+            result.total_cost_usd = total_cost
+
+        result.completed_at = utc_now()
+        store.save_tournament(result)
+        job.status = "completed" if job.failed == 0 else "failed"
+        job.message = f"Tournament finished: {job.completed} completed, {job.failed} failed."
+        job.ended_at = utc_now().isoformat()
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        _fail_job(job, exc)
+
+
+async def _run_calibration_job(
+    job: WebRunJob,
+    config,
+    store: SimulationStore,
+    payload: CalibrationJobRequest,
+) -> None:
+    try:
+        from collection_swarm.calibration import CalibrationLabel, evaluate_judge
+
+        job.status = "running"
+        labels = [CalibrationLabel.model_validate(item) for item in payload.labels]
+        if labels:
+            store.save_calibration_labels(labels)
+        result = evaluate_judge(store.list_calibration_labels(), store)
+        if payload.optimize:
+            store.save_judge_variant(
+                config.prompts.judge.system,
+                config.prompts.judge.transcript,
+                calibration_score=result.overall_score,
+            )
+        job.completed = 1
+        job.status = "completed"
+        job.message = f"Calibration completed with {result.label_count} labels."
         job.ended_at = utc_now().isoformat()
     except asyncio.CancelledError:
         raise

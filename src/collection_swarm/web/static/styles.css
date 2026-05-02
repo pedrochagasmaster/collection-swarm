@@ -623,6 +623,73 @@ body {
   border-bottom: none;
 }
 
+.arena-table tbody tr.arena-history-row {
+  cursor: default;
+}
+
+.arena-table tbody tr.arena-history-row:hover {
+  background: transparent;
+}
+
+.elo-badge {
+  display: inline-flex;
+  min-width: 72px;
+  justify-content: center;
+  padding: 3px var(--space-2);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-default);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.elo-high {
+  color: var(--success);
+  background: var(--success-bg);
+  border-color: var(--success-border);
+}
+
+.elo-mid {
+  color: var(--warning);
+  background: var(--warning-bg);
+  border-color: var(--warning-border);
+}
+
+.elo-low {
+  color: var(--danger);
+  background: var(--danger-bg);
+  border-color: var(--danger-border);
+}
+
+.arena-history {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+}
+
+.arena-sparkline {
+  width: 100%;
+  height: 54px;
+  margin-bottom: var(--space-2);
+  overflow: visible;
+}
+
+.arena-sparkline polyline {
+  fill: none;
+  stroke: var(--accent-primary);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.arena-history-item {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(120px, 2fr) minmax(80px, 1fr);
+  gap: var(--space-3);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
 /* ── Badges / Chips ────────────────────────────────────────── */
 .badge {
   display: inline-flex;

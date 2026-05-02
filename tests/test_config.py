@@ -20,3 +20,5 @@ def test_load_default_config() -> None:
     assert "Juiz avaliador" in config.prompts.judge.system
     assert "simula\u00e7\u00e3o estruturada" in config.prompts.cursor_sdk.preamble
     assert config.simulation.conversation.max_turns >= 2
+    assert config.simulation.arena.default_format == "swiss"
+    assert config.simulation.arena.default_rounds == 4
