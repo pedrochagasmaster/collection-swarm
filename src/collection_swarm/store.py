@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -573,7 +573,7 @@ class SimulationStore:
 
     def cull_evolved_strategy(self, strategy_id: str) -> None:
         with self._connect() as connection:
-            connection.execute("UPDATE evolved_strategies SET culled_at = ? WHERE id = ?", (datetime.now().isoformat(), strategy_id))
+            connection.execute("UPDATE evolved_strategies SET culled_at = ? WHERE id = ?", (datetime.now(tz=timezone.utc).isoformat(), strategy_id))
 
     def get_evolved_strategy_pool(self) -> dict[str, Strategy]:
         return {strategy.id: strategy for strategy, _ in self.list_evolved_strategies()}
@@ -615,7 +615,7 @@ class SimulationStore:
 
     def cull_evolved_profile(self, profile_id: str) -> None:
         with self._connect() as connection:
-            connection.execute("UPDATE evolved_profiles SET culled_at = ? WHERE id = ?", (datetime.now().isoformat(), profile_id))
+            connection.execute("UPDATE evolved_profiles SET culled_at = ? WHERE id = ?", (datetime.now(tz=timezone.utc).isoformat(), profile_id))
 
     def get_evolved_profile_pool(self) -> dict[str, Profile]:
         return {profile.id: profile for profile, _ in self.list_evolved_profiles()}
@@ -650,7 +650,8 @@ class SimulationStore:
         ]
 
     def save_judge_variant(self, system_prompt: str, transcript_prompt: str, calibration_score: float | None = None) -> str:
-        variant_id = f"judge_{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
+        now = datetime.now(tz=timezone.utc)
+        variant_id = f"judge_{now.strftime('%Y%m%d%H%M%S%f')}"
         with self._connect() as connection:
             connection.execute(
                 """
@@ -658,7 +659,7 @@ class SimulationStore:
                     id, system_prompt, transcript_prompt, calibration_score, created_at
                 ) VALUES (?, ?, ?, ?, ?)
                 """,
-                (variant_id, system_prompt, transcript_prompt, calibration_score, datetime.now().isoformat()),
+                (variant_id, system_prompt, transcript_prompt, calibration_score, now.isoformat()),
             )
         return variant_id
 

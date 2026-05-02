@@ -57,6 +57,8 @@ def _parse_hardened_profiles(output: str) -> list[dict]:
 
 
 def _fallback_profile(profiles: list[Profile]) -> Profile:
+    if not profiles:
+        raise ValueError("Cannot create fallback profile without at least one parent")
     parent = profiles[0]
     constraints = [*parent.constraints]
     constraints.append(Constraint(text="Só aceitará avançar após receber confirmação oficial por escrito."))
