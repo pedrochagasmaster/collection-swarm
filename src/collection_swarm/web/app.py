@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+import bleach
 import markdown
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import HTMLResponse
@@ -43,6 +44,13 @@ from collection_swarm.runner import build_matrix
 from collection_swarm.store import SimulationStore
 
 STATIC_DIR = Path(__file__).parent / "static"
+
+_BLEACH_TAGS = [
+    "p", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li",
+    "table", "thead", "tbody", "tr", "th", "td", "code", "pre",
+    "blockquote", "strong", "em", "a", "br", "hr", "span",
+]
+_BLEACH_ATTRS = {"a": ["href", "title"], "th": ["align"], "td": ["align"]}
 
 
 class SimulationLaunchRequest(BaseModel):
@@ -450,6 +458,7 @@ def create_app(
         if format == "markdown":
             return {"format": "markdown", "content": md_text}
         html = markdown.markdown(md_text, extensions=["tables", "fenced_code"])
+        html = bleach.clean(html, tags=_BLEACH_TAGS, attributes=_BLEACH_ATTRS)
         return {"format": "html", "content": html}
 
     # ── Config info ─────────────────────────────────────────────────
