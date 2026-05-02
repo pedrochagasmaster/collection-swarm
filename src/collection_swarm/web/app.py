@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+import bleach
 import markdown
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import HTMLResponse
@@ -43,6 +44,39 @@ from collection_swarm.runner import build_matrix
 from collection_swarm.store import SimulationStore
 
 STATIC_DIR = Path(__file__).parent / "static"
+PLAYBOOK_ALLOWED_TAGS = [
+    "a",
+    "blockquote",
+    "br",
+    "code",
+    "em",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "hr",
+    "li",
+    "ol",
+    "p",
+    "pre",
+    "span",
+    "strong",
+    "table",
+    "tbody",
+    "td",
+    "th",
+    "thead",
+    "tr",
+    "ul",
+]
+PLAYBOOK_ALLOWED_ATTRS = {
+    "a": ["href", "title"],
+    "td": ["align"],
+    "th": ["align"],
+}
+PLAYBOOK_ALLOWED_PROTOCOLS = ["http", "https", "mailto"]
 
 
 class SimulationLaunchRequest(BaseModel):
@@ -435,7 +469,7 @@ def create_app(
     # ── Playbook (rendered) ─────────────────────────────────────────
 
     @app.get("/api/playbook")
-    def get_playbook(format: str = Query("html", description="html or markdown")) -> dict[str, str]:
+    def get_playbook(format: str = Query("html", description="html or markdown")) -> dict[str, Any]:
         store = _store()
         config = _config()
         rankings = [compare_strategies(pid, store) for pid in config.profiles]
@@ -447,10 +481,18 @@ def create_app(
             max_escalation_risk=config.simulation.max_escalation_risk,
         )
         md_text = generate_playbook(rankings, exclusions, store)
+        simulation_count = len(store.list_runs(status="completed"))
         if format == "markdown":
-            return {"format": "markdown", "content": md_text}
+            return {"format": "markdown", "content": md_text, "simulation_count": simulation_count}
         html = markdown.markdown(md_text, extensions=["tables", "fenced_code"])
-        return {"format": "html", "content": html}
+        html = bleach.clean(
+            html,
+            tags=PLAYBOOK_ALLOWED_TAGS,
+            attributes=PLAYBOOK_ALLOWED_ATTRS,
+            protocols=PLAYBOOK_ALLOWED_PROTOCOLS,
+            strip=True,
+        )
+        return {"format": "html", "content": html, "simulation_count": simulation_count}
 
     # ── Config info ─────────────────────────────────────────────────
 

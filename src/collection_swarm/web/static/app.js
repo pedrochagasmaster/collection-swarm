@@ -14,9 +14,29 @@ const mainEl = $('#main-content');
 let currentPage = 'dashboard';
 let _lastPageParams = {};
 
-function navigateTo(page, params = {}) {
-  currentPage = page;
-  _lastPageParams[page] = params || {};
+const PAGE_TITLES = {
+  dashboard: 'Dashboard',
+  runs: 'Simulation Runs',
+  launch: 'Launch Run',
+  matrix: 'Batch Comparison',
+  manual: 'Manual Run',
+  playbook: 'Generated Playbook',
+  compliance: 'Compliance',
+  arena: 'Arena',
+  evolution: 'Evolution',
+  calibration: 'Calibration',
+  benchmarks: 'Model Benchmarks',
+  profiles: 'Debtor Profiles',
+  strategies: 'Collector Strategies',
+};
+
+const KNOWN_PAGES = new Set(Object.keys(PAGE_TITLES));
+
+function updateDocumentTitle(page) {
+  document.title = `${PAGE_TITLES[page] || 'Page Not Found'} | Collection Swarm`;
+}
+
+function setActiveNav(page) {
   $$('.nav-link').forEach(el => {
     const isActive = el.dataset.page === page;
     el.classList.toggle('active', isActive);
@@ -26,21 +46,70 @@ function navigateTo(page, params = {}) {
       el.removeAttribute('aria-current');
     }
   });
+}
+
+function pageFromHash() {
+  return decodeURIComponent(location.hash.replace(/^#/, '')) || 'dashboard';
+}
+
+function isPageHash(hash = location.hash) {
+  const page = decodeURIComponent(String(hash || '').replace(/^#/, '')) || 'dashboard';
+  return KNOWN_PAGES.has(page);
+}
+
+function renderUnknownPage(page) {
+  mainEl.innerHTML = `
+    <div class="page-header">
+      <h1>Page Not Found</h1>
+      <p>No page "${escapeHTML(page)}" exists in Collection Swarm.</p>
+    </div>
+    ${emptyState('Page Not Found', 'Use the navigation or return to the dashboard.')}
+    <button class="btn btn-primary" type="button" onclick="navigateTo('dashboard')">Go to Dashboard</button>`;
+}
+
+function beforeNavigate(page) {
+  if (currentPage === 'manual' && page !== 'manual' && window._manualSessionId) {
+    return window.confirm('You have an active manual session. Leave and lose progress?');
+  }
+  return true;
+}
+
+function navigateTo(page, params = {}) {
+  if (!beforeNavigate(page)) return;
+  currentPage = page;
+  _lastPageParams[page] = params || {};
+  setActiveNav(page);
+  updateDocumentTitle(page);
   window.history.pushState({ page, params }, '', `#${page}`);
   closeMobileSidebar();
   renderPage(page, params);
 }
 
 window.addEventListener('popstate', (e) => {
-  const state = e.state || { page: 'dashboard', params: {} };
+  const state = e.state || { page: pageFromHash(), params: _lastPageParams[pageFromHash()] || {} };
+  if (!beforeNavigate(state.page)) {
+    window.history.pushState({ page: currentPage, params: _lastPageParams[currentPage] || {} }, '', `#${currentPage}`);
+    return;
+  }
   currentPage = state.page;
-  $$('.nav-link').forEach(el => {
-    const isActive = el.dataset.page === state.page;
-    el.classList.toggle('active', isActive);
-    if (isActive) el.setAttribute('aria-current', 'page');
-    else el.removeAttribute('aria-current');
-  });
-  renderPage(state.page, state.params);
+  setActiveNav(state.page);
+  updateDocumentTitle(state.page);
+  renderPage(state.page, state.params || {});
+});
+
+window.addEventListener('hashchange', () => {
+  const page = pageFromHash();
+  if (!isPageHash()) return;
+  if (page === currentPage) return;
+  if (!beforeNavigate(page)) {
+    history.replaceState({ page: currentPage, params: _lastPageParams[currentPage] || {} }, '', `#${currentPage}`);
+    return;
+  }
+  currentPage = page;
+  const params = _lastPageParams[page] || {};
+  setActiveNav(page);
+  updateDocumentTitle(page);
+  renderPage(page, params);
 });
 
 // ── Theme ──────────────────────────────────────────────────────
@@ -243,6 +312,15 @@ function emptyState(title, msg) {
     </div>`;
 }
 
+function emptyStateHTML(title, html) {
+  return `
+    <div class="empty-state" role="status">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+      <h3>${escapeHTML(title)}</h3>
+      <p>${html}</p>
+    </div>`;
+}
+
 function scoreBarHTML(label, value) {
   value = safePctInput(value);
   const isRisk = label.toLowerCase().includes('escalation');
@@ -261,11 +339,12 @@ function scoreBarHTML(label, value) {
   const definition = definitions[label] || `${label} score.`;
   const meaning = cls === 'score-good' ? 'Good' : cls === 'score-mid' ? 'Watch' : 'Risk';
   const labelText = isRisk ? `${label} (lower is better)` : label;
+  const pctValue = Math.round(value * 100);
   return `
     <div class="judgment-score-item">
       <span class="judgment-score-label" title="${escapeAttr(definition)}">${escapeHTML(labelText)}</span>
       <div class="score-bar-wrap">
-        <div class="score-bar" role="meter" aria-valuenow="${Math.round(value * 100)}" aria-valuemin="0" aria-valuemax="100" aria-label="${escapeAttr(`${labelText}: ${definition}`)}">
+        <div class="score-bar" role="meter" aria-valuenow="${pctValue}" aria-valuemin="0" aria-valuemax="100" aria-valuetext="${escapeAttr(`${pctValue}% ${meaning}`)}" aria-label="${escapeAttr(`${labelText}: ${definition}`)}">
           <div class="score-bar-fill" style="width:${value * 100}%;background:var(${colorVar})"></div>
         </div>
         <span class="score-bar-label ${cls}"><span aria-hidden="true">${cls === 'score-good' ? 'OK' : cls === 'score-mid' ? '!' : 'X'}</span> ${pct(value)} ${meaning}</span>
@@ -452,7 +531,7 @@ async function renderPage(page, params = {}) {
       case 'benchmarks': await renderBenchmarks(); break;
       case 'profiles': await renderProfiles(); break;
       case 'strategies': await renderStrategies(); break;
-      default: mainEl.innerHTML = emptyState('Not Found', 'Page not found.');
+      default: renderUnknownPage(page);
     }
     mainEl.classList.remove('page-enter');
     void mainEl.offsetWidth;
@@ -535,7 +614,7 @@ async function renderDashboard() {
       </div>
     </div>
 
-    ${total_runs === 0 ? renderFirstRunPanel() : ''}
+    ${total_runs === 0 ? renderFirstRunPanel() : quickActionsStrip()}
     ${strategySection}
     ${complianceBanner}
 
@@ -587,6 +666,21 @@ function renderFirstRunPanel() {
         <button class="first-run-action" type="button" onclick="navigateTo('launch', { demo: true })"><strong>Run a demo simulation</strong><span>Use defaults to create the first judged transcript.</span></button>
         <button class="first-run-action" type="button" onclick="navigateTo('matrix', { profile: 'cooperative_hardship' })"><strong>Compare strategies for a profile</strong><span>Run every strategy against one debtor archetype.</span></button>
         <button class="first-run-action" type="button" onclick="navigateTo('compliance')"><strong>Review compliance risks</strong><span>Check what thresholds will exclude a strategy.</span></button>
+      </div>
+    </section>`;
+}
+
+function quickActionsStrip() {
+  return `
+    <section class="quick-actions" aria-label="Quick actions">
+      <div>
+        <p class="eyebrow">Start here</p>
+        <strong>Use the current evidence, then run the next comparison.</strong>
+      </div>
+      <div class="quick-actions-buttons">
+        <button class="btn btn-primary" type="button" onclick="navigateTo('launch')">Launch new run</button>
+        <button class="btn" type="button" onclick="navigateTo('matrix')">Compare strategies</button>
+        <button class="btn" type="button" onclick="navigateTo('compliance')">Review compliance</button>
       </div>
     </section>`;
 }
@@ -794,7 +888,7 @@ window.filterRuns = function() {
   tbody.innerHTML = filtered.map(r => {
     const j = r.judgment;
     return `
-      <tr onclick="openTranscript(${jsArg(r.id)})">
+      <tr tabindex="0" role="row" onclick="openTranscript(${jsArg(r.id)})" onkeydown="handleRunRowKey(event, ${jsArg(r.id)})" aria-label="Run ${escapeAttr(r.id)}, ${escapeAttr(fmtId(r.profile_id))} with ${escapeAttr(fmtId(r.strategy_id))}">
         <td>${escapeHTML(r.id)}</td>
         <td class="run-action-cell">
           <button class="btn btn-compact" type="button" onclick="event.stopPropagation();openTranscript(${jsArg(r.id)})" aria-label="View transcript for ${escapeAttr(r.id)}">View</button>
@@ -1009,7 +1103,7 @@ async function renderLaunch(params = {}) {
       </div>
       <div class="card">
         <div class="card-header"><h2>Live Progress</h2><div id="single-job-status">${statusBadge('queued')}</div></div>
-        <div class="card-body" id="single-job-panel">
+        <div class="card-body" id="single-job-panel" aria-live="polite">
           ${emptyState('Ready', 'Configure and start a simulation to see live progress here.')}
         </div>
       </div>
@@ -1048,7 +1142,7 @@ window.startSingleRun = async function(event) {
 
 async function renderMatrix(params = {}) {
   const [options, jobs] = await Promise.all([api('/config/run-options'), api('/jobs')]);
-  const profiles = checkboxList('matrix-profiles', options.profiles.map(p => [p.id, fmtId(p.id)]), params.profile ? [params.profile] : null);
+  const profiles = checkboxList('matrix-profiles', options.profiles.map(p => [p.id, fmtId(p.id)]), params.profile ? [params.profile] : []);
   const strategies = checkboxList('matrix-strategies', options.strategies.map(s => [s.id, fmtId(s.id)]));
   const conversationModels = checkboxList(
     'matrix-conversation-models',
@@ -1072,10 +1166,10 @@ async function renderMatrix(params = {}) {
         <div class="card-header"><h2>Matrix Setup</h2></div>
         <div class="card-body">
           <form class="control-form" onsubmit="startMatrixRun(event)">
-            <div class="form-field"><label>Profiles</label><div class="checkbox-grid" onchange="updateMatrixCount()">${profiles}</div></div>
-            <div class="form-field"><label>Strategies</label><div class="checkbox-grid" onchange="updateMatrixCount()">${strategies}</div></div>
-            <div class="form-field"><label>Conversation models</label><p class="field-summary">Each checked model role-plays both collector and debtor.</p><div class="checkbox-grid model-grid">${conversationModels}</div></div>
-            <div class="form-field"><label>Judge models</label><p class="field-summary">Each checked judge scores every generated transcript.</p><div class="checkbox-grid model-grid">${judgeModels}</div></div>
+            <div class="form-field"><label>Profiles</label>${checkboxGroupActions('matrix-profiles')}<div class="checkbox-grid" onchange="updateMatrixCount()">${profiles}</div></div>
+            <div class="form-field"><label>Strategies</label>${checkboxGroupActions('matrix-strategies')}<div class="checkbox-grid" onchange="updateMatrixCount()">${strategies}</div></div>
+            <div class="form-field"><label>Conversation models</label><p class="field-summary">Each checked model role-plays both collector and debtor.</p>${checkboxGroupActions('matrix-conversation-models')}<div class="checkbox-grid model-grid">${conversationModels}</div></div>
+            <div class="form-field"><label>Judge models</label><p class="field-summary">Each checked judge scores every generated transcript.</p>${checkboxGroupActions('matrix-judge-models')}<div class="checkbox-grid model-grid">${judgeModels}</div></div>
             <div class="btn-row">
               ${inputField('matrix-reps', 'Reps', options.defaults.reps || 1, 1, 100, "updateMatrixCount()")}
               ${inputField('matrix-concurrency', 'Concurrency', 2, 1, 10)}
@@ -1087,7 +1181,7 @@ async function renderMatrix(params = {}) {
       </div>
       <div class="card">
         <div class="card-header"><h2>Progress</h2><div id="matrix-job-status">${statusBadge('queued')}</div></div>
-        <div class="card-body" id="matrix-job-panel">
+        <div class="card-body" id="matrix-job-panel" aria-live="polite">
           ${jobs.length ? jobs.map(jobSummaryHTML).join('') : emptyState('No Jobs', 'Start a matrix run to watch progress.')}
         </div>
       </div>
@@ -1262,21 +1356,30 @@ function inputField(id, label, value, min, max, oninput = '') {
     </div>`;
 }
 
-function checkboxList(name, entries, selected = null, onchange = 'updateMatrixCount()') {
+function checkboxList(name, entries, selected = [], onchange = 'updateMatrixCount()') {
+  // Default selected = [] prevents accidental all-selected batch jobs.
   const changeAttr = onchange ? ` onchange="${escapeAttr(onchange)}"` : '';
   return entries.map(([value, label]) => `
     <label class="check-option">
-      <input type="checkbox" name="${escapeAttr(name)}" value="${escapeAttr(value)}" ${selected && !selected.includes(value) ? '' : 'checked'}${changeAttr}>
+      <input type="checkbox" name="${escapeAttr(name)}" value="${escapeAttr(value)}" ${selected.includes(value) ? 'checked' : ''}${changeAttr}>
       <span>${escapeHTML(label)}</span>
     </label>`).join('');
 }
 
-function benchmarkCheckboxList(name, entries, selected = null) {
+function benchmarkCheckboxList(name, entries, selected = []) {
   return entries.map(([value, label]) => `
     <label class="check-option">
-      <input type="checkbox" name="${escapeAttr(name)}" value="${escapeAttr(value)}" ${selected && !selected.includes(value) ? '' : 'checked'} onchange="updateBenchmarkCount()">
+      <input type="checkbox" name="${escapeAttr(name)}" value="${escapeAttr(value)}" ${selected.includes(value) ? 'checked' : ''} onchange="updateBenchmarkCount()">
       <span>${escapeHTML(label)}</span>
     </label>`).join('');
+}
+
+function checkboxGroupActions(name, updateFn = 'updateMatrixCount') {
+  return `
+    <div class="checkbox-actions" aria-label="${escapeAttr(name)} selection controls">
+      <button class="text-link" type="button" onclick="setCheckboxGroup(${jsArg(name)}, true, ${jsArg(updateFn)})">Select all</button>
+      <button class="text-link" type="button" onclick="setCheckboxGroup(${jsArg(name)}, false, ${jsArg(updateFn)})">Clear all</button>
+    </div>`;
 }
 
 function modelDimensionSummary(conversationModels, judgeModels) {
@@ -1287,9 +1390,22 @@ function modelDimensionSummary(conversationModels, judgeModels) {
 
 function updateCheckboxSelection(name, selected) {
   $$(`input[name="${name}"]`).forEach(input => {
-    input.checked = !selected || selected.includes(input.value);
+    input.checked = selected.includes(input.value);
   });
 }
+
+window.setCheckboxGroup = function(name, checked, updateFn = 'updateMatrixCount') {
+  $$(`input[name="${name}"]`).forEach(input => { input.checked = checked; });
+  const updater = window[updateFn];
+  if (typeof updater === 'function') updater();
+};
+
+window.setCheckboxSelection = function(name, action) {
+  const checked = action === 'all';
+  $$(`input[name="${name}"]`).forEach(input => { input.checked = checked; });
+  updateMatrixCount();
+  updateBenchmarkCount();
+};
 
 window.updateMatrixCount = function() {
   const profiles = checkedValues('matrix-profiles').length;
@@ -1342,6 +1458,22 @@ function clearPoll(key) {
 
 const _pollFailCounts = {};
 
+function handlePollFailure(pollKey, panelId, statusId = null) {
+  _pollFailCounts[pollKey] = (_pollFailCounts[pollKey] || 0) + 1;
+  if (_pollFailCounts[pollKey] >= 10) {
+    clearPoll(pollKey);
+    const panel = $(`#${panelId}`);
+    const status = statusId ? $(`#${statusId}`) : null;
+    if (status) status.innerHTML = statusBadge('failed');
+    if (panel) panel.innerHTML = emptyState('Connection Lost', 'Unable to reach the server. Reload the page before starting another job.');
+    showToast('Polling stopped: connection lost', 'error', 10000);
+    return;
+  }
+  if (_pollFailCounts[pollKey] === 3) {
+    showToast('Connection interrupted, retrying\u2026', 'error', 6000);
+  }
+}
+
 async function pollJob(jobId, panelId, statusId, pollKey) {
   try {
     const job = await api(`/jobs/${pathPart(jobId)}`);
@@ -1360,10 +1492,7 @@ async function pollJob(jobId, panelId, statusId, pollKey) {
       if (job.status === 'cancelled') showToast('Job cancelled', 'info');
     }
   } catch (_) {
-    _pollFailCounts[pollKey] = (_pollFailCounts[pollKey] || 0) + 1;
-    if (_pollFailCounts[pollKey] === 3) {
-      showToast('Connection interrupted, retrying\u2026', 'error', 6000);
-    }
+    handlePollFailure(pollKey, panelId, statusId);
   }
 }
 
@@ -1564,6 +1693,12 @@ document.addEventListener('keydown', (e) => {
 
 async function renderPlaybook() {
   const data = await api('/playbook?format=html');
+  const simulationCount = fmtNum(data.simulation_count || 0);
+  const trustBanner = `
+    <aside class="trust-banner" aria-label="Synthetic analysis notice">
+      <strong>Synthetic Analysis</strong>
+      <p>This playbook is generated from ${simulationCount} simulated conversations using scripted and model-driven backends. It is not legal advice, operational policy, or a substitute for human compliance review. Review all recommendations before operational use.</p>
+    </aside>`;
 
   mainEl.innerHTML = `
     <div class="page-header page-header-actions">
@@ -1578,10 +1713,32 @@ async function renderPlaybook() {
     </div>
     <div class="card">
       <div class="card-body">
+        ${trustBanner}
+        <nav class="playbook-toc" id="playbook-toc" aria-label="Playbook sections" hidden></nav>
         <article class="playbook-content">${data.content || emptyState('No Playbook', 'Run simulations and analyze to generate a playbook.')}</article>
       </div>
     </div>
   `;
+  generatePlaybookTOC();
+}
+
+function generatePlaybookTOC() {
+  const article = $('.playbook-content');
+  const toc = $('#playbook-toc');
+  if (!article || !toc) return;
+  const headings = $$('h2, h3', article);
+  if (headings.length < 4) return;
+  const seen = new Map();
+  const links = headings.map(heading => {
+    const base = heading.textContent.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'section';
+    const count = seen.get(base) || 0;
+    seen.set(base, count + 1);
+    const id = count ? `${base}-${count + 1}` : base;
+    heading.id = id;
+    return `<a class="${heading.tagName === 'H3' ? 'toc-sub' : ''}" href="#${escapeAttr(id)}">${escapeHTML(heading.textContent.trim())}</a>`;
+  }).join('');
+  toc.innerHTML = `<strong>On this page</strong><div>${links}</div>`;
+  toc.hidden = false;
 }
 
 window.exportPlaybook = async function() {
@@ -1670,6 +1827,7 @@ async function renderBenchmarks() {
               <button class="btn btn-primary" type="submit" id="benchmark-btn">Run benchmark</button>
               <button class="btn" type="button" onclick="selectProductionBenchmarkModels()">Production set</button>
               <button class="btn" type="button" onclick="selectAllBenchmarkModels()">Select all</button>
+              <button class="btn" type="button" onclick="clearBenchmarkModels()">Clear all</button>
             </div>
           </form>
         </div>
@@ -1677,7 +1835,7 @@ async function renderBenchmarks() {
 
       <div class="card">
         <div class="card-header"><h2>Progress</h2><div id="benchmark-job-status">${statusBadge('queued')}</div></div>
-        <div class="card-body" id="benchmark-job-panel">
+        <div class="card-body" id="benchmark-job-panel" aria-live="polite">
           ${benchmarkJobs.length ? benchmarkJobs.map(job => benchmarkJobSummaryHTML(job)).join('') : emptyState('Ready', 'Start a benchmark to see live progress and recommendations.')}
         </div>
       </div>
@@ -1694,13 +1852,22 @@ async function renderBenchmarks() {
 }
 
 window.selectProductionBenchmarkModels = function() {
-  const selected = new Set(['composer-2', 'gpt-5.5', 'gpt-5.4', 'gpt-5.3-codex', 'claude-sonnet-4-6', 'claude-opus-4-7', 'gemini-3.1-pro', 'gpt-5.4-mini', 'claude-haiku-4-5']);
+  const wanted = ['composer-2', 'gpt-5.5', 'gpt-5.4', 'gpt-5.3-codex', 'claude-sonnet-4-6', 'claude-opus-4-7', 'gemini-3.1-pro', 'gpt-5.4-mini', 'claude-haiku-4-5'];
+  const available = new Set($$('input[name="benchmark-models"]').map(input => input.value));
+  const missing = wanted.filter(id => !available.has(id));
+  const selected = new Set(wanted.filter(id => available.has(id)));
   $$('input[name="benchmark-models"]').forEach(input => { input.checked = selected.has(input.value); });
+  if (missing.length) showToast(`Models not available: ${missing.join(', ')}`, 'info', 7000);
   updateBenchmarkCount();
 };
 
 window.selectAllBenchmarkModels = function() {
   $$('input[name="benchmark-models"]').forEach(input => { input.checked = true; });
+  updateBenchmarkCount();
+};
+
+window.clearBenchmarkModels = function() {
+  $$('input[name="benchmark-models"]').forEach(input => { input.checked = false; });
   updateBenchmarkCount();
 };
 
@@ -1736,6 +1903,9 @@ window.startModelBenchmark = async function(event) {
 async function pollBenchmarkJob(jobId) {
   try {
     const job = await api(`/jobs/${pathPart(jobId)}`);
+    if (_pollFailCounts.benchmark) {
+      _pollFailCounts.benchmark = 0;
+    }
     const panel = $('#benchmark-job-panel');
     const status = $('#benchmark-job-status');
     if (status) status.innerHTML = statusBadge(job.status);
@@ -1746,8 +1916,8 @@ async function pollBenchmarkJob(jobId) {
       if (job.status === 'completed') showToast('Benchmark completed', 'success');
       if (job.status === 'failed') showToast('Benchmark failed', 'error');
     }
-  } catch (err) {
-    showToast(err.message, 'error');
+  } catch (_) {
+    handlePollFailure('benchmark', 'benchmark-job-panel');
   }
 }
 
@@ -1910,14 +2080,14 @@ function benchHeatmapHTML(assessments, models, roles) {
   function heatColor(score) {
     if (score === null) return 'var(--bg-elevated)';
     if (score >= 9) return 'var(--success)';
-    if (score >= 7) return 'oklch(68% 0.14 155)';
+    if (score >= 7) return 'var(--fit-strong)';
     if (score >= 5) return 'var(--warning)';
-    if (score >= 3) return 'oklch(68% 0.14 55)';
+    if (score >= 3) return 'var(--fit-unsafe)';
     return 'var(--danger)';
   }
   function textColor(score) {
     if (score === null) return 'var(--text-tertiary)';
-    return score >= 5 ? 'oklch(15% 0 0)' : 'oklch(95% 0 0)';
+    return score >= 5 ? 'var(--fit-heatmap-text-dark)' : 'var(--fit-heatmap-text-light)';
   }
 
   return `
@@ -1938,9 +2108,9 @@ function benchHeatmapHTML(assessments, models, roles) {
       </div>
       <div class="bench-hm-legend">
         <span style="background:var(--danger)"></span><span>1-2</span>
-        <span style="background:oklch(68% 0.14 55)"></span><span>3-4</span>
+        <span style="background:var(--fit-unsafe)"></span><span>3-4</span>
         <span style="background:var(--warning)"></span><span>5-6</span>
-        <span style="background:oklch(68% 0.14 155)"></span><span>7-8</span>
+        <span style="background:var(--fit-strong)"></span><span>7-8</span>
         <span style="background:var(--success)"></span><span>9-10</span>
       </div>
     </div>`;
@@ -1987,9 +2157,9 @@ function benchFitDistHTML(assessments, roles) {
   const fitOrder = ['Primary recommendation', 'Strong candidate', 'Usable with caution', 'Unsafe without parser hardening', 'Unavailable'];
   const fitColors = {
     'Primary recommendation': 'var(--success)',
-    'Strong candidate': 'oklch(68% 0.14 155)',
+    'Strong candidate': 'var(--fit-strong)',
     'Usable with caution': 'var(--warning)',
-    'Unsafe without parser hardening': 'oklch(68% 0.14 55)',
+    'Unsafe without parser hardening': 'var(--fit-unsafe)',
     'Unavailable': 'var(--danger)',
   };
   const fitShort = {
@@ -2229,7 +2399,7 @@ async function renderArena() {
       </div>
       <div class="card">
         <div class="card-header"><h2>Progress</h2><div id="arena-job-status">${statusBadge('queued')}</div></div>
-        <div class="card-body" id="arena-job-panel">
+        <div class="card-body" id="arena-job-panel" aria-live="polite">
           ${tournamentJobs.length ? tournamentJobs.map(jobSummaryHTML).join('') : emptyState('No Tournaments', 'Start a tournament to update Elo ratings.')}
         </div>
       </div>
@@ -2389,10 +2559,13 @@ function evolutionTable(items, type) {
 // ── Calibration ──────────────────────────────────────────────────
 
 async function renderCalibration() {
-  const [results, variants] = await Promise.all([
+  const [results, variants, options, jobs] = await Promise.all([
     api('/calibration/results'),
     api('/calibration/variants'),
+    api('/config/run-options'),
+    api('/jobs'),
   ]);
+  const calibrationJobs = jobs.filter(job => job.kind === 'calibration');
   const metrics = Object.entries(results.correlations || {}).map(([metric, value]) => `
     <div class="judgment-score-item">
       <span class="judgment-score-label">${escapeHTML(fmtId(metric))}</span>
@@ -2424,8 +2597,78 @@ async function renderCalibration() {
           ${variants.length ? variants.map(v => `<div class="job-summary"><span>${escapeHTML(v.id)}</span><span>score ${Number(v.calibration_score || 0).toFixed(2)}</span></div>`).join('') : emptyState('No Variants', 'Use calibrate --optimize to store a scored judge prompt variant.')}
         </div>
       </section>
+      <section class="card">
+        <div class="card-header"><h2>Run Calibration</h2><div id="calibration-job-status">${statusBadge('queued')}</div></div>
+        <div class="card-body">
+          <form class="control-form" onsubmit="startCalibration(event)">
+            <p class="field-summary">Evaluate current human labels and store a scored judge prompt variant when optimization is enabled.</p>
+            <label class="check-option"><input id="calibration-optimize" type="checkbox" checked><span>Store optimized prompt variant</span></label>
+            <button class="btn btn-primary" type="submit" id="calibration-btn">Start calibration</button>
+          </form>
+          <div class="status-card" id="calibration-job-panel" aria-live="polite" style="margin-top:var(--space-4)">
+            ${calibrationJobs.length ? calibrationJobs.map(jobSummaryHTML).join('') : emptyState('Ready', 'Start calibration to evaluate current labels.')}
+          </div>
+        </div>
+      </section>
+      <section class="card">
+        <div class="card-header"><h2>Upload Labels</h2></div>
+        <div class="card-body">
+          <form class="control-form" onsubmit="submitCalibrationLabels(event)">
+            <label for="calibration-labels-json" class="form-label">Labels JSON</label>
+            <textarea class="form-textarea" id="calibration-labels-json" rows="8" placeholder='[{"transcript_id":"sim_123","human_scores":{"payment_probability":0.7},"labeler_id":"analyst"}]'></textarea>
+            <p class="field-summary">Paste an array of calibration labels. Saved labels are used by the next calibration run.</p>
+            <button class="btn" type="submit" id="calibration-labels-btn">Save labels</button>
+          </form>
+        </div>
+      </section>
     </div>`;
 }
+
+window.startCalibration = async function(event) {
+  event.preventDefault();
+  clearPoll('calibration');
+  const panel = $('#calibration-job-panel');
+  const status = $('#calibration-job-status');
+  const btn = $('#calibration-btn');
+  if (panel) panel.innerHTML = skeleton();
+  if (btn) { btn.classList.add('btn-loading'); btn.disabled = true; }
+  try {
+    const job = await apiPost('/jobs/calibration', { labels: [], optimize: !!($('#calibration-optimize') || {}).checked });
+    if (status) status.innerHTML = statusBadge(job.status);
+    if (panel) renderJobPanel(job, panel);
+    showToast('Calibration started', 'success');
+    window._pollers.calibration = setInterval(() => pollJob(job.id, 'calibration-job-panel', 'calibration-job-status', 'calibration'), 900);
+  } catch (err) {
+    if (panel) panel.innerHTML = emptyState('Calibration failed', err.message);
+    showToast(err.message, 'error');
+  } finally {
+    if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; }
+  }
+};
+
+window.submitCalibrationLabels = async function(event) {
+  event.preventDefault();
+  const input = $('#calibration-labels-json');
+  const btn = $('#calibration-labels-btn');
+  let labels;
+  try {
+    labels = JSON.parse(input.value || '[]');
+    if (!Array.isArray(labels)) throw new Error('Labels JSON must be an array.');
+  } catch (err) {
+    showToast(err.message, 'error');
+    return;
+  }
+  if (btn) { btn.classList.add('btn-loading'); btn.disabled = true; }
+  try {
+    const result = await apiPost('/calibration/labels', labels);
+    showToast(`${fmtNum(result.saved || 0)} calibration labels saved`, 'success');
+    await renderCalibration();
+  } catch (err) {
+    showToast(err.message, 'error');
+  } finally {
+    if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; }
+  }
+};
 
 // ── Profiles ───────────────────────────────────────────────────
 
@@ -2529,5 +2772,9 @@ async function renderStrategies() {
 
 (function init() {
   const hash = location.hash.replace('#', '') || 'dashboard';
-  navigateTo(hash);
+  currentPage = hash;
+  setActiveNav(hash);
+  updateDocumentTitle(hash);
+  window.history.replaceState({ page: hash, params: {} }, '', `#${hash}`);
+  renderPage(hash);
 })();
