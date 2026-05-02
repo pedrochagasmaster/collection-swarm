@@ -14,7 +14,18 @@ const mainEl = $('#main-content');
 let currentPage = 'dashboard';
 let _lastPageParams = {};
 
+const PAGE_TITLES = {
+  dashboard: 'Dashboard', runs: 'Simulation Runs', launch: 'Launch Run',
+  matrix: 'Batch Comparison', manual: 'Manual Run', playbook: 'Playbook',
+  compliance: 'Compliance', arena: 'Arena', evolution: 'Evolution',
+  calibration: 'Calibration', benchmarks: 'Model Benchmarks',
+  profiles: 'Profiles', strategies: 'Strategies',
+};
+
 function navigateTo(page, params = {}) {
+  if (currentPage === 'manual' && window._manualSessionId) {
+    if (!confirm('You have an active manual session. Leave and lose progress?')) return;
+  }
   currentPage = page;
   _lastPageParams[page] = params || {};
   $$('.nav-link').forEach(el => {
@@ -26,21 +37,30 @@ function navigateTo(page, params = {}) {
       el.removeAttribute('aria-current');
     }
   });
+  document.title = `${PAGE_TITLES[page] || 'Page'} — Collection Swarm`;
   window.history.pushState({ page, params }, '', `#${page}`);
   closeMobileSidebar();
   renderPage(page, params);
 }
 
 window.addEventListener('popstate', (e) => {
-  const state = e.state || { page: 'dashboard', params: {} };
-  currentPage = state.page;
+  const state = e.state || {};
+  const page = state.page || location.hash.replace('#', '') || 'dashboard';
+  const params = state.params || {};
+  currentPage = page;
+  document.title = `${PAGE_TITLES[page] || 'Page'} — Collection Swarm`;
   $$('.nav-link').forEach(el => {
-    const isActive = el.dataset.page === state.page;
+    const isActive = el.dataset.page === page;
     el.classList.toggle('active', isActive);
     if (isActive) el.setAttribute('aria-current', 'page');
     else el.removeAttribute('aria-current');
   });
-  renderPage(state.page, state.params);
+  renderPage(page, params);
+});
+
+window.addEventListener('hashchange', () => {
+  const hash = location.hash.replace('#', '') || 'dashboard';
+  if (hash !== currentPage) navigateTo(hash);
 });
 
 // ── Theme ──────────────────────────────────────────────────────
@@ -265,7 +285,7 @@ function scoreBarHTML(label, value) {
     <div class="judgment-score-item">
       <span class="judgment-score-label" title="${escapeAttr(definition)}">${escapeHTML(labelText)}</span>
       <div class="score-bar-wrap">
-        <div class="score-bar" role="meter" aria-valuenow="${Math.round(value * 100)}" aria-valuemin="0" aria-valuemax="100" aria-label="${escapeAttr(`${labelText}: ${definition}`)}">
+        <div class="score-bar" role="meter" aria-valuenow="${Math.round(value * 100)}" aria-valuemin="0" aria-valuemax="100" aria-valuetext="${Math.round(value * 100)}% — ${meaning}" aria-label="${escapeAttr(`${labelText}: ${definition}`)}">
           <div class="score-bar-fill" style="width:${value * 100}%;background:var(${colorVar})"></div>
         </div>
         <span class="score-bar-label ${cls}"><span aria-hidden="true">${cls === 'score-good' ? 'OK' : cls === 'score-mid' ? '!' : 'X'}</span> ${pct(value)} ${meaning}</span>
@@ -535,7 +555,7 @@ async function renderDashboard() {
       </div>
     </div>
 
-    ${total_runs === 0 ? renderFirstRunPanel() : ''}
+    ${total_runs === 0 ? renderFirstRunPanel() : quickActionsStrip()}
     ${strategySection}
     ${complianceBanner}
 
@@ -589,6 +609,15 @@ function renderFirstRunPanel() {
         <button class="first-run-action" type="button" onclick="navigateTo('compliance')"><strong>Review compliance risks</strong><span>Check what thresholds will exclude a strategy.</span></button>
       </div>
     </section>`;
+}
+
+function quickActionsStrip() {
+  return `
+    <div class="quick-actions">
+      <button class="btn" type="button" onclick="navigateTo('launch')">Launch new run</button>
+      <button class="btn" type="button" onclick="navigateTo('matrix')">Compare strategies</button>
+      <button class="btn" type="button" onclick="navigateTo('compliance')">Review compliance</button>
+    </div>`;
 }
 
 function renderComplianceBanner(data) {
@@ -794,7 +823,7 @@ window.filterRuns = function() {
   tbody.innerHTML = filtered.map(r => {
     const j = r.judgment;
     return `
-      <tr onclick="openTranscript(${jsArg(r.id)})">
+      <tr tabindex="0" role="row" onclick="openTranscript(${jsArg(r.id)})" onkeydown="handleRunRowKey(event, ${jsArg(r.id)})" aria-label="Run ${escapeAttr(r.id)}, ${escapeAttr(fmtId(r.profile_id))} × ${escapeAttr(fmtId(r.strategy_id))}">
         <td>${escapeHTML(r.id)}</td>
         <td class="run-action-cell">
           <button class="btn btn-compact" type="button" onclick="event.stopPropagation();openTranscript(${jsArg(r.id)})" aria-label="View transcript for ${escapeAttr(r.id)}">View</button>
@@ -1048,8 +1077,8 @@ window.startSingleRun = async function(event) {
 
 async function renderMatrix(params = {}) {
   const [options, jobs] = await Promise.all([api('/config/run-options'), api('/jobs')]);
-  const profiles = checkboxList('matrix-profiles', options.profiles.map(p => [p.id, fmtId(p.id)]), params.profile ? [params.profile] : null);
-  const strategies = checkboxList('matrix-strategies', options.strategies.map(s => [s.id, fmtId(s.id)]));
+  const profiles = checkboxList('matrix-profiles', options.profiles.map(p => [p.id, fmtId(p.id)]), params.profile ? [params.profile] : []);
+  const strategies = checkboxList('matrix-strategies', options.strategies.map(s => [s.id, fmtId(s.id)]), []);
   const conversationModels = checkboxList(
     'matrix-conversation-models',
     options.conversation_models.map(m => [m.id, modelLabel(m)]),
@@ -1262,19 +1291,19 @@ function inputField(id, label, value, min, max, oninput = '') {
     </div>`;
 }
 
-function checkboxList(name, entries, selected = null, onchange = 'updateMatrixCount()') {
+function checkboxList(name, entries, selected = [], onchange = 'updateMatrixCount()') {
   const changeAttr = onchange ? ` onchange="${escapeAttr(onchange)}"` : '';
   return entries.map(([value, label]) => `
     <label class="check-option">
-      <input type="checkbox" name="${escapeAttr(name)}" value="${escapeAttr(value)}" ${selected && !selected.includes(value) ? '' : 'checked'}${changeAttr}>
+      <input type="checkbox" name="${escapeAttr(name)}" value="${escapeAttr(value)}" ${selected.includes(value) ? 'checked' : ''}${changeAttr}>
       <span>${escapeHTML(label)}</span>
     </label>`).join('');
 }
 
-function benchmarkCheckboxList(name, entries, selected = null) {
+function benchmarkCheckboxList(name, entries, selected = []) {
   return entries.map(([value, label]) => `
     <label class="check-option">
-      <input type="checkbox" name="${escapeAttr(name)}" value="${escapeAttr(value)}" ${selected && !selected.includes(value) ? '' : 'checked'} onchange="updateBenchmarkCount()">
+      <input type="checkbox" name="${escapeAttr(name)}" value="${escapeAttr(value)}" ${selected.includes(value) ? 'checked' : ''} onchange="updateBenchmarkCount()">
       <span>${escapeHTML(label)}</span>
     </label>`).join('');
 }
@@ -1364,11 +1393,21 @@ async function pollJob(jobId, panelId, statusId, pollKey) {
     if (_pollFailCounts[pollKey] === 3) {
       showToast('Connection interrupted, retrying\u2026', 'error', 6000);
     }
+    if (_pollFailCounts[pollKey] >= 10) {
+      clearPoll(pollKey);
+      const panel = $(`#${panelId}`);
+      if (panel) panel.innerHTML = emptyState('Connection Lost',
+        'Unable to reach the server after 10 attempts.');
+      showToast('Polling stopped \u2014 connection lost', 'error', 10000);
+      delete _pollFailCounts[pollKey];
+      return;
+    }
   }
 }
 
 function renderJobPanel(job, panel) {
   const canCancel = job.status === 'queued' || job.status === 'running';
+  panel.setAttribute('aria-live', 'polite');
   panel.innerHTML = `
     <div class="status-card">
       <div class="job-item-head">
@@ -1576,12 +1615,39 @@ async function renderPlaybook() {
         <button class="btn" type="button" onclick="exportPlaybook()">Export Markdown</button>
       </div>
     </div>
+    <div class="trust-banner">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+      <div>
+        <strong>Synthetic Analysis</strong>
+        <p>This playbook is generated from simulated conversations using scripted backends. It is not legal advice, operational policy, or a substitute for human compliance review. Review all recommendations before operational use.</p>
+      </div>
+    </div>
     <div class="card">
       <div class="card-body">
         <article class="playbook-content">${data.content || emptyState('No Playbook', 'Run simulations and analyze to generate a playbook.')}</article>
       </div>
     </div>
   `;
+  generatePlaybookTOC();
+}
+
+function generatePlaybookTOC() {
+  const article = $('.playbook-content');
+  if (!article) return;
+  const headings = $$('h2, h3', article);
+  if (headings.length < 4) return;
+  headings.forEach((h, i) => {
+    if (!h.id) h.id = `playbook-heading-${i}`;
+  });
+  const tocItems = headings.map(h => {
+    const indent = h.tagName === 'H3' ? ' class="toc-indent"' : '';
+    return `<li${indent}><a href="#${h.id}" onclick="event.preventDefault();document.getElementById('${h.id}').scrollIntoView({behavior:'smooth',block:'start'})">${escapeHTML(h.textContent)}</a></li>`;
+  }).join('');
+  const tocEl = document.createElement('nav');
+  tocEl.className = 'playbook-toc';
+  tocEl.setAttribute('aria-label', 'Table of contents');
+  tocEl.innerHTML = `<strong>Contents</strong><ul>${tocItems}</ul>`;
+  article.insertBefore(tocEl, article.firstChild);
 }
 
 window.exportPlaybook = async function() {
@@ -1694,7 +1760,11 @@ async function renderBenchmarks() {
 }
 
 window.selectProductionBenchmarkModels = function() {
-  const selected = new Set(['composer-2', 'gpt-5.5', 'gpt-5.4', 'gpt-5.3-codex', 'claude-sonnet-4-6', 'claude-opus-4-7', 'gemini-3.1-pro', 'gpt-5.4-mini', 'claude-haiku-4-5']);
+  const wanted = ['composer-2', 'gpt-5.5', 'gpt-5.4', 'gpt-5.3-codex', 'claude-sonnet-4-6', 'claude-opus-4-7', 'gemini-3.1-pro', 'gpt-5.4-mini', 'claude-haiku-4-5'];
+  const available = new Set($$('input[name="benchmark-models"]').map(i => i.value));
+  const missing = wanted.filter(id => !available.has(id));
+  if (missing.length) showToast(`Models not available: ${missing.join(', ')}`, 'warning');
+  const selected = new Set(wanted);
   $$('input[name="benchmark-models"]').forEach(input => { input.checked = selected.has(input.value); });
   updateBenchmarkCount();
 };
@@ -1910,14 +1980,14 @@ function benchHeatmapHTML(assessments, models, roles) {
   function heatColor(score) {
     if (score === null) return 'var(--bg-elevated)';
     if (score >= 9) return 'var(--success)';
-    if (score >= 7) return 'oklch(68% 0.14 155)';
+    if (score >= 7) return 'var(--fit-strong)';
     if (score >= 5) return 'var(--warning)';
-    if (score >= 3) return 'oklch(68% 0.14 55)';
+    if (score >= 3) return 'var(--fit-moderate)';
     return 'var(--danger)';
   }
   function textColor(score) {
     if (score === null) return 'var(--text-tertiary)';
-    return score >= 5 ? 'oklch(15% 0 0)' : 'oklch(95% 0 0)';
+    return score >= 5 ? 'var(--bench-text-on-light)' : 'var(--bench-text-on-dark)';
   }
 
   return `
@@ -1938,9 +2008,9 @@ function benchHeatmapHTML(assessments, models, roles) {
       </div>
       <div class="bench-hm-legend">
         <span style="background:var(--danger)"></span><span>1-2</span>
-        <span style="background:oklch(68% 0.14 55)"></span><span>3-4</span>
+        <span style="background:var(--fit-moderate)"></span><span>3-4</span>
         <span style="background:var(--warning)"></span><span>5-6</span>
-        <span style="background:oklch(68% 0.14 155)"></span><span>7-8</span>
+        <span style="background:var(--fit-strong)"></span><span>7-8</span>
         <span style="background:var(--success)"></span><span>9-10</span>
       </div>
     </div>`;
@@ -1958,7 +2028,7 @@ function benchBarChartHTML(assessments, models, roles) {
     if (!scores || !scores.length) return 0;
     return scores.reduce((a, b) => a + b, 0) / scores.length;
   }
-  const roleColors = { collector: 'var(--accent-primary)', debtor: 'oklch(65% 0.17 310)', judge: 'var(--warning)' };
+  const roleColors = { collector: 'var(--accent-primary)', debtor: 'var(--debtor-accent)', judge: 'var(--warning)' };
 
   return `
     <div class="bench-barchart-wrap">
@@ -1987,9 +2057,9 @@ function benchFitDistHTML(assessments, roles) {
   const fitOrder = ['Primary recommendation', 'Strong candidate', 'Usable with caution', 'Unsafe without parser hardening', 'Unavailable'];
   const fitColors = {
     'Primary recommendation': 'var(--success)',
-    'Strong candidate': 'oklch(68% 0.14 155)',
+    'Strong candidate': 'var(--fit-strong)',
     'Usable with caution': 'var(--warning)',
-    'Unsafe without parser hardening': 'oklch(68% 0.14 55)',
+    'Unsafe without parser hardening': 'var(--fit-moderate)',
     'Unavailable': 'var(--danger)',
   };
   const fitShort = {
@@ -2389,10 +2459,12 @@ function evolutionTable(items, type) {
 // ── Calibration ──────────────────────────────────────────────────
 
 async function renderCalibration() {
-  const [results, variants] = await Promise.all([
+  const [results, variants, jobs] = await Promise.all([
     api('/calibration/results'),
     api('/calibration/variants'),
+    api('/jobs'),
   ]);
+  const calibrationJobs = jobs.filter(j => j.kind === 'calibration');
   const metrics = Object.entries(results.correlations || {}).map(([metric, value]) => `
     <div class="judgment-score-item">
       <span class="judgment-score-label">${escapeHTML(fmtId(metric))}</span>
@@ -2421,11 +2493,54 @@ async function renderCalibration() {
       <section class="card">
         <div class="card-header"><h2>Prompt Variants</h2></div>
         <div class="card-body">
-          ${variants.length ? variants.map(v => `<div class="job-summary"><span>${escapeHTML(v.id)}</span><span>score ${Number(v.calibration_score || 0).toFixed(2)}</span></div>`).join('') : emptyState('No Variants', 'Use calibrate --optimize to store a scored judge prompt variant.')}
+          ${variants.length ? variants.map(v => `<div class="job-summary"><span>${escapeHTML(v.id)}</span><span>score ${Number(v.calibration_score || 0).toFixed(2)}</span></div>`).join('') : emptyState('No Variants', 'Run calibration with optimize enabled to store a scored judge prompt variant.')}
+        </div>
+      </section>
+    </div>
+    <div class="grid-2">
+      <section class="card">
+        <div class="card-header"><h2>Run Calibration</h2></div>
+        <div class="card-body">
+          <form class="control-form" onsubmit="startCalibration(event)">
+            <label class="check-option">
+              <input type="checkbox" id="calibration-optimize" checked>
+              <span>Optimize: save scored judge prompt variant</span>
+            </label>
+            <button class="btn btn-primary" type="submit" id="calibration-btn">Start calibration</button>
+          </form>
+        </div>
+      </section>
+      <section class="card">
+        <div class="card-header"><h2>Calibration Jobs</h2><div id="calibration-job-status">${statusBadge('queued')}</div></div>
+        <div class="card-body" id="calibration-job-panel">
+          ${calibrationJobs.length ? calibrationJobs.map(jobSummaryHTML).join('') : emptyState('No Jobs', 'Start a calibration run to see progress.')}
         </div>
       </section>
     </div>`;
 }
+
+window.startCalibration = async function(event) {
+  event.preventDefault();
+  clearPoll('calibration');
+  const panel = $('#calibration-job-panel');
+  const status = $('#calibration-job-status');
+  const btn = $('#calibration-btn');
+  panel.innerHTML = skeleton();
+  if (btn) { btn.classList.add('btn-loading'); btn.disabled = true; }
+  try {
+    const optimize = $('#calibration-optimize') ? $('#calibration-optimize').checked : true;
+    const job = await apiPost('/jobs/calibration', { labels: [], optimize });
+    status.innerHTML = statusBadge(job.status);
+    renderJobPanel(job, panel);
+    showToast('Calibration started', 'success');
+    window._pollers.calibration = setInterval(() => pollJob(job.id, 'calibration-job-panel', 'calibration-job-status', 'calibration'), 800);
+  } catch (err) {
+    panel.innerHTML = emptyState('Calibration failed', err.message);
+    showToast(err.message, 'error');
+  } finally {
+    if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; }
+  }
+};
 
 // ── Profiles ───────────────────────────────────────────────────
 
