@@ -364,6 +364,73 @@ class TestEvolutionAndCalibration:
         assert resp.status_code == 200
         assert resp.json()["saved"] == 1
 
+    def test_arena_leaderboard_can_filter_model_pair(self, empty_client: TestClient) -> None:
+        from collection_swarm.models import EloUpdate
+        from collection_swarm.store import SimulationStore
+
+        store = SimulationStore(empty_client.app.state.db_path)
+        store.save_elo_update(
+            EloUpdate(
+                entity_type="strategy",
+                entity_id="model_specific",
+                opponent_id="profile",
+                conversation_model="cursor-composer-2",
+                judge_model="local-judge",
+                simulation_id="sim_model",
+                rating_before=1500,
+                rating_after=1510,
+                effective_score=0.8,
+                expected_score=0.5,
+            )
+        )
+
+        default_data = empty_client.get("/api/arena/leaderboard").json()
+        filtered = empty_client.get(
+            "/api/arena/leaderboard?conversation_model=cursor-composer-2&judge_model=local-judge"
+        ).json()
+
+        assert "model_specific" not in {item["entity_id"] for item in default_data["strategies"]}
+        assert "model_specific" in {item["entity_id"] for item in filtered["strategies"]}
+
+    def test_run_options_include_evolved_entities(self, empty_client: TestClient) -> None:
+        from collection_swarm.models import ProfileLineage, Strategy, StrategyLineage
+        from collection_swarm.store import SimulationStore
+
+        store = SimulationStore(empty_client.app.state.db_path)
+        store.save_evolved_strategy(
+            Strategy(
+                id="evo_ui",
+                tone="neutral",
+                opening_approach="reminder",
+                negotiation_tactic="payment_reminder",
+                escalation_style="none",
+                concession_willingness="low",
+                compliance_adherence="strict",
+                follow_up_strategy="written_agreement",
+            ),
+            StrategyLineage(strategy_id="evo_ui", generation=1),
+        )
+        profile = store.get_run if False else None
+        config_profile = empty_client.get("/api/config/profiles").json()[0]
+        from collection_swarm.models import Profile
+        store.save_evolved_profile(
+            Profile.model_validate({**config_profile, "id": "hard_ui"}),
+            ProfileLineage(profile_id="hard_ui", parent_id=config_profile["id"], generation=1),
+        )
+
+        data = empty_client.get("/api/config/run-options").json()
+
+        assert "evo_ui" in {item["id"] for item in data["strategies"]}
+        assert "hard_ui" in {item["id"] for item in data["profiles"]}
+
+    def test_calibration_job_stores_variant(self, empty_client: TestClient) -> None:
+        resp = empty_client.post("/api/jobs/calibration", json={"labels": []})
+
+        assert resp.status_code == 200
+        job = _wait_for_job(empty_client, resp.json()["id"])
+        assert job["status"] == "completed"
+        assert empty_client.get("/api/calibration/variants").json()
+
 
 class TestModelBenchmarks:
     def test_benchmark_options_include_models_and_roles(self, empty_client: TestClient) -> None:

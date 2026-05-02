@@ -14,7 +14,7 @@ from collection_swarm.backends.router import LLMRouter
 from collection_swarm.config import AppConfig
 from collection_swarm.engine import SimulationEngine
 from collection_swarm.adversarial import harden_profiles
-from collection_swarm.evolution import evolve_strategies
+from collection_swarm.evolution import cull_strategies, evolve_strategies
 from collection_swarm.models import EvolutionConfig, HardeningConfig, MatrixCell, ProfileLineage, SimulationResult, StrategyLineage, TournamentConfig, TournamentResult, utc_now
 from collection_swarm.store import SimulationStore
 
@@ -218,12 +218,13 @@ async def run_evolution_cycle(
     router = LLMRouter(config.models, cursor_sdk_prompts=config.prompts.cursor_sdk)
     results: list[TournamentResult] = []
     active_strategy_ids = list(strategy_ids or config.strategies)
+    active_profile_ids = list(profile_ids or config.profiles)
     for generation in range(1, generations + 1):
         tournament = await run_tournament(
             config,
             store,
             tournament_config,
-            profile_ids=profile_ids,
+            profile_ids=active_profile_ids,
             strategy_ids=active_strategy_ids,
             conversation_model=conversation_model,
             judge_model=judge_model,
@@ -237,7 +238,16 @@ async def run_evolution_cycle(
         all_strategies = {**config.strategies, **store.get_evolved_strategy_pool()}
         top = [all_strategies[strategy_id] for strategy_id in sorted_ids[: evolution_config.top_k] if strategy_id in all_strategies]
         bottom = [all_strategies[strategy_id] for strategy_id in sorted_ids[-evolution_config.bottom_k :] if strategy_id in all_strategies]
-        evolved = await evolve_strategies(top, bottom, [], evolution_config, router)
+        failed_runs = [
+            run
+            for run in store.list_runs(status="completed")
+            if run.strategy_id in {strategy.id for strategy in bottom} and run.transcript
+        ]
+        failure_transcripts = [
+            "\n".join(f"{message.role}: {message.content}" for message in run.transcript)
+            for run in failed_runs[:5]
+        ]
+        evolved = await evolve_strategies(top, bottom, failure_transcripts, evolution_config, router)
         for strategy in evolved:
             lineage = StrategyLineage(
                 strategy_id=strategy.id,
@@ -249,9 +259,25 @@ async def run_evolution_cycle(
             store.save_evolved_strategy(strategy, lineage)
             if strategy.id not in active_strategy_ids:
                 active_strategy_ids.append(strategy.id)
+        if evolution_config.cull_bottom_n:
+            active_evolved = store.list_evolved_strategies()
+            lineages = {lineage.strategy_id: lineage for _, lineage in active_evolved}
+            rating_map = {rating.entity_id: rating.rating for rating in ratings}
+            all_strategies = {**config.strategies, **store.get_evolved_strategy_pool()}
+            kept = cull_strategies(
+                [all_strategies[strategy_id] for strategy_id in active_strategy_ids if strategy_id in all_strategies],
+                rating_map,
+                keep_n=max(0, evolution_config.population_size - len(config.strategies)),
+                lineages=lineages,
+            )
+            kept_ids = {strategy.id for strategy in kept}
+            for strategy, lineage in active_evolved:
+                if lineage.generation > 0 and strategy.id not in kept_ids:
+                    store.cull_evolved_strategy(strategy.id)
+                    if strategy.id in active_strategy_ids:
+                        active_strategy_ids.remove(strategy.id)
         if hardening_config and hardening_config.enabled:
             profile_pool = {**config.profiles, **store.get_evolved_profile_pool()}
-            active_profile_ids = list(profile_ids or config.profiles)
             seed_profiles = [profile_pool[profile_id] for profile_id in active_profile_ids if profile_id in profile_pool]
             hardened = await harden_profiles(seed_profiles[: evolution_config.bottom_k], [], hardening_config, router)
             for profile in hardened:
@@ -264,6 +290,8 @@ async def run_evolution_cycle(
                     hardening_description="Generated from successful collection transcripts.",
                 )
                 store.save_evolved_profile(profile, lineage)
+                if profile.id not in active_profile_ids:
+                    active_profile_ids.append(profile.id)
         if on_generation_complete is not None:
             await on_generation_complete(generation, tournament)
     return results
