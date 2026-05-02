@@ -203,7 +203,13 @@ def create_app(
     config_dir: Path = Path("config"),
     db_path: Path = Path("output/collection_swarm.sqlite"),
 ) -> FastAPI:
-    app = FastAPI(title="Collection Swarm Dashboard", version="0.1.0")
+    app = FastAPI(
+        title="Collection Swarm Dashboard",
+        version="0.1.0",
+        docs_url="/docs",
+        redoc_url="/redoc",
+        openapi_url="/openapi.json",
+    )
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
     app.state.jobs = {}
     app.state.manual_sessions = {}

@@ -1,0 +1,1169 @@
+/* ═══════════════════════════════════════════════════════════════
+   Collection Swarm — Pages Module
+   Page router, dashboard, runs, launch, matrix, manual
+   role-play, transcript slideout, form helpers, job polling,
+   and playbook rendering. Depends on core.js.
+   ═══════════════════════════════════════════════════════════════ */
+
+async function renderPage(page, params = {}) {
+  mainEl.innerHTML = skeleton();
+  mainEl.scrollTop = 0;
+  try {
+    switch (page) {
+      case 'dashboard': await renderDashboard(params); break;
+      case 'runs': await renderRuns(); break;
+      case 'launch': await renderLaunch(params); break;
+      case 'matrix': await renderMatrix(params); break;
+      case 'manual': await renderManual(params); break;
+      case 'playbook': await renderPlaybook(); break;
+      case 'compliance': await renderCompliance(); break;
+      case 'arena': await renderArena(); break;
+      case 'evolution': await renderEvolution(); break;
+      case 'calibration': await renderCalibration(); break;
+      case 'benchmarks': await renderBenchmarks(); break;
+      case 'profiles': await renderProfiles(); break;
+      case 'strategies': await renderStrategies(); break;
+      default: mainEl.innerHTML = emptyState('Not Found', 'Page not found.');
+    }
+    mainEl.classList.remove('page-enter');
+    void mainEl.offsetWidth;
+    mainEl.classList.add('page-enter');
+  } catch (err) {
+    mainEl.innerHTML = emptyState('Error', err.message);
+  }
+}
+
+// ── Dashboard ──────────────────────────────────────────────────
+
+async function renderDashboard() {
+  const [data, compliance] = await Promise.all([
+    api('/dashboard'),
+    api('/compliance/exclusions'),
+  ]);
+  const { total_runs, completed, failed, average_scores: avg, outcome_distribution: dist, cost } = data;
+
+  const totalOutcomes = Object.values(dist).reduce((a, b) => a + b, 0) || 1;
+  const outcomeRows = Object.entries(dist).sort((a, b) => b[1] - a[1]).map(([outcome, count]) => {
+    const w = (count / totalOutcomes) * 100;
+    const color = OUTCOME_COLORS[outcome] || 'var(--chart-1)';
+    return `
+      <div class="dist-row">
+        <span class="dist-label">${escapeHTML(fmtId(outcome))}</span>
+        <div class="dist-bar-track">
+          <div class="dist-bar-fill" style="width:${Math.max(w, 6)}%;background:${color}"><span>${pct(count / totalOutcomes)}</span></div>
+        </div>
+        <span class="dist-count">${count}</span>
+      </div>`;
+  }).join('');
+
+  const tabs = data.profiles.map((p, i) => {
+    const tabId = `profile-tab-${i}`;
+    const panelId = 'strategy-comparison';
+    return `<button id="${tabId}" class="tab-btn${i === 0 ? ' active' : ''}" onclick="switchProfileTab(${jsArg(p)}, this)" onkeydown="handleProfileTabKey(event)" role="tab" aria-selected="${i === 0}" aria-controls="${panelId}" tabindex="${i === 0 ? '0' : '-1'}">${escapeHTML(fmtId(p))}</button>`;
+  }).join('');
+  const strategySection = data.profiles.length ? `
+    <section class="card decision-card">
+      <div class="card-header">
+        <div>
+          <h2>Strategy Rankings</h2>
+          <p class="section-lead">Best strategy per debtor profile, ranked by payment probability.</p>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="tabs" role="tablist" aria-label="Profile strategy rankings" id="profile-tabs">${tabs}</div>
+        <div id="strategy-comparison" role="tabpanel" tabindex="0" aria-labelledby="profile-tab-0">${skeleton()}</div>
+      </div>
+    </section>` : '';
+
+  const complianceBanner = renderComplianceBanner(compliance);
+  const successRate = total_runs > 0 ? Math.round((completed / total_runs) * 100) : 0;
+
+  mainEl.innerHTML = `
+    <div class="page-header">
+      <h1>Dashboard</h1>
+      <p>Which strategy to use, which to avoid, and why.</p>
+    </div>
+
+    <div class="overview-strip" role="status" aria-label="Simulation summary">
+      <div class="overview-item">
+        <span class="overview-label">${metricLabelHTML('Runs')}</span>
+        <span class="overview-value">${fmtNum(total_runs)}</span>
+      </div>
+      <div class="overview-sep" aria-hidden="true"></div>
+      <div class="overview-item">
+        <span class="overview-label">${metricLabelHTML('Completed')}</span>
+        <span class="overview-value">${fmtNum(completed)}</span>
+      </div>
+      <div class="overview-sep" aria-hidden="true"></div>
+      <div class="overview-item">
+        <span class="overview-label">${metricLabelHTML('Failed')}</span>
+        <span class="overview-value">${fmtNum(failed)}</span>
+      </div>
+      <div class="overview-sep" aria-hidden="true"></div>
+      <div class="overview-item">
+        <span class="overview-label">${metricLabelHTML('Success')}</span>
+        <span class="overview-value">${successRate}%</span>
+      </div>
+    </div>
+
+    ${total_runs === 0 ? renderFirstRunPanel() : ''}
+    ${strategySection}
+    ${complianceBanner}
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header"><h2>Average Scores</h2></div>
+        <div class="card-body">
+          ${total_runs === 0 ? emptyState('No Data', 'Run simulations to see scores.') : `
+          ${scoreBarHTML('Payment Probability', avg.payment_probability)}
+          ${scoreBarHTML('Compliance Score', avg.compliance_score)}
+          ${scoreBarHTML('Debtor Satisfaction', avg.debtor_satisfaction)}
+          ${scoreBarHTML('Rapport Built', avg.rapport_built)}
+          ${scoreBarHTML('Escalation Risk', avg.escalation_risk)}
+          `}
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h2>Outcome Distribution</h2></div>
+        <div class="card-body">
+          ${total_runs === 0 ? emptyState('No Data', 'Run simulations to see outcomes.') : `
+          <div class="dist-bars" role="img" aria-label="Outcome distribution chart">${outcomeRows}</div>
+          `}
+        </div>
+      </div>
+    </div>
+
+    <details class="operational-details">
+      <summary>Operational Details</summary>
+      <div class="operational-grid">
+        <span>Estimated cost <strong>${fmtMoney(cost.estimated_cost_usd || 0)}</strong></span>
+        <span>Input tokens <strong>${fmtNum(cost.input_tokens || 0)}</strong></span>
+        <span>Output tokens <strong>${fmtNum(cost.output_tokens || 0)}</strong></span>
+      </div>
+    </details>
+  `;
+
+  if (data.profiles.length) setTimeout(() => loadStrategyComparison(data.profiles[0]), 0);
+}
+
+function renderFirstRunPanel() {
+  return `
+    <section class="first-run-panel" aria-label="Getting started">
+      <div>
+        <p class="eyebrow">Start here</p>
+        <h2>Run enough evidence to choose a collection strategy.</h2>
+      </div>
+      <div class="first-run-actions">
+        <button class="first-run-action" type="button" onclick="navigateTo('launch', { demo: true })"><strong>Run a demo simulation</strong><span>Use defaults to create the first judged transcript.</span></button>
+        <button class="first-run-action" type="button" onclick="navigateTo('matrix', { profile: 'cooperative_hardship' })"><strong>Compare strategies for a profile</strong><span>Run every strategy against one debtor archetype.</span></button>
+        <button class="first-run-action" type="button" onclick="navigateTo('compliance')"><strong>Review compliance risks</strong><span>Check what thresholds will exclude a strategy.</span></button>
+      </div>
+    </section>`;
+}
+
+function renderComplianceBanner(data) {
+  const exclusions = data.exclusions || [];
+  if (!exclusions.length) {
+    return `<div class="compliance-strip success"><strong>No compliance exceptions</strong><span>${fmtNum(data.total_completed_runs || 0)} completed runs checked.</span><button class="text-link" type="button" onclick="navigateTo('compliance')">View details</button></div>`;
+  }
+  const critical = exclusions.slice(0, 3).map(e =>
+    `<span>${escapeHTML(fmtId(e.strategy_id))} x ${escapeHTML(fmtId(e.profile_id))}: ${pct(e.compliance_score)} compliance, ${pct(e.escalation_risk)} escalation</span>`
+  ).join('');
+  return `<div class="compliance-strip danger"><strong>${exclusions.length} compliance exception${exclusions.length !== 1 ? 's' : ''}</strong><span class="compliance-strip-items">${critical}</span><button class="text-link" type="button" onclick="navigateTo('compliance')">View details</button></div>`;
+}
+
+window.switchProfileTab = async function(profileId, btn) {
+  $$('#profile-tabs .tab-btn').forEach(b => {
+    const selected = b === btn;
+    b.classList.toggle('active', selected);
+    b.setAttribute('aria-selected', String(selected));
+    b.setAttribute('tabindex', selected ? '0' : '-1');
+  });
+  const panel = $('#strategy-comparison');
+  if (panel) panel.setAttribute('aria-labelledby', btn.id);
+  btn.focus();
+  await loadStrategyComparison(profileId);
+};
+
+window.handleProfileTabKey = function(event) {
+  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+  event.preventDefault();
+  const tabs = $$('#profile-tabs .tab-btn');
+  const index = tabs.indexOf(event.currentTarget);
+  let next = index;
+  if (event.key === 'ArrowLeft') next = index <= 0 ? tabs.length - 1 : index - 1;
+  if (event.key === 'ArrowRight') next = index >= tabs.length - 1 ? 0 : index + 1;
+  if (event.key === 'Home') next = 0;
+  if (event.key === 'End') next = tabs.length - 1;
+  tabs[next].click();
+};
+
+async function loadStrategyComparison(profileId) {
+  const container = $('#strategy-comparison');
+  if (!container) return;
+  container.innerHTML = skeleton();
+  try {
+    const data = await api(`/profiles/${pathPart(profileId)}/strategies`);
+    if (!data.strategies.length) {
+      container.innerHTML = emptyState('No Data', `No completed simulations for ${fmtId(profileId)}.`);
+      return;
+    }
+    container.innerHTML = data.strategies.map((s, i) => {
+      const escalationClass = scoreClass(1 - safePctInput(s.mean_escalation_risk));
+      return `
+      <div class="comparison-row">
+        <div class="comparison-rank" aria-label="Rank ${i + 1}">${i + 1}</div>
+        <div class="comparison-name">${escapeHTML(fmtId(s.strategy_id))}</div>
+        <div class="comparison-scores">
+          <div class="comparison-metric">
+            <span class="comparison-metric-value ${scoreClass(s.mean_payment_probability)}">${pct(s.mean_payment_probability)}</span>
+            <span class="comparison-metric-label">Payment</span>
+          </div>
+          <div class="comparison-metric">
+            <span class="comparison-metric-value ${scoreClass(s.mean_compliance_score)}">${pct(s.mean_compliance_score)}</span>
+            <span class="comparison-metric-label">Compliance</span>
+          </div>
+          <div class="comparison-metric">
+            <span class="comparison-metric-value ${escalationClass}">${pct(s.mean_escalation_risk)}</span>
+            <span class="comparison-metric-label">Escalation, lower is better</span>
+          </div>
+          <div class="comparison-metric">
+            <span class="comparison-metric-value">${s.simulation_count}</span>
+            <span class="comparison-metric-label">Runs</span>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (err) {
+    container.innerHTML = emptyState('Error', err.message);
+  }
+}
+
+// ── Runs ───────────────────────────────────────────────────────
+
+async function renderRuns() {
+  const [runs, dashboard] = await Promise.all([
+    api('/runs?status='),
+    api('/dashboard'),
+  ]);
+
+  const profiles = dashboard.profiles || [];
+  const strategies = dashboard.strategies || [];
+
+  const profileOpts = profiles.map(p => `<option value="${escapeAttr(p)}">${escapeHTML(fmtId(p))}</option>`).join('');
+  const strategyOpts = strategies.map(s => `<option value="${escapeAttr(s)}">${escapeHTML(fmtId(s))}</option>`).join('');
+
+  mainEl.innerHTML = `
+    <div class="page-header page-header-actions">
+      <div>
+        <h1>Simulation Runs</h1>
+        <p>${runs.length} simulation${runs.length !== 1 ? 's' : ''} recorded</p>
+      </div>
+      <button class="btn" type="button" onclick="exportRunsCSV()">Export CSV</button>
+    </div>
+
+    <div class="filter-bar" role="search" aria-label="Filter simulations">
+      <label class="sr-only" for="filter-search">Search runs</label>
+      <input class="form-input filter-search" id="filter-search" type="search" placeholder="Search runs, profiles, strategies, outcomes, transcripts" oninput="debouncedFilterRuns()" aria-label="Search runs">
+      <label class="sr-only" for="filter-status">Status</label>
+      <select class="filter-select" id="filter-status" onchange="filterRuns()" aria-label="Filter by status">
+        <option value="">All Status</option>
+        <option value="completed">Completed</option>
+        <option value="failed">Failed</option>
+      </select>
+      <label class="sr-only" for="filter-profile">Profile</label>
+      <select class="filter-select" id="filter-profile" onchange="filterRuns()" aria-label="Filter by profile">
+        <option value="">All Profiles</option>
+        ${profileOpts}
+      </select>
+      <label class="sr-only" for="filter-strategy">Strategy</label>
+      <select class="filter-select" id="filter-strategy" onchange="filterRuns()" aria-label="Filter by strategy">
+        <option value="">All Strategies</option>
+        ${strategyOpts}
+      </select>
+      <button class="filter-clear" id="filter-clear-btn" onclick="clearFilters()" style="display:none" aria-label="Clear all filters">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        Clear filters
+      </button>
+      <span class="filter-count" id="filter-count"></span>
+    </div>
+    <div class="filter-chips" id="filter-chips" aria-live="polite"></div>
+
+    <div class="card">
+      <div class="card-body no-padding">
+        <div style="overflow-x:auto;max-height:calc(100vh - 320px)">
+          <table class="data-table" id="runs-table" aria-label="Simulation runs">
+            <thead><tr id="runs-head-row"></tr></thead>
+            <tbody id="runs-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+
+  window._allRuns = runs;
+  window._sortColumn = window._sortColumn || 'started_at';
+  window._sortDirection = window._sortDirection || 'desc';
+  renderRunHeaders();
+  filterRuns();
+}
+
+window.filterRuns = function() {
+  const status = ($('#filter-status') || {}).value || '';
+  const profile = ($('#filter-profile') || {}).value || '';
+  const strategy = ($('#filter-strategy') || {}).value || '';
+  const search = (($('#filter-search') || {}).value || '').trim().toLowerCase();
+
+  let filtered = window._allRuns || [];
+  if (status) filtered = filtered.filter(r => r.status === status);
+  if (profile) filtered = filtered.filter(r => r.profile_id === profile);
+  if (strategy) filtered = filtered.filter(r => r.strategy_id === strategy);
+  if (search) {
+    filtered = filtered.filter(r => {
+      const j = r.judgment || {};
+      const haystack = [
+        r.id,
+        r.profile_id,
+        r.strategy_id,
+        r.status,
+        j.payment_outcome,
+        r.conversation_model,
+        r.judge_model,
+        r.error_message,
+      ].join(' ').toLowerCase();
+      return haystack.includes(search);
+    });
+  }
+  filtered = sortRuns(filtered);
+  window._filteredRuns = filtered;
+
+  const hasFilters = status || profile || strategy || search;
+  const clearBtn = $('#filter-clear-btn');
+  if (clearBtn) clearBtn.style.display = hasFilters ? '' : 'none';
+
+  $$('.filter-select').forEach(el => {
+    el.classList.toggle('has-value', !!el.value);
+  });
+
+  const countEl = $('#filter-count');
+  if (countEl) {
+    const total = (window._allRuns || []).length;
+    countEl.textContent = hasFilters ? `${filtered.length} of ${total}` : `${total} total`;
+  }
+  const chipsEl = $('#filter-chips');
+  if (chipsEl) chipsEl.innerHTML = renderFilterChips({ status, profile, strategy, search });
+
+  const tbody = $('#runs-tbody');
+  if (!tbody) return;
+
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="13">${emptyState('No Runs', 'No simulations match the current filters.')}</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(r => {
+    const j = r.judgment;
+    return `
+      <tr onclick="openTranscript(${jsArg(r.id)})">
+        <td>${escapeHTML(r.id)}</td>
+        <td class="run-action-cell">
+          <button class="btn btn-compact" type="button" onclick="event.stopPropagation();openTranscript(${jsArg(r.id)})" aria-label="View transcript for ${escapeAttr(r.id)}">View</button>
+        </td>
+        <td>${statusBadge(r.status)}</td>
+        <td>${escapeHTML(fmtId(r.profile_id))}</td>
+        <td>${escapeHTML(fmtId(r.strategy_id))}</td>
+        <td>${escapeHTML(r.conversation_model)}</td>
+        <td>${escapeHTML(r.judge_model)}</td>
+        <td>${j ? outcomeBadge(j.payment_outcome) : '\u2014'}</td>
+        <td class="${j ? scoreClass(j.payment_probability) : ''}">${j ? pct(j.payment_probability) : '\u2014'}</td>
+        <td class="${j ? scoreClass(j.compliance_score) : ''}">${j ? pct(j.compliance_score) : '\u2014'}</td>
+        <td>${r.turn_count}</td>
+        <td>${r.ended_by ? escapeHTML(fmtId(r.ended_by)) : '\u2014'}</td>
+        <td title="${escapeAttr(r.started_at || '')}">${relTime(r.started_at)}</td>
+      </tr>`;
+  }).join('');
+};
+
+let _runFilterTimer = null;
+window.debouncedFilterRuns = function() {
+  clearTimeout(_runFilterTimer);
+  _runFilterTimer = setTimeout(filterRuns, 200);
+};
+
+window.handleRunRowKey = function(event, runId) {
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  event.preventDefault();
+  openTranscript(runId);
+};
+
+window.clearFilters = function() {
+  $$('.filter-select').forEach(el => { el.value = ''; });
+  const search = $('#filter-search');
+  if (search) search.value = '';
+  filterRuns();
+};
+
+function renderFilterChips(filters) {
+  const chips = [];
+  if (filters.status) chips.push(['status', `Status: ${fmtId(filters.status)}`]);
+  if (filters.profile) chips.push(['profile', `Profile: ${fmtId(filters.profile)}`]);
+  if (filters.strategy) chips.push(['strategy', `Strategy: ${fmtId(filters.strategy)}`]);
+  if (filters.search) chips.push(['search', `Search: ${filters.search}`]);
+  return chips.map(([key, label]) => `
+    <span class="filter-chip">
+      ${escapeHTML(label)}
+      <button type="button" onclick="clearFilter(${jsArg(key)})" aria-label="Clear ${escapeAttr(label)}">x</button>
+    </span>
+  `).join('');
+}
+
+window.clearFilter = function(key) {
+  const map = {
+    status: '#filter-status',
+    profile: '#filter-profile',
+    strategy: '#filter-strategy',
+    search: '#filter-search',
+  };
+  const el = $(map[key]);
+  if (el) el.value = '';
+  filterRuns();
+};
+
+function sortRuns(runs) {
+  const column = window._sortColumn || 'started_at';
+  const direction = window._sortDirection === 'asc' ? 1 : -1;
+  return runs.slice().sort((a, b) => {
+    const av = sortValue(a, column);
+    const bv = sortValue(b, column);
+    if (av < bv) return -1 * direction;
+    if (av > bv) return 1 * direction;
+    return 0;
+  });
+}
+
+function sortValue(run, column) {
+  const judgment = run.judgment || {};
+  const values = {
+    id: run.id,
+    status: run.status,
+    profile_id: fmtId(run.profile_id),
+    strategy_id: fmtId(run.strategy_id),
+    conversation_model: run.conversation_model || '',
+    judge_model: run.judge_model || '',
+    payment_outcome: judgment.payment_outcome || '',
+    payment_probability: Number(judgment.payment_probability || 0),
+    compliance_score: Number(judgment.compliance_score || 0),
+    turn_count: Number(run.turn_count || 0),
+    ended_by: run.ended_by || '',
+    started_at: run.started_at || '',
+  };
+  return values[column] ?? '';
+}
+
+function sortableHeader(label, column) {
+  const active = window._sortColumn === column;
+  const arrow = active ? (window._sortDirection === 'asc' ? 'up' : 'down') : '';
+  return `<button class="sort-btn${active ? ' active' : ''}" type="button" onclick="setRunSort(${jsArg(column)})">${escapeHTML(label)} <span aria-hidden="true">${arrow === 'up' ? '^' : arrow === 'down' ? 'v' : ''}</span></button>`;
+}
+
+window.setRunSort = function(column) {
+  if (window._sortColumn === column) {
+    window._sortDirection = window._sortDirection === 'asc' ? 'desc' : 'asc';
+  } else {
+    window._sortColumn = column;
+    window._sortDirection = column === 'started_at' ? 'desc' : 'asc';
+  }
+  renderRunHeaders();
+  filterRuns();
+};
+
+function renderRunHeaders() {
+  const row = $('#runs-head-row');
+  if (!row) return;
+  row.innerHTML = [
+    ['ID', 'id'],
+    ['Transcript', null],
+    ['Status', 'status'],
+    ['Profile', 'profile_id'],
+    ['Strategy', 'strategy_id'],
+    ['Conversation Model', 'conversation_model'],
+    ['Judge Model', 'judge_model'],
+    ['Outcome', 'payment_outcome'],
+    ['Payment', 'payment_probability'],
+    ['Compliance', 'compliance_score'],
+    ['Turns', 'turn_count'],
+    ['Ended By', 'ended_by'],
+    ['Time', 'started_at'],
+  ].map(([label, column]) => `<th scope="col">${column ? sortableHeader(label, column) : escapeHTML(label)}</th>`).join('');
+}
+
+function exportRunsCSV() {
+  const rows = window._filteredRuns || [];
+  const headers = ['id', 'status', 'profile_id', 'strategy_id', 'conversation_model', 'judge_model', 'outcome', 'payment_probability', 'compliance_score', 'debtor_satisfaction', 'escalation_risk', 'turn_count', 'ended_by', 'started_at'];
+  const csvRows = [headers.join(',')].concat(rows.map(run => {
+    const j = run.judgment || {};
+    return [
+      run.id,
+      run.status,
+      run.profile_id,
+      run.strategy_id,
+      run.conversation_model,
+      run.judge_model,
+      j.payment_outcome || '',
+      j.payment_probability ?? '',
+      j.compliance_score ?? '',
+      j.debtor_satisfaction ?? '',
+      j.escalation_risk ?? '',
+      run.turn_count ?? '',
+      run.ended_by || '',
+      run.started_at || '',
+    ].map(csvCell).join(',');
+  }));
+  const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `collection-swarm-runs-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function csvCell(value) {
+  return `"${String(value ?? '').replace(/"/g, '""')}"`;
+}
+
+window.updateLaunchDescriptions = function() {
+  const options = window._runOptions || { profiles: [], strategies: [] };
+  updateSelectSummary('launch-profile', 'launch-profile-summary', options.profiles, profileSummary);
+  updateSelectSummary('launch-strategy', 'launch-strategy-summary', options.strategies, strategySummary);
+};
+
+window.updateManualDescriptions = function() {
+  const options = window._runOptions || { profiles: [], strategies: [] };
+  updateSelectSummary('manual-profile', 'manual-profile-summary', options.profiles, profileSummary);
+  updateSelectSummary('manual-strategy', 'manual-strategy-summary', options.strategies, strategySummary);
+};
+
+// ── Launch single run ───────────────────────────────────────────
+
+async function renderLaunch(params = {}) {
+  const options = await api('/config/run-options');
+  const selectedProfile = params.profile || (params.demo ? 'cooperative_hardship' : '');
+  const selectedStrategy = params.strategy || (params.demo ? 'empathetic_payment_plan' : '');
+  const profileOpts = runSelectOptions(options.profiles, selectedProfile);
+  const strategyOpts = runSelectOptions(options.strategies, selectedStrategy);
+  const conversationOpts = modelSelectOptions(options.conversation_models, options.defaults.conversation_model);
+  const judgeOpts = modelSelectOptions(options.judge_models, options.defaults.judge_model);
+
+  window._runOptions = options;
+  mainEl.innerHTML = `
+    <div class="page-header">
+      <h1>Launch Run</h1>
+      <p>Choose the debtor and strategy; defaults handle the model setup.</p>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header"><h2>Configuration</h2></div>
+        <div class="card-body">
+          <form class="control-form" onsubmit="startSingleRun(event)">
+            ${selectField('launch-profile', 'Profile', profileOpts, "updateLaunchDescriptions()")}
+            <p class="field-summary" id="launch-profile-summary"></p>
+            ${selectField('launch-strategy', 'Strategy', strategyOpts, "updateLaunchDescriptions()")}
+            <p class="field-summary" id="launch-strategy-summary"></p>
+            ${advancedModelSettings('launch', conversationOpts, judgeOpts)}
+            <button class="btn btn-primary" type="submit" id="launch-btn">Start simulation</button>
+          </form>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h2>Live Progress</h2><div id="single-job-status">${statusBadge('queued')}</div></div>
+        <div class="card-body" id="single-job-panel">
+          ${emptyState('Ready', 'Configure and start a simulation to see live progress here.')}
+        </div>
+      </div>
+    </div>`;
+  updateLaunchDescriptions();
+}
+
+window.startSingleRun = async function(event) {
+  event.preventDefault();
+  clearPoll('single');
+  const panel = $('#single-job-panel');
+  const status = $('#single-job-status');
+  const btn = $('#launch-btn');
+  panel.innerHTML = skeleton();
+  if (btn) { btn.classList.add('btn-loading'); btn.disabled = true; }
+  try {
+    const job = await apiPost('/jobs/simulations', {
+      profile_id: $('#launch-profile').value,
+      strategy_id: $('#launch-strategy').value,
+      conversation_model: $('#launch-conversation-model').value,
+      judge_model: $('#launch-judge-model').value,
+    });
+    status.innerHTML = statusBadge(job.status);
+    renderJobPanel(job, panel);
+    showToast('Simulation started', 'success');
+    window._pollers.single = setInterval(() => pollJob(job.id, 'single-job-panel', 'single-job-status', 'single'), 800);
+  } catch (err) {
+    panel.innerHTML = emptyState('Launch failed', err.message);
+    showToast(err.message, 'error');
+  } finally {
+    if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; }
+  }
+};
+
+// ── Matrix runs ─────────────────────────────────────────────────
+
+async function renderMatrix(params = {}) {
+  const [options, jobs] = await Promise.all([api('/config/run-options'), api('/jobs')]);
+  const profiles = checkboxList('matrix-profiles', options.profiles.map(p => [p.id, fmtId(p.id)]), params.profile ? [params.profile] : null);
+  const strategies = checkboxList('matrix-strategies', options.strategies.map(s => [s.id, fmtId(s.id)]));
+  const conversationModels = checkboxList(
+    'matrix-conversation-models',
+    options.conversation_models.map(m => [m.id, modelLabel(m)]),
+    [options.defaults.conversation_model]
+  );
+  const judgeModels = checkboxList(
+    'matrix-judge-models',
+    options.judge_models.map(m => [m.id, modelLabel(m)]),
+    [options.defaults.judge_model]
+  );
+
+  window._runOptions = options;
+  mainEl.innerHTML = `
+    <div class="page-header">
+      <h1>Batch Comparison</h1>
+      <p>Compare strategies, debtor profiles, conversation models, and judge models in one run.</p>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header"><h2>Matrix Setup</h2></div>
+        <div class="card-body">
+          <form class="control-form" onsubmit="startMatrixRun(event)">
+            <div class="form-field"><label>Profiles</label><div class="checkbox-grid" onchange="updateMatrixCount()">${profiles}</div></div>
+            <div class="form-field"><label>Strategies</label><div class="checkbox-grid" onchange="updateMatrixCount()">${strategies}</div></div>
+            <div class="form-field"><label>Conversation models</label><p class="field-summary">Each checked model role-plays both collector and debtor.</p><div class="checkbox-grid model-grid">${conversationModels}</div></div>
+            <div class="form-field"><label>Judge models</label><p class="field-summary">Each checked judge scores every generated transcript.</p><div class="checkbox-grid model-grid">${judgeModels}</div></div>
+            <div class="btn-row">
+              ${inputField('matrix-reps', 'Reps', options.defaults.reps || 1, 1, 100, "updateMatrixCount()")}
+              ${inputField('matrix-concurrency', 'Concurrency', 2, 1, 10)}
+            </div>
+            <div class="matrix-count" id="matrix-count" aria-live="polite"></div>
+            <button class="btn btn-primary" type="submit" id="matrix-btn">Start matrix</button>
+          </form>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h2>Progress</h2><div id="matrix-job-status">${statusBadge('queued')}</div></div>
+        <div class="card-body" id="matrix-job-panel">
+          ${jobs.length ? jobs.map(jobSummaryHTML).join('') : emptyState('No Jobs', 'Start a matrix run to watch progress.')}
+        </div>
+      </div>
+    </div>`;
+  updateMatrixCount();
+}
+
+window.startMatrixRun = async function(event) {
+  event.preventDefault();
+  clearPoll('matrix');
+  const panel = $('#matrix-job-panel');
+  const status = $('#matrix-job-status');
+  const btn = $('#matrix-btn');
+  panel.innerHTML = skeleton();
+  if (btn) { btn.classList.add('btn-loading'); btn.disabled = true; }
+  try {
+    const job = await apiPost('/jobs/matrix', {
+      profile_ids: checkedValues('matrix-profiles'),
+      strategy_ids: checkedValues('matrix-strategies'),
+      conversation_models: checkedValues('matrix-conversation-models'),
+      judge_models: checkedValues('matrix-judge-models'),
+      reps: Number($('#matrix-reps').value || 1),
+      concurrency: Number($('#matrix-concurrency').value || 1),
+    });
+    status.innerHTML = statusBadge(job.status);
+    renderJobPanel(job, panel);
+    showToast('Matrix run started', 'success');
+    window._pollers.matrix = setInterval(() => pollJob(job.id, 'matrix-job-panel', 'matrix-job-status', 'matrix'), 800);
+  } catch (err) {
+    panel.innerHTML = emptyState('Matrix failed', err.message);
+    showToast(err.message, 'error');
+  } finally {
+    if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; }
+  }
+};
+
+// ── Manual role-play ────────────────────────────────────────────
+
+async function renderManual() {
+  const options = await api('/config/run-options');
+  const profileOpts = runSelectOptions(options.profiles, '');
+  const strategyOpts = runSelectOptions(options.strategies, '');
+  const conversationOpts = modelSelectOptions(options.conversation_models, options.defaults.conversation_model);
+  const judgeOpts = modelSelectOptions(options.judge_models, options.defaults.judge_model);
+
+  window._runOptions = options;
+  mainEl.innerHTML = `
+    <div class="page-header">
+      <h1>Manual Run</h1>
+      <p>Play the collector or debtor role, then save the judged transcript</p>
+    </div>
+    <div class="grid-2 manual-layout">
+      <div class="card">
+        <div class="card-header"><h2>Session Setup</h2></div>
+        <div class="card-body">
+          <form class="control-form" onsubmit="startManualSession(event)">
+            ${selectField('manual-profile', 'Profile', profileOpts, "updateManualDescriptions()")}
+            <p class="field-summary" id="manual-profile-summary"></p>
+            ${selectField('manual-strategy', 'Strategy', strategyOpts, "updateManualDescriptions()")}
+            <p class="field-summary" id="manual-strategy-summary"></p>
+            ${selectField('manual-role', 'You play', '<option value="debtor">Debtor</option><option value="collector">Collector</option>')}
+            ${advancedModelSettings('manual', conversationOpts, judgeOpts, 'AI model')}
+            <button class="btn btn-primary" type="submit" id="manual-btn">Start session</button>
+          </form>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h2>Transcript</h2><div id="manual-status">${statusBadge('waiting_for_human')}</div></div>
+        <div class="card-body" id="manual-panel">${emptyState('No Session', 'Start a manual session to begin.')}</div>
+      </div>
+    </div>`;
+  updateManualDescriptions();
+}
+
+window.startManualSession = async function(event) {
+  event.preventDefault();
+  const panel = $('#manual-panel');
+  const btn = $('#manual-btn');
+  panel.innerHTML = skeleton();
+  if (btn) { btn.classList.add('btn-loading'); btn.disabled = true; }
+  try {
+    const session = await apiPost('/manual-sessions', {
+      profile_id: $('#manual-profile').value,
+      strategy_id: $('#manual-strategy').value,
+      human_role: $('#manual-role').value,
+      conversation_model: $('#manual-conversation-model').value,
+      judge_model: $('#manual-judge-model').value,
+    });
+    window._manualSessionId = session.id;
+    renderManualSession(session);
+    showToast('Session started', 'success');
+  } catch (err) {
+    panel.innerHTML = emptyState('Setup failed', err.message);
+    showToast(err.message, 'error');
+  } finally {
+    if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; }
+  }
+};
+
+window.submitManualTurn = async function(event) {
+  event.preventDefault();
+  const input = $('#manual-turn-content');
+  const panel = $('#manual-panel');
+  const content = input.value.trim();
+  if (!content || !window._manualSessionId) return;
+  input.value = '';
+  panel.classList.add('is-loading');
+  try {
+    const session = await apiPost(`/manual-sessions/${window._manualSessionId}/turn`, { content });
+    renderManualSession(session);
+  } catch (err) {
+    appendFormError(panel, err.message);
+  } finally {
+    panel.classList.remove('is-loading');
+  }
+};
+
+window.finishManualSession = async function() {
+  if (!window._manualSessionId) return;
+  const panel = $('#manual-panel');
+  try {
+    const session = await apiPost(`/manual-sessions/${window._manualSessionId}/finish`, {});
+    renderManualSession(session);
+    showToast('Session finished and judged', 'success');
+  } catch (err) {
+    appendFormError(panel, err.message);
+  }
+};
+
+function renderManualSession(session) {
+  $('#manual-status').innerHTML = statusBadge(session.status);
+  const run = session.run;
+  const disabled = session.status !== 'waiting_for_human' ? 'disabled' : '';
+  $('#manual-panel').innerHTML = `
+    ${runMetaHTML(run)}
+    ${transcriptHTML(run)}
+    ${judgmentHTML(run)}
+    ${session.status === 'completed' ? `
+      <div class="btn-row" style="margin-top:var(--space-4)">
+        ${linkButton('View saved run', `openTranscript(${jsArgRaw(run.id)})`)}
+      </div>` : `
+      <form class="control-form" style="margin-top:var(--space-4)" onsubmit="submitManualTurn(event)">
+        <label for="manual-turn-content" class="form-label">Your ${escapeHTML(session.human_role)} turn</label>
+        <textarea class="form-textarea" id="manual-turn-content" rows="4" ${disabled} placeholder="Type your response as the ${escapeAttr(session.human_role)}."></textarea>
+        <div class="btn-row">
+          <button class="btn btn-primary" type="submit" ${disabled}>Send turn</button>
+          <button class="btn btn-primary" type="button" onclick="finishManualSession()">Finish and judge</button>
+        </div>
+      </form>`}
+    <p class="status-line" style="margin-top:var(--space-3)">${escapeHTML(session.message || '')}</p>`;
+}
+
+// ── Launch form helpers ─────────────────────────────────────────
+
+window._pollers = {};
+
+function selectField(id, label, optionsHTML, onchange = '') {
+  const changeAttr = onchange ? ` onchange="${escapeAttr(onchange)}"` : '';
+  return `
+    <div class="form-field">
+      <label for="${escapeAttr(id)}">${escapeHTML(label)}</label>
+      <select class="filter-select" id="${escapeAttr(id)}"${changeAttr}>${optionsHTML}</select>
+    </div>`;
+}
+
+function inputField(id, label, value, min, max, oninput = '') {
+  const inputAttr = oninput ? ` oninput="${escapeAttr(oninput)}"` : '';
+  return `
+    <div class="form-field">
+      <label for="${escapeAttr(id)}">${escapeHTML(label)}</label>
+      <input class="form-input" id="${escapeAttr(id)}" type="number" value="${escapeAttr(value)}" min="${escapeAttr(min)}" max="${escapeAttr(max)}"${inputAttr}>
+    </div>`;
+}
+
+function checkboxList(name, entries, selected = null, onchange = 'updateMatrixCount()') {
+  const changeAttr = onchange ? ` onchange="${escapeAttr(onchange)}"` : '';
+  return entries.map(([value, label]) => `
+    <label class="check-option">
+      <input type="checkbox" name="${escapeAttr(name)}" value="${escapeAttr(value)}" ${selected && !selected.includes(value) ? '' : 'checked'}${changeAttr}>
+      <span>${escapeHTML(label)}</span>
+    </label>`).join('');
+}
+
+function benchmarkCheckboxList(name, entries, selected = null) {
+  return entries.map(([value, label]) => `
+    <label class="check-option">
+      <input type="checkbox" name="${escapeAttr(name)}" value="${escapeAttr(value)}" ${selected && !selected.includes(value) ? '' : 'checked'} onchange="updateBenchmarkCount()">
+      <span>${escapeHTML(label)}</span>
+    </label>`).join('');
+}
+
+function modelDimensionSummary(conversationModels, judgeModels) {
+  const conversation = conversationModels.length === 1 ? conversationModels[0] : `${conversationModels.length} conversation models`;
+  const judge = judgeModels.length === 1 ? judgeModels[0] : `${judgeModels.length} judge models`;
+  return `${conversation} x ${judge}`;
+}
+
+function updateCheckboxSelection(name, selected) {
+  $$(`input[name="${name}"]`).forEach(input => {
+    input.checked = !selected || selected.includes(input.value);
+  });
+}
+
+window.updateMatrixCount = function() {
+  const profiles = checkedValues('matrix-profiles').length;
+  const strategies = checkedValues('matrix-strategies').length;
+  const conversationModels = checkedValues('matrix-conversation-models').length;
+  const judgeModels = checkedValues('matrix-judge-models').length;
+  const reps = Number(($('#matrix-reps') || {}).value || 1);
+  const total = profiles * strategies * conversationModels * judgeModels * reps;
+  const el = $('#matrix-count');
+  if (!el) return;
+  el.classList.toggle('warning', total > 50);
+  el.textContent = `${profiles} profiles x ${strategies} strategies x ${conversationModels} conversation models x ${judgeModels} judge models x ${reps} reps = ${total} total simulations${total > 50 ? '. Large batches take longer and cost more.' : ''}`;
+};
+
+window.updateBenchmarkCount = function() {
+  const models = checkedValues('benchmark-models').length;
+  const roles = checkedValues('benchmark-roles');
+  const profiles = checkedValues('benchmark-profiles').length;
+  const strategies = checkedValues('benchmark-strategies').length;
+  const judgeProfiles = checkedValues('benchmark-judge-profiles').length;
+  const nonJudgeRoles = roles.filter(r => r !== 'judge').length;
+  const hasJudge = roles.includes('judge');
+  const convScenarios = profiles * strategies;
+  const total = models * (nonJudgeRoles * convScenarios + (hasJudge ? judgeProfiles : 0));
+  const el = $('#benchmark-count');
+  if (!el) return;
+  el.classList.toggle('warning', total > 36);
+  const parts = [`${models} models`];
+  if (nonJudgeRoles > 0) parts.push(`${nonJudgeRoles} role${nonJudgeRoles !== 1 ? 's' : ''} x ${profiles} profile${profiles !== 1 ? 's' : ''} x ${strategies} strateg${strategies !== 1 ? 'ies' : 'y'}`);
+  if (hasJudge) parts.push(`judge x ${judgeProfiles} judge profile${judgeProfiles !== 1 ? 's' : ''}`);
+  el.textContent = `${parts.join(' + ')} = ${total} live probes${total > 36 ? '. This is a production-sized benchmark and can take several minutes.' : ''}`;
+};
+
+function checkedValues(name) {
+  return $$(`input[name="${name}"]:checked`).map(input => input.value);
+}
+
+function appendFormError(container, message) {
+  if (!container) return;
+  const existing = $('.form-error', container);
+  if (existing) existing.remove();
+  $$('.status-line', container).forEach(status => status.remove());
+  container.insertAdjacentHTML('beforeend', `<div class="form-error" role="alert">${escapeHTML(message)}</div>`);
+}
+
+function clearPoll(key) {
+  if (window._pollers[key]) clearInterval(window._pollers[key]);
+  delete window._pollers[key];
+}
+
+const _pollFailCounts = {};
+
+async function pollJob(jobId, panelId, statusId, pollKey) {
+  try {
+    const job = await api(`/jobs/${pathPart(jobId)}`);
+    if (_pollFailCounts[pollKey]) {
+      _pollFailCounts[pollKey] = 0;
+    }
+    const panel = $(`#${panelId}`);
+    const status = $(`#${statusId}`);
+    if (status) status.innerHTML = statusBadge(job.status);
+    if (panel) renderJobPanel(job, panel);
+    if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') {
+      clearPoll(pollKey);
+      delete _pollFailCounts[pollKey];
+      if (job.status === 'completed') showToast('Job completed', 'success');
+      if (job.status === 'failed') showToast('Job failed', 'error');
+      if (job.status === 'cancelled') showToast('Job cancelled', 'info');
+    }
+  } catch (_) {
+    _pollFailCounts[pollKey] = (_pollFailCounts[pollKey] || 0) + 1;
+    if (_pollFailCounts[pollKey] === 3) {
+      showToast('Connection interrupted, retrying\u2026', 'error', 6000);
+    }
+  }
+}
+
+function renderJobPanel(job, panel) {
+  const canCancel = job.status === 'queued' || job.status === 'running';
+  panel.innerHTML = `
+    <div class="status-card">
+      <div class="job-item-head">
+        <div>
+          <div style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-secondary)">${escapeHTML(job.id)}</div>
+          <div class="status-line">${escapeHTML(job.message || '')}</div>
+        </div>
+        ${statusBadge(job.status)}
+      </div>
+      ${progressHTML(job.completed, job.failed, job.total)}
+      ${canCancel ? `<button class="btn btn-danger" type="button" onclick="cancelJob(${jsArg(job.id)})">Cancel job</button>` : ''}
+      ${job.current_run ? `
+        <div class="live-transcript">
+          ${runMetaHTML(job.current_run)}
+          ${transcriptHTML(job.current_run)}
+          ${judgmentHTML(job.current_run)}
+        </div>` : ''}
+      ${job.result_ids && job.result_ids.length ? `
+        <div class="btn-row" style="margin-top:var(--space-3)">
+          ${linkButton('View latest run', `openTranscript(${jsArgRaw(job.result_ids[job.result_ids.length - 1])})`)}
+          ${linkButton('All runs', "navigateTo('runs')")}
+        </div>` : ''}
+      ${(job.errors || []).length ? `<div class="form-error" style="margin-top:var(--space-3)">${job.errors.map(escapeHTML).join('<br>')}</div>` : ''}
+    </div>`;
+}
+
+window.cancelJob = async function(jobId) {
+  const job = await apiPost(`/jobs/${pathPart(jobId)}/cancel`, {});
+  const panels = ['single-job-panel', 'matrix-job-panel', 'benchmark-job-panel'];
+  panels.forEach(id => {
+    const panel = $(`#${id}`);
+    if (!panel) return;
+    if (id === 'benchmark-job-panel') renderBenchmarkJobPanel(job, panel);
+    else renderJobPanel(job, panel);
+  });
+};
+
+function jobSummaryHTML(job) {
+  return `
+    <button class="job-item" type="button" onclick="showJob(${jsArg(job.id)}, 'matrix-job-panel', 'matrix-job-status')">
+      <span style="font-size:var(--text-sm)">${escapeHTML(job.kind)} \u00b7 ${escapeHTML(job.id)}</span>
+      <span>${statusBadge(job.status)}</span>
+      <span style="font-size:var(--text-xs);color:var(--text-secondary)">${job.completed + job.failed} of ${job.total}</span>
+    </button>`;
+}
+
+window.showJob = async function(jobId, panelId, statusId) {
+  const job = await api(`/jobs/${pathPart(jobId)}`);
+  const panel = $(`#${panelId}`);
+  const status = $(`#${statusId}`);
+  if (status) status.innerHTML = statusBadge(job.status);
+  if (panel) renderJobPanel(job, panel);
+};
+
+// ── Transcript slideout ────────────────────────────────────────
+
+let _slideoutPreviousFocus = null;
+
+window.openTranscript = async function(runId) {
+  const overlay = $('#slideout-overlay');
+  const panel = $('#slideout-panel');
+  const body = $('#slideout-body');
+  const title = $('#slideout-title');
+  const subtitle = $('#slideout-subtitle');
+
+  if (!panel.classList.contains('open')) _slideoutPreviousFocus = document.activeElement;
+  window._currentTranscriptRunId = runId;
+  overlay.classList.add('open');
+  overlay.removeAttribute('aria-hidden');
+  panel.classList.add('open');
+  body.innerHTML = skeleton();
+  title.textContent = 'Loading\u2026';
+  subtitle.textContent = '';
+
+  try {
+    const run = await api(`/runs/${pathPart(runId)}`);
+    title.textContent = run.id;
+    subtitle.textContent = `${fmtId(run.profile_id)} \u00d7 ${fmtId(run.strategy_id)}`;
+
+    body.innerHTML = runMetaHTML(run) + transcriptHTML(run) + judgmentHTML(run);
+    renderSlideoutNav(runId);
+
+    panel.querySelector('.slideout-close').focus();
+  } catch (err) {
+    body.innerHTML = emptyState('Error', err.message);
+  }
+};
+
+function renderSlideoutNav(runId) {
+  let nav = $('#slideout-nav');
+  const header = $('.slideout-header');
+  if (!nav && header) {
+    nav = document.createElement('div');
+    nav.id = 'slideout-nav';
+    nav.className = 'slideout-nav';
+    header.insertBefore(nav, header.querySelector('.slideout-close'));
+  }
+  if (!nav) return;
+  const runs = window._filteredRuns || window._allRuns || [];
+  const index = runs.findIndex(run => run.id === runId);
+  if (index === -1 || runs.length < 2) {
+    nav.innerHTML = '';
+    return;
+  }
+  nav.innerHTML = `
+    <button class="btn" type="button" ${index === 0 ? 'disabled' : ''} onclick="openTranscript(${jsArg(runs[index - 1]?.id || '')})">Previous</button>
+    <button class="btn" type="button" ${index === runs.length - 1 ? 'disabled' : ''} onclick="openTranscript(${jsArg(runs[index + 1]?.id || '')})">Next</button>`;
+}
+
+function runMetaHTML(run) {
+  return `
+      <div class="meta-tags">
+        <span class="meta-tag"><strong>Status:</strong> ${escapeHTML(run.status)}</span>
+        <span class="meta-tag"><strong>Conversation model:</strong> ${escapeHTML(run.conversation_model)}</span>
+        <span class="meta-tag"><strong>Judge model:</strong> ${escapeHTML(run.judge_model)}</span>
+        <span class="meta-tag"><strong>Turns:</strong> ${run.turn_count}</span>
+        <span class="meta-tag"><strong>Ended by:</strong> ${run.ended_by ? escapeHTML(fmtId(run.ended_by)) : '\u2014'}</span>
+        <span class="meta-tag"><strong>Tokens:</strong> ${fmtNum(run.total_input_tokens + run.total_output_tokens)}</span>
+        <span class="meta-tag"><strong>Cost:</strong> ${fmtMoney(run.estimated_cost_usd)}</span>
+      </div>`;
+}
+
+function transcriptHTML(run) {
+  const chatMsgs = chatHTML(run.transcript || '');
+  return `<div class="chat-container" role="list" aria-label="Conversation transcript">${chatMsgs || emptyState('No Turns', 'No transcript turns yet.')}</div>`;
+}
+
+function judgmentHTML(run) {
+  if (!run.judgment) return '';
+  const j = run.judgment;
+  const violations = (j.constraint_violations || []);
+  return `
+        <div class="judgment-panel">
+          <h3>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            Judgment ${outcomeBadge(j.payment_outcome)}
+          </h3>
+          <div class="judgment-scores">
+            ${scoreBarHTML('Payment Probability', j.payment_probability)}
+            ${scoreBarHTML('Compliance Score', j.compliance_score)}
+            ${scoreBarHTML('Debtor Satisfaction', j.debtor_satisfaction)}
+            ${scoreBarHTML('Rapport Built', j.rapport_built)}
+            ${scoreBarHTML('Escalation Risk', j.escalation_risk)}
+            ${scoreBarHTML('Efficiency', Math.min(1, (j.conversation_efficiency || 0) / 20))}
+          </div>
+          ${violations.length ? `
+            <div class="judgment-violations" aria-label="Constraint violations">
+              ${violations.map(v => `<span class="badge badge-danger">${escapeHTML(v)}</span>`).join('')}
+            </div>` : ''}
+          ${j.reasoning ? `<div class="judgment-reasoning">${escapeHTML(j.reasoning)}</div>` : ''}
+        </div>`;
+}
+
+window.closeTranscript = function() {
+  const overlay = $('#slideout-overlay');
+  const panel = $('#slideout-panel');
+  overlay.classList.remove('open');
+  overlay.setAttribute('aria-hidden', 'true');
+  panel.classList.remove('open');
+  const nav = $('#slideout-nav');
+  if (nav) nav.innerHTML = '';
+  if (_slideoutPreviousFocus && typeof _slideoutPreviousFocus.focus === 'function') {
+    _slideoutPreviousFocus.focus();
+    _slideoutPreviousFocus = null;
+  }
+};
+
+document.addEventListener('keydown', (e) => {
+  const panel = $('#slideout-panel');
+  if (e.key === 'Tab' && panel && panel.classList.contains('open')) {
+    const focusable = $$('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])', panel).filter(el => !el.disabled);
+    if (focusable.length) {
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  }
+  if (e.key === 'Escape') {
+    const sidebar = $('#sidebar');
+    if (sidebar && sidebar.classList.contains('open')) {
+      closeMobileSidebar();
+      return;
+    }
+    closeTranscript();
+  }
+});
+
+// ── Playbook ───────────────────────────────────────────────────
+
+async function renderPlaybook() {
+  const data = await api('/playbook?format=html');
+
+  mainEl.innerHTML = `
+    <div class="page-header page-header-actions">
+      <div>
+        <h1>Generated Playbook</h1>
+        <p>Strategy recommendations based on simulation data</p>
+      </div>
+      <div class="btn-row">
+        <button class="btn" type="button" onclick="copyPlaybook()">Copy Markdown</button>
+        <button class="btn" type="button" onclick="exportPlaybook()">Export Markdown</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-body">
+        <article class="playbook-content">${data.content || emptyState('No Playbook', 'Run simulations and analyze to generate a playbook.')}</article>
+      </div>
+    </div>
+  `;
+}
+
+window.exportPlaybook = async function() {
+  const data = await api('/playbook?format=markdown');
+  downloadText('collection-swarm-playbook.md', data.content || '', 'text/markdown;charset=utf-8');
+};
+
+window.copyPlaybook = async function() {
+  const data = await api('/playbook?format=markdown');
+  await navigator.clipboard.writeText(data.content || '');
+  showToast('Playbook copied', 'success');
+};

@@ -10,7 +10,7 @@ from collection_swarm.models import (
     TournamentConfig,
     TournamentResult,
 )
-from collection_swarm.store import SimulationStore
+from collection_swarm.store import SCHEMA_VERSION, SimulationStore
 
 
 def _result() -> SimulationResult:
@@ -181,3 +181,21 @@ def test_save_and_read_tournament(tmp_path) -> None:
 
     assert store.get_tournament("tourn_test").total_games == 2
     assert store.list_tournaments()[0].id == "tourn_test"
+
+
+def test_schema_version_is_current(tmp_path) -> None:
+    store = SimulationStore(tmp_path / "versioned.sqlite")
+
+    assert store.schema_version() == SCHEMA_VERSION
+
+
+def test_schema_migration_is_idempotent(tmp_path) -> None:
+    db_path = tmp_path / "migrate.sqlite"
+    store1 = SimulationStore(db_path)
+    store1.save_run(_result())
+    v1 = store1.schema_version()
+
+    store2 = SimulationStore(db_path)
+
+    assert store2.schema_version() == v1
+    assert store2.get_run("sim_test").profile_id == "cooperative_hardship"
