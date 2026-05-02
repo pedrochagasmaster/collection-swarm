@@ -608,7 +608,7 @@ async function renderDashboard() {
       </div>
     </div>
 
-    ${total_runs === 0 ? renderFirstRunPanel() : ''}
+    ${total_runs === 0 ? renderFirstRunPanel() : quickActionsStrip()}
     ${strategySection}
     ${complianceBanner}
 
@@ -1136,7 +1136,7 @@ window.startSingleRun = async function(event) {
 
 async function renderMatrix(params = {}) {
   const [options, jobs] = await Promise.all([api('/config/run-options'), api('/jobs')]);
-  const profiles = checkboxList('matrix-profiles', options.profiles.map(p => [p.id, fmtId(p.id)]), params.profile ? [params.profile] : null);
+  const profiles = checkboxList('matrix-profiles', options.profiles.map(p => [p.id, fmtId(p.id)]), params.profile ? [params.profile] : []);
   const strategies = checkboxList('matrix-strategies', options.strategies.map(s => [s.id, fmtId(s.id)]));
   const conversationModels = checkboxList(
     'matrix-conversation-models',
