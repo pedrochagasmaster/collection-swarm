@@ -1,702 +1,282 @@
-# Collection Swarm UX Report
+# Collection Swarm — Web Dashboard UX Report
 
-Date: 2026-04-30
+**Tested URL:** `http://127.0.0.1:8000` (FastAPI dashboard, `collection-swarm serve`)
+**Build:** `app.js?v=ux-fixes-20260430b`
+**Demo data:** 24 seeded simulations (`collection-swarm seed --count 24`)
+**Browsers:** Chromium via Selenium remote debugging
+**Viewports tested:** 1024×655 desktop, 390×844 mobile, 1024px light theme
+**Method:** end-to-end click-through of all 13 pages plus targeted code-level audit of `index.html`, `styles.css` (≈2,950 lines) and `app.js` (≈2,530 lines).
 
-Reviewer: Cursor Cloud agent using browser-based manual testing, source inspection, an independent design review pass, and deterministic UI pattern detection.
+---
 
-Test target: `http://127.0.0.1:8000`
+## TL;DR
 
-Test data: 24 seeded simulation runs generated from `collection_swarm.web.seed.generate_seed_data`.
+The dashboard is **functionally complete, fast, and visually coherent**. Every nav target loaded with no console errors, no failed network requests, and theme/mobile behavior worked. The product feels closer to a polished internal ops tool than to typical AI-slop SaaS, helped by purposeful empty states, OKLCH tokens, and a real focus-trap on the slideout.
 
-Walkthrough artifact: `/opt/cursor/artifacts/collection_swarm_ux_walkthrough.mp4`
+The headline gaps are **not visual** — they are **interaction depth and IA fidelity**:
 
-## Executive Summary
+1. **Keyboard parity on the Runs table is incomplete.** Rows are not focusable; the per-row "View" button is the only keyboard path to a transcript. The row's own click target and the dead `handleRunRowKey` handler imply the intent was full row-as-button.
+2. **Hash routing is one-way.** `navigateTo()` writes via `pushState`, but the app never listens to `hashchange`/`popstate` for the hash itself, so back/forward and direct hash edits silently land on the dashboard with the URL still showing the old route.
+3. **Calibration is a read-only window onto a backend that supports writes.** `/api/calibration/labels` and `/api/jobs/calibration` exist; the UI only links to the CLI.
+4. **The whole `<main>` is `aria-live="polite"` and gets `innerHTML` swapped on every navigation.** This is a noisy assistive-tech experience and the main perf footgun.
+5. **Several "absolute-ban" motifs** (hero metric strip on Benchmarks, glass blur on the slideout overlay, gradient logo, dense card grids) are present. They are not fatal; they're the difference between a 7/10 and a 9/10 design.
 
-Collection Swarm is a credible product dashboard for synthetic debt-collection strategy testing. The app has a strong operational foundation: the information architecture is understandable, seeded data renders clearly, asynchronous simulation progress is visible, transcript review is efficient, filters work, and dark/light theming is consistently applied.
+**Nielsen heuristic score: 30/40.** Above-average for an internal analytics tool. See full table below.
 
-The main UX gap is not basic usability. The gap is decision support. The interface exposes the simulator's machinery before it explains how a user should make a better collections decision. First-time users see many destinations, models, profiles, strategies, scores, outcomes, and launch options without a guided path or enough inline explanation. Power users get useful data, but lack search, sorting, export, comparison, cancellation, and saved workflows.
+---
 
-Recommended focus:
+## Walkthrough
 
-1. Add a guided first-run path on the dashboard.
-2. Reframe the dashboard around decisions: best strategy by profile, compliance exceptions, and evidence.
-3. Add context to launch selectors: summaries, default recommendations, cost/runtime estimates, and risk hints.
-4. Harden accessibility and keyboard behavior around the transcript dialog, table rows, tabs, and reduced motion.
-5. Upgrade run analysis workflows with sort, search, export, saved filters, and run comparison.
+<img src="/opt/cursor/artifacts/dashboard_overview.png" alt="Collection Swarm dashboard overview, dark theme" />
+Dashboard overview, dark theme. Clean strategy-rankings module, OKLCH compliance/risk semantics, prominent compliance-exclusion callout.
 
-## Product Context
+<img src="/opt/cursor/artifacts/runs_list.png" alt="Simulation Runs table" />
+Simulation Runs page with 13 columns, sticky header, dedicated `View` button per row.
 
-Collection Swarm is an AI-driven simulator for testing debt-collection strategies before they touch real customers. It runs synthetic conversations between three roles:
+<img src="/opt/cursor/artifacts/transcript_slideout.png" alt="Transcript slideout panel" />
+Transcript slideout: roleplay turns, judgment scoring strip, prev/next chrome. Closes on Escape; focus returns to invoker.
 
-- Collector: follows a configured collection strategy.
-- Debtor: follows a synthetic profile, financial situation, objection pattern, and hard constraints.
-- Judge: scores the transcript for payment outcome, compliance, rapport, escalation risk, and other adoption-critical metrics.
+<img src="/opt/cursor/artifacts/dashboard_light_theme.png" alt="Dashboard in light theme" />
+Light theme: tokens swap cleanly; compliance-exception band keeps its red tint correctly.
 
-The product helps teams answer questions such as:
+<img src="/opt/cursor/artifacts/dashboard_mobile_menu_open.png" alt="Mobile sidebar open at 390px" />
+Mobile sidebar at 390px: off-canvas drawer with overlay scrim works as expected.
 
-- Which strategy works best for hardship profiles?
-- Which approaches trigger compliance risk?
-- Which model is better at role-playing debtors versus judging outcomes?
-- Which transcripts should become training examples?
-- How do strategy changes affect payment probability and debtor satisfaction?
+<img src="/opt/cursor/artifacts/launch_form.png" alt="Launch Run configuration form" />
+Launch Run: profile + strategy selectors with inline help, advanced settings collapsed, single primary CTA.
 
-This means the interface is a product UI, not a marketing surface. The highest bar is task clarity, trust, repeatability, and fast analysis.
+<img src="/opt/cursor/artifacts/playbook.png" alt="Generated playbook page" />
+Generated Playbook: server-rendered Markdown article. Long; no in-page TOC.
+
+<img src="/opt/cursor/artifacts/model_benchmarks.png" alt="Model Benchmarks page with hero" />
+Model Benchmarks: notice the "Production evaluation" hero strip with three vertical KPI tiles. This is the impeccable "hero-metric template" pattern.
 
-## Methodology
+---
+
+## Design Health Score (Nielsen heuristics)
+
+| # | Heuristic | Score | Key issue |
+|---|---|---|---|
+| 1 | Visibility of system status | 3 | Job panels show queued/running/done well; row click on Runs has no focus/active state, so keyboard users can't tell what's selected. `pollJob` toasts "Connection interrupted" but keeps polling silently. |
+| 2 | Match system / real world | 3 | Mostly business-correct (FDCPA, BCB liquidation, Pix). Internal jargon leaks through in IDs (`willbank_fgc_waiting_high_balance`) shown verbatim in tables and badges. |
+| 3 | User control and freedom | 2 | No undo/cancel on destructive choices (running a 50-sim matrix); cancel exists for jobs (`/api/jobs/{id}/cancel`) but not surfaced everywhere. Back-button does not restore page. |
+| 4 | Consistency and standards | 3 | Cards-everywhere is consistent; benchmark page tabs use a different keyboard model than dashboard tabs. Two overlapping checkbox-list helpers (`checkboxList` vs `benchmarkCheckboxList`) drift. |
+| 5 | Error prevention | 2 | No client-side `required` on Launch/Manual/Matrix forms; defaults select all profiles/strategies/models so a stray click submits a 50+ run job. `#matrix-count.warning` mitigates but only after the fact. |
+| 6 | Recognition rather than recall | 3 | Sidebar labels + icons are good. Hero "Production" preset on Benchmarks hard-codes IDs (`composer-2`, `gpt-5.5`) that may silently miss models if API list drifts. |
+| 7 | Flexibility and efficiency | 3 | Sortable, filterable runs table; CSV export; theme toggle; mobile drawer; per-row View button. Missing: keyboard shortcut to dismiss slideout via row arrow keys, deep-linking by ID, saved filter views. |
+| 8 | Aesthetic and minimalist | 3 | OKLCH palette is restrained; typography hierarchy works. Density is high — eight-card dashboard, hero strip on Benchmarks, dual KPI banner on dashboard. |
+| 9 | Error recovery | 2 | Invalid `#runs/<bad-id>` silently shows the dashboard while keeping the URL unchanged. Failed API calls surface only as a transient toast. |
+| 10 | Help and documentation | 4 | Empty states are unusually good — they teach the CLI command to populate the page (Arena, Evolution, Calibration). Inline form copy is confident and brief. |
+| **Total** | | **30/40** | Above average; ceiling is held down by routing, error handling, and the few "ban-list" motifs. |
 
-### Runtime Setup
+---
 
-The app was launched locally with a seeded SQLite database:
-
-- Generated 24 demo runs using `collection_swarm.web.seed.generate_seed_data`.
-- Started the FastAPI app with `uvicorn` against `output/ux_report.sqlite`.
-- Verified `/`, `/api/dashboard`, and `/api/runs?status=` returned successful responses.
-
-### Browser Walkthrough
-
-The browser walkthrough covered:
-
-- Dashboard in dark theme.
-- Simulation Runs table.
-- Transcript slideout open and close behavior.
-- Table filters and clear filters.
-- Launch Run form and successful single simulation.
-- Matrix Runs setup form.
-- Manual Run setup and started session.
-- Playbook page.
-- Compliance Monitor.
-- Debtor Profiles.
-- Collector Strategies.
-- Theme toggle from dark to light.
-- Fullscreen and partial responsive check.
-
-### Independent Review Inputs
-
-Two independent review passes were used:
-
-- Design review pass: evaluated visual hierarchy, information architecture, cognitive load, heuristic scoring, persona risks, and product fit.
-- Automated/source pattern pass: inspected markup and JavaScript for accessibility risks, cognitive-load patterns, motion behavior, and deterministic design anti-patterns.
-
-The deterministic detector was also run:
-
-`npx impeccable --json /workspace/src/collection_swarm/web/static/index.html`
-
-It returned two typography findings:
-
-- Overused font: Inter.
-- Single font for everything.
-
-For a product dashboard, these are mild findings. Inter is acceptable for dense product UI, but the broader point stands: the interface looks familiar and somewhat generic.
-
-## Test Evidence
-
-Evidence gathered during the audit:
-
-- Local endpoint smoke test: `/`, `/api/dashboard`, and `/api/runs?status=` returned HTTP 200 responses.
-- Seeded data check: `/api/dashboard` reported 24 total runs and 24 completed runs.
-- Browser walkthrough: the recorded session exercised dashboard review, run table filtering, transcript slideout behavior, a successful single-run launch, matrix setup, manual session setup, playbook, compliance, profiles, strategies, theme toggle, and a limited fullscreen responsive check.
-- Video artifact: `/opt/cursor/artifacts/collection_swarm_ux_walkthrough.mp4`.
-- Independent design review: produced a 22/40 Nielsen heuristic score and identified decision-support gaps as the dominant UX risk.
-- Automated detector: returned two typography findings, overused font and single-font usage.
-- Source inspection: found accessibility risks around dialog focus management, table row keyboard activation, tabs, SVG hiding, and reduced-motion behavior.
-
-## Design Health Score
-
-Scale: 0 to 4 per Nielsen heuristic. A 4 means genuinely excellent, not merely functional.
-
-| # | Heuristic | Score | Key Issue |
-|---|---|---:|---|
-| 1 | Visibility of system status | 3 | Strong skeletons, toasts, progress bars, badges, and live transcripts. Long-running jobs still need cancellation and clearer failure recovery. |
-| 2 | Match between system and real world | 2 | Collector, debtor, and judge concepts are clear, but labels such as Matrix Runs, Reps, model IDs, and score names need translation. |
-| 3 | User control and freedom | 2 | Filters clear, Escape closes the transcript, and theme toggles work. There is no stop/cancel for queued or running jobs. |
-| 4 | Consistency and standards | 3 | Shared sidebar, cards, badges, and forms are consistent. Table rows acting as buttons and custom tabs need stronger standard keyboard behavior. |
-| 5 | Error prevention | 2 | Selects and min/max fields help, but launch flows do not preview cost, runtime, risk, or total run count clearly enough. |
-| 6 | Recognition rather than recall | 3 | Labels are visible and navigation is explicit. Users still need to infer what profiles, strategies, and models mean before choosing. |
-| 7 | Flexibility and efficiency of use | 2 | Matrix runs support batch work, but the Runs table lacks sort, search, export, saved filters, keyboard shortcuts, and comparison. |
-| 8 | Aesthetic and minimalist design | 2 | Clean and usable, but metrics compete equally and the dashboard does not express a clear opinion about what matters first. |
-| 9 | Help users recognize, diagnose, and recover from errors | 2 | Errors are surfaced, but recovery copy is mostly generic and does not tell users what to do next. |
-| 10 | Help and documentation | 1 | No glossary, onboarding, metric definitions, compliance threshold explanation, or contextual help is visible in the UI. |
-| Total |  | 22/40 | Usable foundation with meaningful decision-support and hardening work remaining. |
-
-## AI Slop and Visual Originality Verdict
-
-Verdict: medium risk.
-
-The interface does not fail in an obvious way. It avoids severe anti-patterns such as gradient text, decorative glass cards, chaotic neon, and purposeless animation. It uses OKLCH tokens, semantic colors, restrained cards, clear data tables, and familiar navigation.
-
-However, it still feels close to the standard AI-generated dashboard kit:
-
-- Dark indigo theme.
-- Inter as the primary UI font.
-- Rounded cards and badges.
-- Sidebar plus metric strip.
-- Colorful score bars.
-- Generic gradient logo.
-- Similar card grids across configuration pages.
-
-For a product UI, familiarity is often a strength, so this is not a blocker. The concern is that the visual language does not yet express the product's specific domain: synthetic collections strategy, compliance risk, and evidence-based call policy decisions. The interface could feel more like a strategy lab and less like a generic analytics dashboard.
-
-## Cognitive Load Assessment
-
-Overall cognitive load: moderate-high.
-
-The app is understandable after exploration, but it asks a new user to make too many choices before explaining the intended workflow.
-
-Observed load drivers:
-
-- Sidebar exposes 9 destinations.
-- Overview section alone contains 5 navigation choices.
-- Dashboard top strip exposes 6 metrics.
-- Average Scores exposes 5 core metrics plus ranking metrics.
-- Runs table exposes 10 columns.
-- Launch Run asks for profile, strategy, conversation model, and judge model.
-- Matrix Runs adds multi-select profiles, multi-select strategies, reps, and concurrency.
-- Manual Run adds role selection and manual termination syntax.
-
-The product's domain is inherently complex, but the UI can reveal complexity more progressively.
-
-Recommended cognitive-load changes:
-
-- Add a dashboard "Start here" module for first-time use.
-- Put recommended defaults and explanations directly beside selectors.
-- Collapse advanced model controls behind an "Advanced" disclosure.
-- Rename Matrix Runs to Batch Comparison or Strategy Matrix, depending on product language.
-- Define each score inline on first exposure.
-- Treat compliance exceptions as a first-class path, not a secondary page.
-
-## Page-by-Page Findings
-
-### Dashboard
-
-What works:
-
-- The dashboard loads into a rich, non-empty state with clear metrics and charts.
-- The top strip communicates operational summary quickly: runs, completed, failed, success, cost, and tokens.
-- Average score bars are readable and use consistent meter-like visual language.
-- Outcome distribution gives a useful scan of result categories.
-- Strategy ranking by profile is a valuable decision surface.
-
-Issues:
-
-- Every metric appears to have similar importance. The user is not told which finding deserves action.
-- Cost and token counts appear alongside outcome and compliance metrics, but they serve different decision modes.
-- Strategy Rankings is lower on the page even though it may be the highest-value insight.
-- First-time users are not guided to run a demo, compare strategies, or inspect compliance.
-- Escalation Risk is a lower-is-better metric shown visually beside higher-is-better metrics, which can confuse interpretation.
-
-Recommended changes:
-
-- Lead with "Best strategy by profile" and "Compliance exceptions requiring review."
-- Move operational metrics into a secondary strip or collapsible details area.
-- Add brief metric definitions or tooltips.
-- Add a first-run panel when data is empty or when the user has not launched a run in the current session.
-- Invert or relabel escalation risk as "Escalation safety" if using the same good/mid/bad visual treatment as other positive scores.
-
-### Simulation Runs
-
-What works:
-
-- The table is readable at desktop size.
-- Status, outcome, payment, and compliance are scannable.
-- Filters apply immediately.
-- The result count updates after filtering.
-- Clear filters appears when filters are active.
-- Clicking a row opens a transcript without navigating away from the table.
-
-Issues:
-
-- The table is dense and lacks sorting.
-- There is no search by run ID, profile, strategy, outcome, or transcript content.
-- There is no export or share action.
-- Rows act as buttons but only Enter key activation was found in source, not Space.
-- The table uses a horizontal scroll container, but small-screen usability was not fully verified.
-- Active filters are only visible through dropdown state and the Clear filters button. Filter chips would scan faster.
-
-Recommended changes:
-
-- Add sortable headers.
-- Add a search field.
-- Add export CSV or copy link actions.
-- Add filter chips for active filters.
-- Add multi-select compare mode.
-- Support both Enter and Space activation for row buttons, or use actual button/link elements inside the table.
-
-### Transcript Slideout
-
-What works:
-
-- The slideout is one of the strongest UX patterns in the app.
-- It preserves table context.
-- It shows run metadata, transcript messages, and judgment details together.
-- Escape closes the slideout in browser testing.
-- The close button also works.
-
-Issues:
-
-- Source inspection did not show a focus trap.
-- Source inspection did not show focus restoration to the previously focused row after close.
-- The dialog has `role="dialog"` and `aria-modal="true"`, but needs stronger complete dialog behavior.
-- There is no next/previous run navigation inside the slideout.
-- Long transcripts may need better internal navigation, anchors, or summary.
-
-Recommended changes:
-
-- Store the opener before opening and restore focus on close.
-- Trap focus while the slideout is open.
-- Add Space and Enter support where relevant.
-- Add next/previous run controls.
-- Add a transcript summary or "jump to judgment" affordance for long transcripts.
-
-### Launch Run
-
-What works:
-
-- The form is simple and vertically organized.
-- Defaults are filled in.
-- Starting a simulation gives immediate feedback.
-- Live progress and transcript generation are engaging and clear.
-- Completion gives useful next actions: View latest run and All runs.
-
-Issues:
-
-- Select options are IDs only. Users do not get enough context to choose well.
-- There is no estimated runtime or cost preview.
-- There is no risk hint for strategy/profile combinations.
-- Advanced model selection is exposed to all users, even when local defaults are likely sufficient.
-- There is no cancellation once the job starts.
-
-Recommended changes:
-
-- Add short descriptions below selected profile and strategy.
-- Add recommendation badges such as Recommended, Risky, Good for hardship, or Requires validation.
-- Move model selectors into Advanced settings.
-- Add estimated turns, runtime, and cost.
-- Add cancel job action while queued or running.
-
-### Matrix Runs
-
-What works:
-
-- The form is visually organized.
-- Profile and strategy checkboxes are readable.
-- Defaults produce a reasonable 12-run matrix with the seeded configuration.
-- Reps and concurrency are explicit.
-
-Issues:
-
-- "Matrix Runs" and "Reps" are technically accurate but intimidating.
-- Total run count is not prominent enough before launch.
-- Cost/runtime implications are not previewed.
-- There is no saved preset for common comparisons.
-- There is no guardrail for very large matrices.
-
-Recommended changes:
-
-- Rename or subtitle the page as "Batch comparison."
-- Show a live calculation: profiles x strategies x models x reps = total simulations.
-- Add estimated runtime and cost.
-- Warn before launching large or expensive matrices.
-- Offer presets: Compare all strategies for one profile, Compare top two strategies, Full strategy audit.
-
-### Manual Run
-
-What works:
-
-- The setup form is clear.
-- The role choice is easy to understand.
-- Starting a session produces an immediate collector message.
-- The transcript panel and status badge orient the user.
-
-Issues:
-
-- The textarea placeholder exposes `[END_CONVERSATION]`, which is implementation syntax.
-- "Finish and judge" is visible, but the stop instruction still teaches users an internal token.
-- There is no guidance about what a good manual test should try to validate.
-- Manual role-play could benefit from scripted prompts or scenario goals.
-
-Recommended changes:
-
-- Replace the token instruction with a visible "End conversation" button or checkbox.
-- Add scenario goal text, such as "Try to test hardship negotiation under a strict $150/month constraint."
-- Add role guidance based on selected profile.
-- Add a confirmation before judging if the transcript is very short.
-
-### Playbook
-
-What works:
-
-- The Playbook is one of the product's most valuable outputs.
-- It includes compliance notice, analyzed simulation count, profile recommendations, and strategy ranking tables.
-- The generated Markdown-to-HTML rendering is readable.
-
-Issues:
-
-- It appears as a static report, with limited interactive affordances.
-- Recommendations need more evidence links back to underlying runs.
-- Compliance exclusions are present, but could be visually stronger and more traceable.
-- There is no export/download action visible in the UI.
-
-Recommended changes:
-
-- Add "View evidence" links from recommendations to representative transcripts.
-- Add export Markdown/PDF/copy actions.
-- Add filters by profile, strategy, and risk category.
-- Add generated-at and data coverage details near the top.
-
-### Compliance Monitor
-
-What works:
-
-- Red warning cards communicate risk clearly.
-- Each card identifies the strategy/profile combination.
-- Compliance and escalation values are visible.
-- Reasons are written in plain language.
-
-Issues:
-
-- Thresholds are not visible.
-- Evidence count is not visible.
-- There is no audit trail or link to supporting transcripts.
-- The "All Clear" state may be overconfident if data coverage is low.
-
-Recommended changes:
-
-- Show configured thresholds.
-- Show number of runs supporting each exclusion.
-- Link each exclusion to sample transcripts and judge reasoning.
-- Add coverage warnings when combinations have insufficient runs.
-- Consider severity levels instead of a single red-card treatment.
-
-### Debtor Profiles
-
-What works:
-
-- Cards expose detailed attributes.
-- Backstory text gives needed domain context.
-- Constraints are visible and visually separated.
-- The three profile cards are easy to compare at a high level.
-
-Issues:
-
-- Dense card content may be hard to scan quickly.
-- Constraints are important enough to be elevated.
-- There is no direct "run this profile" action from the card.
-- There is no performance summary per profile.
-
-Recommended changes:
-
-- Move constraints closer to the card header.
-- Add "Run simulation" and "Compare strategies" actions.
-- Add latest performance summary for each profile.
-- Add tags for objection, responsiveness, and risk.
-
-### Collector Strategies
-
-What works:
-
-- Strategy cards are consistent.
-- Core strategy attributes are visible.
-- The grid is clean and readable.
-
-Issues:
-
-- Strategy cards do not show performance outcomes.
-- There is no "best for" or "risky for" guidance.
-- There is no direct action to test or compare a strategy.
-
-Recommended changes:
-
-- Add performance summary per strategy.
-- Add risk badges by profile.
-- Add "Launch with this strategy" and "Compare this strategy" actions.
-- Show sample opening or negotiation behavior for each strategy.
-
-### Theme Toggle
-
-What works:
-
-- Dark and light themes are both readable.
-- Theme changes apply consistently across the app.
-- Badges and score bars remain legible in both modes.
-
-Issues:
-
-- The toggle label can be ambiguous because it reflects the target or current state depending on user interpretation.
-- No issue was found severe enough to prioritize here.
-
-Recommended changes:
-
-- Consider labeling the toggle as "Theme: Dark" or "Switch to light" to remove ambiguity.
-
-### Responsive Behavior
-
-What was verified:
-
-- Desktop layout works.
-- Fullscreen layout works.
-- Source inspection shows responsive CSS at max-width 768px for fixed sidebar, open state, and mobile menu display.
-
-What was not fully verified:
-
-- A true narrow mobile viewport, such as 375px wide, was not successfully tested in browser tooling.
-
-Risks:
-
-- The Runs table may be cramped on mobile.
-- Sidebar drawer focus behavior should be checked.
-- Form density in Matrix Runs may need mobile-specific restructuring.
-
-Recommended changes:
-
-- Run a dedicated mobile pass at 375px, 390px, 768px, and 1024px.
-- Verify mobile drawer focus behavior and Escape handling.
-- Convert dense tables to card rows or priority columns on small screens.
-
-## Accessibility Findings
-
-Positive findings:
-
-- Main navigation uses labels and active state.
-- The main content area has `role="main"`.
-- The transcript slideout uses `role="dialog"` and `aria-modal="true"`.
-- The close button has an accessible label.
-- Focus-visible styles are defined.
-- Toasts use live regions.
-- Score bars use meter semantics.
-
-Issues to fix:
-
-1. Transcript slideout focus trap and restoration.
-2. Table row keyboard activation should support Space, not just Enter.
-3. Tabs should include `aria-controls`, matching panel labels, and arrow-key behavior.
-4. Decorative SVGs in generated controls should consistently use `aria-hidden="true"`.
-5. Reduced-motion mode should also disable smooth scrolling.
-6. Color-coded score meaning needs non-color reinforcement, especially for escalation risk.
-
-## Technical UX Notes
-
-### Console Error
-
-During browser testing, a recurring console error was visible:
-
-`Uncaught SyntaxError: Unexpected token '<'`
-
-It did not block the tested flows, including launching and completing a simulation, but it is a technical health concern. This type of error often indicates that JavaScript tried to parse HTML as JavaScript or JSON, or that an asset/API request returned an unexpected HTML response.
-
-Recommended investigation:
-
-- Inspect network requests around app load and after simulation launch.
-- Confirm all script URLs return JavaScript, not HTML.
-- Confirm polling endpoints return JSON for success and error cases.
-- Add user-facing recovery states for polling failures.
-
-### Detector Findings
-
-The deterministic detector flagged:
-
-- Overused font: Inter.
-- Single font for everything.
-
-Assessment:
-
-- In a dense product UI, Inter and a single family are not inherently wrong.
-- This is a low-severity visual distinctiveness issue, not a usability blocker.
-- If the team wants more brand character, consider a more distinctive heading or mono data treatment while preserving UI readability.
-
-## Persona Red Flags
-
-### First-Time Strategy Analyst
-
-Goal: understand what to do first and produce a useful strategy recommendation.
-
-Red flags:
-
-- No start-here path.
-- Too many navigation choices before workflow explanation.
-- Profile and strategy selectors lack summaries.
-- Score meanings are not defined in context.
-- Matrix Runs may sound technical rather than task-oriented.
-
-### Power User or Operations Analyst
-
-Goal: run many simulations, compare results quickly, and export/share findings.
-
-Red flags:
-
-- No sortable table columns.
-- No search.
-- No export.
-- No saved filters or presets.
-- No multi-run compare.
-- No job cancellation.
-
-### Compliance or Risk Reviewer
-
-Goal: defend exclusions and prove recommendations are safe.
-
-Red flags:
-
-- Compliance thresholds are hidden.
-- Evidence counts are hidden.
-- Exclusions do not link directly to transcripts.
-- "All Clear" could imply certainty without showing coverage.
-- Judge reasoning is not packaged as an audit trail.
-
-### Accessibility-Dependent Keyboard User
-
-Goal: navigate runs, inspect transcripts, and close overlays without losing context.
-
-Red flags:
-
-- Table rows need standard keyboard activation.
-- Dialog focus trap/restoration is not clearly implemented.
-- Tabs need standard arrow-key behavior.
-- Reduced-motion support misses smooth scrolling.
-
-## Priority Issues
-
-The highest-impact issues are:
-
-1. First-time users do not get a guided path through the product's core workflow.
-2. The dashboard summarizes activity, but does not clearly prioritize strategic decisions.
-3. Launch and matrix controls ask users to choose profiles, strategies, models, reps, and concurrency without enough context.
-4. Transcript dialog, table row, tab, and reduced-motion behavior need accessibility hardening.
-5. Runs analysis lacks the expected power-user tools: search, sort, export, saved filters, and comparison.
-6. Compliance findings need stronger evidence, thresholds, and audit trail links.
-
-## Severity-Ranked Recommendations
-
-### P1: Add Guided First-Run Experience
-
-Why it matters:
-
-The product is useful but complex. A user should not have to infer whether to inspect profiles, launch one run, start a matrix, or read the playbook first.
-
-Fix:
-
-- Add a dashboard panel with three recommended actions:
-  - Run recommended demo.
-  - Compare all strategies for one profile.
-  - Review compliance risks.
-- Explain what each action produces.
-- Hide or de-emphasize advanced model settings until needed.
-
-Suggested implementation command:
-
-`$impeccable onboard dashboard`
-
-### P1: Reframe Dashboard Around Decisions
-
-Why it matters:
-
-The current dashboard summarizes activity well, but it does not strongly answer the product's core question: what strategy should we use, and what should we avoid?
-
-Fix:
-
-- Put best strategy by profile near the top.
-- Put compliance exceptions near the top.
-- Add confidence or evidence counts.
-- Move tokens and cost to an operational details area.
-- Clarify escalation risk direction.
-
-Suggested implementation command:
-
-`$impeccable layout dashboard`
-
-### P1: Add Context to Launch and Matrix Controls
-
-Why it matters:
-
-Launching a run is the key action. Users need to understand the selected profile, strategy, model, risk, and expected cost before they start.
-
-Fix:
-
-- Add selected profile summary.
-- Add selected strategy summary.
-- Add estimated run count, runtime, and cost.
-- Add risk hints for known problematic combinations.
-- Add a large-matrix warning.
-- Move model selection behind Advanced.
-
-Suggested implementation command:
-
-`$impeccable clarify launch and matrix`
-
-### P2: Harden Accessibility for Dialogs, Rows, Tabs, and Motion
-
-Why it matters:
-
-The app is close to accessible, but a few standard interaction gaps can make it unreliable for keyboard and assistive technology users.
-
-Fix:
-
-- Add focus trap and restoration to transcript slideout.
-- Support Space on table row activation or use proper button/link controls.
-- Add complete ARIA tab semantics and keyboard handling.
-- Disable smooth scrolling in reduced-motion mode.
-- Mark decorative SVGs as hidden.
-
-Suggested implementation command:
-
-`$impeccable harden accessibility`
-
-### P2: Upgrade Runs Table for Analysis Workflows
-
-Why it matters:
-
-The Runs page is where users validate evidence. Without search, sort, export, and compare, users hit a ceiling quickly.
-
-Fix:
-
-- Sortable columns.
-- Search.
-- Export CSV.
-- Active filter chips.
-- Saved filters.
-- Compare selected runs.
-
-Suggested implementation command:
-
-`$impeccable polish runs table`
-
-### P2: Strengthen Compliance Evidence
-
-Why it matters:
-
-Compliance users need defensible explanations, not just warnings.
-
-Fix:
-
-- Show thresholds.
-- Show evidence counts.
-- Link cards to supporting transcripts.
-- Add coverage warnings.
-- Include sample violation excerpts where available.
-
-Suggested implementation command:
-
-`$impeccable harden compliance monitor`
-
-## Recommended Roadmap
-
-Recommended order:
-
-1. `onboard`: add dashboard first-run guidance and empty-state workflow prompts.
-2. `layout`: reprioritize the dashboard around recommendations and risk.
-3. `clarify`: rewrite launch, matrix, manual, and score copy.
-4. `harden`: fix accessibility, motion, dialog, and error recovery gaps.
-5. `polish`: add power-user affordances to the Runs page.
-
-## Open Questions
-
-1. Should Collection Swarm optimize for analysts who already understand collections strategy, or for non-technical stakeholders who need guided interpretation?
-2. Should model selection be a primary control, or should it be advanced configuration?
-3. Is Manual Run intended for internal QA users, or for broader product users? The answer determines whether implementation tokens like `[END_CONVERSATION]` are acceptable.
-4. What level of compliance evidence is required for a recommendation to be trusted: threshold summary, transcript examples, judge reasoning, or exportable audit packet?
-5. Should the product's visual identity remain a neutral analytics dashboard, or should it more strongly evoke a simulation lab or risk review workspace?
-
-## Final Assessment
-
-Collection Swarm is already usable and has several strong product moments, especially the live simulation feedback and transcript slideout. The highest-value UX work is to make the product more opinionated: guide the first run, expose why a strategy wins, show why a strategy is risky, and connect every recommendation back to evidence.
-
-The interface should help users move from "I can run simulations" to "I know which strategy to use, which strategy to avoid, and why."
+## Anti-pattern verdict ("does this look AI-generated?")
+
+Mostly no — there are real signals of intent (purpose-built compliance band, strategy-rankings tabs, Portuguese microcopy from real Brazilian collection law). But there are AI-slop tells worth naming:
+
+- **Hero-metric strip.** `benchmark-hero` (`app.js` ~1626–1636, `styles.css` ~1520–1576) is the textbook "big number / small caption / supporting stat / accented headline" SaaS pattern. The headline "Find the model mix that can safely drive Collection Swarm." pushes it further into marketing register.
+- **Glassmorphism on the slideout overlay.** `styles.css` ~913–917 uses `backdrop-filter: blur(...)` decoratively.
+- **Decorative gradient logo.** `index.html` ~26–27 — a violet→indigo `linearGradient`. Small surface but it sets the tone.
+- **Card overuse.** Most pages are wall-to-wall `.card`. A handful of surfaces (Strategies, Profiles, Compliance exclusions) would breathe better as plain typographic blocks.
+- **Dashboard "Operational Details" disclosure** plus the four-stat pill row at top is the standard SaaS dashboard hero arrangement.
+
+The cross-register absolute bans the codebase **does avoid**: side-stripe colored borders, gradient text, dark glow shadows, identical-card icon grids.
+
+---
+
+## Per-page findings
+
+### Dashboard (`#dashboard`)
+- **Works:** four-stat KPI strip, profile-tab strategy rankings (clean tab transition), compliance-exception callout above the fold, average-scores bar with semantic color coding, outcome distribution.
+- **Issues:**
+  - The KPI strip ("Runs 24 / Completed 24 / Failed 0 / Success 100%") is decorative when there are no failures — consider hiding `Failed` when zero or collapsing into a single-line summary.
+  - The compliance-exception card is the only non-card surface; visually loud (red tint) but the "View details" link is the same color as the body text and easy to miss.
+  - "Operational Details" disclosure at the bottom is invisible until expanded — what it contains is not previewed in the heading.
+
+### Simulation Runs (`#runs`)
+- **Works:** sticky header, sortable columns, debounced filter (200 ms, `app.js` ~818), per-row `View` button with `aria-label`, status/outcome badges with semantic color, transcript slideout with prev/next.
+- **Issues:**
+  - **Row keyboard parity (P1).** `<tr onclick="...">` (line 797) gives mouse users a giant click target; keyboard users only have the small `View` button. The handler `handleRunRowKey` exists at line 823 but is never wired — almost certainly an incomplete refactor.
+  - Cells are truncated to 200 px with no native tooltip on most columns (only `started_at` has a `title`). `Conversation Model: Low Digital Access Guida...` loses information.
+  - Empty state inside `<td colspan="13">` (line 790) renders block content inside a table cell — fine functionally, but cell padding fights the empty-state layout.
+
+### Launch Run (`#launch`)
+- **Works:** two clean selects with inline descriptions; "Advanced model settings" collapsed by default; single high-affordance primary button; live-progress panel always present.
+- **Issues:**
+  - No `required` attributes; submit fires unconditionally. With local backends this is harmless; with paid backends a misclick spends money.
+  - The right panel says "Ready" before any action — fine, but offers no "what will happen" preview (no token cost estimate, no expected wall-time).
+  - "Advanced model settings" hides the choice that most affects cost (Cursor SDK vs local). Defaults are safe; discoverability is not.
+
+### Batch Comparison (`#matrix`)
+- **Works:** dense matrix builder; `updateMatrixCount()` (line 1294) calculates total simulations live and adds `.warning` past 50.
+- **Issues:**
+  - All checkboxes default to **checked**, including all profiles × all strategies × all models × all judges — selecting nothing requires a manual deselect-all per group. This is the inverse of error-prevention defaults.
+  - Job history list and the active job panel coexist; relationship is not signposted.
+  - <img src="/opt/cursor/artifacts/batch_comparison_form.png" alt="Batch Comparison form" />
+
+### Manual Run (`#manual`)
+- **Works:** start session, send turn, finish session; uses local backends fine.
+  - <img src="/opt/cursor/artifacts/manual_run_in_progress.png" alt="Manual run in progress" />
+- **Issues:**
+  - Navigating away while a session is open silently drops `_manualSessionId` with no warning. Returning shows a fresh form, so the in-flight session looks gone (it isn't — backend keeps it).
+  - Sending a turn shows no optimistic UI; the input clears only after the round trip.
+
+### Playbook (`#playbook`)
+- **Works:** server-rendered Markdown via `markdown.markdown` (`app.py` ~449), copy/export buttons, code-style monospace tags for IDs.
+- **Issues:**
+  - Long page (16 H2s, 33 H3s observed); no in-page TOC, no anchor links.
+  - The Markdown is injected via `innerHTML` into `article.playbook-content` (`app.js` ~1581). If the Markdown extension allows raw HTML, the playbook is an XSS sink driven by config files. Worth confirming the converter strips raw HTML.
+
+### Compliance (`#compliance`)
+- **Works:** clear list of profile×strategy combinations excluded by the configured thresholds; tone is appropriately serious.
+- **Issues:**
+  - "Exclusion cards" are visually dense red-tinted blocks; the threshold values (compliance < 0.8, escalation > 0.3) are present in source but not surfaced as configurable in the UI.
+
+### Arena (`#arena`)
+- **Works:** Elo-style leaderboard scaffold, tournament configuration, history-by-entity drilldown.
+- **Issues:**
+  - Empty state CTA is informative ("Start a tournament to update Elo ratings") but the form to start one is on the same page below — first-time users may not realize the "empty" message resolves itself once they fill the form.
+  - Tournament progress panel uses the same `pollJob` pattern as Matrix; identical UX inconsistencies inherited.
+
+### Evolution (`#evolution`)
+- **Works:** clean empty state with a CLI hint.
+- **Issues:**
+  - No in-app way to trigger evolution (`/api/evolution/pool` is GET-only). The whole page is read-only.
+
+### Calibration (`#calibration`)
+- **Works:** lists current calibration variants and label results.
+- **Issues (P2 functional gap):**
+  - Backend exposes `POST /api/calibration/labels` and `POST /api/jobs/calibration` (`app.py` ~552–572). The UI exposes neither. The page directs users to the CLI/API instead. This is the largest backend↔frontend asymmetry in the app.
+
+### Model Benchmarks (`#benchmarks`)
+- **Works:** "Production" quick-pick (`selectProductionBenchmarkModels`), per-role benchmark toggles, rich result tables.
+- **Issues:**
+  - The hero strip (see Anti-patterns) is the most overtly "AI SaaS" surface in the app.
+  - "Production" hard-codes model IDs (`composer-2`, `gpt-5.5`, `claude-sonnet-4-6`, …) at `app.js` ~1696–1699; if the backend `/api/config/models` ever drops one of those IDs, the preset silently selects fewer than promised, with no warning.
+  - Benchmark tabs (`switchBenchTab`, ~1856) implement a different keyboard model than the dashboard tabs (~491, ~618), with no `aria-controls` or arrow-key navigation. Inconsistent within the same product.
+
+### Profiles / Strategies (`#profiles`, `#strategies`)
+- **Works:** complete catalog rendered as typographic blocks; no card chrome (good).
+- **Issues:**
+  - Read-only. No filter, no anchor links, no copy-to-clipboard for IDs. For a list this long (14 profiles, 13 strategies) a search box would help.
+
+---
+
+## Cross-cutting findings
+
+### Accessibility (WCAG)
+
+| Severity | Where | Finding |
+|---|---|---|
+| **P1** | `app.js` ~797–814 (rows), ~823 (`handleRunRowKey` defined but unused) | Rows lack `tabindex` and `role="button"`; the only keyboard path to a transcript is the small per-row `View` button. The dead handler implies the intent. **Fix:** wire `tabindex="0"` + `keydown` (Enter/Space) to rows, or remove the row-level `onclick` and rely solely on the `View` button (and document that). |
+| **P2** | `index.html` ~103 — `<main aria-live="polite">` swapped via `innerHTML` per nav | Verbose AT announcements on every navigation. **Fix:** scope `aria-live` to genuinely live regions (job panels, toasts), not the whole main. |
+| **P2** | `app.js` ~1856 (`switchBenchTab`) | Benchmark tabs are mouse-oriented; no `aria-controls`, no arrow navigation, no `aria-selected`. Dashboard tabs at ~491 implement the better pattern; benchmark tabs should match. |
+| **P2** | `styles.css` `--text-tertiary` × small caps | Sidebar nav-labels and KPI captions sit at the WCAG-AA threshold for small text. Worth measuring with a contrast tool against your specific OKLCH values. |
+| **P2** | `app.py` ~449 + `app.js` ~1581 | Playbook Markdown rendered via `markdown.markdown` and injected as `innerHTML`. If raw HTML is permitted by the Markdown extension, this is an XSS class issue. **Fix:** disable raw-HTML in the Markdown extension or sanitize server-side. |
+| **P3** | `styles.css` ~206–214 | `prefers-reduced-motion` disables transitions globally but does not disable the named `@keyframes` (`btn-spin`, `skeleton-pulse`). Some users still see motion. |
+| **P3** | `index.html` | No "skip to main content" link; SPA without it forces keyboard users through the full sidebar on every page. |
+| **P3** | `.btn-compact` (`styles.css` ~1330) `min-height: 30px`; `.filter-clear` ~1208 `min-height: 28px` | Below the WCAG 2.5.5 44×44 touch-target guideline. The dense Runs row uses these. |
+| **P3** | Score "meters" (`scoreBarHTML`, `app.js` ~268) | `role="meter"` without `aria-valuetext`; SR users hear the raw number, not the human-meaningful label ("OK / Watch / Risk"). |
+
+**Inputs are not unlabeled.** A first-pass console scan flagged 51/27/60 "unlabeled" inputs on Batch Comparison, Arena, and Model Benchmarks. After verification, every input is wrapped in `<label class="check-option">…</label>` (`app.js` ~1268, ~1276), which is a fully valid programmatic label. Re-running the labeling check explicitly:
+
+| Page | Total inputs | Labeled by `for` | Labeled by wrap | By `aria` | Truly unlabeled |
+|---|---:|---:|---:|---:|---:|
+| Batch Comparison | 53 | 2 | 51 | 0 | **0** |
+| Arena | 33 | 6 | 27 | 0 | **0** |
+| Model Benchmarks | 61 | 1 | 60 | 0 | **0** |
+
+### Information architecture & routing
+
+- **Hash routing is half-implemented.** `navigateTo()` (`app.js` ~17) calls `pushState` but the app never subscribes to `hashchange`. The `popstate` handler restores `e.state`, not the hash, so:
+  - Navigating to `http://127.0.0.1:8000/#runs/nonexistent` lands on the **Dashboard** while the URL still shows `#runs/nonexistent`. This is the "invalid route silently shows dashboard" behavior captured in `invalid_run_id.png`.
+  - <img src="/opt/cursor/artifacts/invalid_run_id.png" alt="Invalid run ID silently shows dashboard" />
+- **Page state is wholesale-discarded on nav.** `renderPage` blasts `mainEl.innerHTML`. Filters, sort columns, manual sessions, all reset on every visit. `_sortColumn` etc. are stored on `window`, but only re-applied if you stay on the page.
+- **Sidebar grouping is good.** Three groups (Overview / Analysis / Configuration) with semantic icons. Active state and `aria-current="page"` are correct. The order ("Launch Run" before "Batch Comparison" and "Manual Run") matches the natural progression.
+
+### Visual / typographic system
+
+- **Tokens are real.** OKLCH custom properties for foreground, surfaces, semantic states; dual theme via `[data-theme="light"]`.
+- **Token leaks.** `app.js` injects literal OKLCH values for benchmark fit badges (~1913–1944, ~1990) and `.bench-fit-badge.fit-strong` backgrounds in `styles.css` (~2135) are tuned for dark only — not remapped under `[data-theme="light"]`. Risk: light-mode benchmark heatmaps will look washed out or unreadable in some cells.
+- **Typography is dense.** Body copy at ~13–14 px on a 16 px root; `--text-xs` is 11 px. Readable on a desktop, fatiguing in long sessions. Inter 350-weight body is intentional; some forms could move to 400 for WCAG-friendliness.
+- **Cards everywhere.** With 6+ cards per typical page, the layout reads as "grid of containers" instead of a story. Strategies and Profiles already do better by going typographic.
+
+### State coverage
+
+- **Loading:** initial skeleton on `renderPage` (~437); per-section skeleton on strategy rankings (~634). No skeletons inside the slideout — it briefly shows nothing before the API resolves.
+- **Empty:** unusually thoughtful — Arena, Evolution, Calibration all teach the user a concrete next action. This is the single best UX dimension of the app.
+- **Error:** `pollJob` (~1362) throws a toast after 3 failures and then **keeps polling silently**. The job panel stays in a perpetual queued/running state. Users can miss the toast and never realize the connection broke.
+- **Success/feedback:** form submission → toast → job panel; clear and consistent.
+
+### Forms & controls
+
+- Defaults heavily checked across matrix builders. Combined with no client-side validation, this is the main "user shoots own foot" risk.
+- `inputField` (`app.js` ~1256) is `type="number"` without `inputmode` — fine on desktop, suboptimal on mobile.
+- The Runs filter panel debounces at 200 ms (`debouncedFilterRuns`, ~818) — good.
+
+### Performance & code quality
+
+- **Single 2,533-line `app.js`**, no bundler, no module split. Every nav re-runs a full `innerHTML` swap and re-fetches its API data. Acceptable today; will hurt as features grow.
+- **Inline `onclick="..."`** is everywhere. Moves behavior into markup; CSP-unfriendly if you ever tighten headers.
+- **No `console.log` left in shipping code** (verified by grep).
+- **`escapeHTML` is used consistently** for user-supplied strings except in the Playbook Markdown path noted above.
+- **Google Fonts CDN.** `index.html` ~9–11 — render-blocking external resource; enterprise networks sometimes block this. Consider self-hosting Inter + JetBrains Mono.
+
+### Microcopy
+
+- Mostly confident, brief, and domain-correct (Portuguese terminology lines up with BCB/Will Bank context).
+- "Connection interrupted" toast is misleading when polling continues.
+- Error strings from FastAPI bubble up raw (`apiPost`, ~174) — `"API error: 404"` is unhelpful for non-developers.
+- Benchmark hero copy ("…can safely drive Collection Swarm") shifts tone toward marketing on what is otherwise a neutral ops UI.
+
+### Mobile / responsive
+
+- Sidebar becomes an off-canvas drawer with overlay scrim; focus return is implemented (`app.js` ~91–103). Solid baseline.
+- Runs table relies on `overflow-x: auto` plus `td { max-width: 200px }` ellipsis — at 390 px the truncation is heavy and tooltips are missing on most columns.
+- Benchmark and Compliance pages have horizontal-scroll inner panels at narrow widths.
+
+---
+
+## Persona red flags
+
+**Alex (analyst, mostly keyboard).** Opens Runs, presses Tab to scan rows — never lands on a row, always lands on the small `View` button. Sorts columns with mouse only (no `aria-sort`). Filters work fine. Tries to share a deep link to a transcript: cannot — there is no per-run URL.
+
+**Jordan (first-time PM, exploring).** Lands on Dashboard, sees four stat pills + a strategy-rankings tab carousel + a red compliance band + an Average-Scores bar + Outcome Distribution + Operational Details disclosure — six top-level affordances above the fold. Picks "Calibration" because the word sounds important; reads "No calibration runs yet" with a CLI command — gives up because there's no in-app way to trigger one.
+
+**Riya (operations lead, mobile commuter).** Opens on phone, drawer works, but the Runs table is unreadable (`...` everywhere, no tooltips). Tries to launch a run from her phone — Launch form works, but advanced model settings are collapsed and she doesn't realize "scripted" is the default.
+
+---
+
+## Priority fixes (impact-ordered)
+
+1. **[P1] Make Runs rows fully keyboard-operable.** Add `tabindex="0"`, wire the existing `handleRunRowKey`, add a focus-visible state. Two-line fix; biggest immediate accessibility win.
+2. **[P1] Hash-route hardening.** Subscribe to `hashchange`; on unknown route, render a small "Run not found" view with a link back to `#runs`. Stop silently falling back to the dashboard.
+3. **[P2] Build the Calibration UI.** Surface the existing `/api/calibration/labels` and `/api/jobs/calibration` endpoints. Today the page lies about what's possible.
+4. **[P2] Sanitize Playbook Markdown render path.** Confirm the Markdown extension blocks raw HTML, or sanitize before injecting.
+5. **[P2] Narrow `aria-live` from `<main>` to actual live regions** (job panels, toast container).
+6. **[P2] Default checkbox grids to *unchecked* on Batch Comparison and Benchmarks.** Selecting "all of everything" should be a deliberate gesture (preset button), not the default.
+7. **[P3] Quiet the Benchmarks hero.** Remove the marketing headline and KPI strip; keep the form. The page already has enough information density.
+8. **[P3] Persist navigation state.** Cache page-local state (filters, sort, manual session) per route so back/forward doesn't blow it away.
+9. **[P3] Self-host Inter + JetBrains Mono.** Eliminates render-blocking third-party request and survives offline/enterprise networks.
+10. **[P3] Add a "skip to main content" link** at the top of `<body>`.
+
+---
+
+## What's working (worth preserving)
+
+- **Empty-state writing.** Arena/Evolution/Calibration empty states teach the next action — keep this voice.
+- **Slideout focus management.** Real focus trap, focus return on close, Escape to dismiss. Better than most apps.
+- **Theme tokens.** OKLCH-driven dual theme is honest and mostly complete (modulo the benchmark fit-badge leaks).
+- **Compliance posture.** Above-the-fold compliance-exception band + Compliance page + automatic exclusion in Playbook is a coherent compliance story, not a marketing bullet.
+- **Mobile drawer.** Off-canvas with proper overlay and focus return; rare to get right.
+
+---
+
+## Provocative questions
+
+- **What if Launch Run estimated cost up front?** Most user anxiety on this page is "is this going to charge me?" — a tiny "≈ R$ 0.0017 with current settings" line would defuse that.
+- **What if the Dashboard had only one above-the-fold module?** Today it has six. The compliance-exception band is by far the most actionable.
+- **Does Model Benchmarks need a hero, or does it need a wizard?** A three-step picker ("which roles? which models? which probes?") would replace both the hero and the dense form.
+- **Should Profiles and Strategies be searchable from the global header?** Power users will want `Cmd-K` for `cooperative_hardship`, not a sidebar trip.
+- **Should the slideout become a full route (`#runs/<id>`) instead of an overlay?** It would give shareable links and survive page reload — both currently absent.
