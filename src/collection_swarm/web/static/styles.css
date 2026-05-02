@@ -27,7 +27,7 @@
 
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace;
-  --text-xs: 0.6875rem;
+  --text-xs: 0.75rem;
   --text-sm: 0.8125rem;
   --text-base: 0.875rem;
   --text-lg: 1rem;
@@ -107,6 +107,13 @@
   --chart-6: oklch(70% 0.18 55);
   --chart-7: oklch(68% 0.17 155);
 
+  --fit-strong: oklch(68% 0.17 155);
+  --fit-moderate: oklch(75% 0.16 75);
+  --fit-weak: oklch(65% 0.2 25);
+  --fit-strong-bg: oklch(20% 0.04 155);
+  --fit-moderate-bg: oklch(22% 0.04 75);
+  --fit-weak-bg: oklch(20% 0.05 25);
+
   --scrollbar-thumb: oklch(30% 0.01 275);
   --scrollbar-track: transparent;
 
@@ -131,7 +138,7 @@
 
   --text-primary: oklch(18% 0.01 275);
   --text-secondary: oklch(45% 0.01 275);
-  --text-tertiary: oklch(60% 0.008 275);
+  --text-tertiary: oklch(50% 0.008 275);
   --text-inverse: oklch(99% 0.003 275);
 
   --accent-primary: oklch(50% 0.22 275);
@@ -176,6 +183,13 @@
   --chart-6: oklch(60% 0.18 55);
   --chart-7: oklch(48% 0.17 155);
 
+  --fit-strong: oklch(45% 0.17 155);
+  --fit-moderate: oklch(55% 0.16 75);
+  --fit-weak: oklch(50% 0.22 25);
+  --fit-strong-bg: oklch(96% 0.03 155);
+  --fit-moderate-bg: oklch(96% 0.03 75);
+  --fit-weak-bg: oklch(96% 0.04 25);
+
   --scrollbar-thumb: oklch(80% 0.006 275);
   --scrollbar-track: transparent;
 
@@ -208,8 +222,7 @@ body {
   html { scroll-behavior: auto; }
 
   *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
+    animation: none !important;
     transition-duration: 0.01ms !important;
   }
 }
@@ -350,6 +363,9 @@ body {
   display: flex;
   align-items: center;
   gap: var(--space-3);
+  position: sticky;
+  bottom: 0;
+  background: var(--bg-surface);
 }
 
 .theme-toggle {
@@ -595,6 +611,12 @@ body {
 
 .data-table tbody tr:active {
   background: var(--bg-active);
+}
+
+.data-table tbody tr:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -2px;
+  background: var(--bg-hover);
 }
 
 .data-table tbody td {
@@ -1220,7 +1242,7 @@ body {
   cursor: pointer;
   transition: background var(--dur-fast) var(--ease-out-quart),
               color var(--dur-fast) var(--ease-out-quart);
-  min-height: 28px;
+  min-height: 36px;
 }
 
 .filter-clear:hover {
@@ -1328,7 +1350,7 @@ body {
 }
 
 .btn-compact {
-  min-height: 30px;
+  min-height: 36px;
   padding: var(--space-1) var(--space-3);
   font-size: var(--text-xs);
 }
@@ -2462,6 +2484,32 @@ body {
   font-size: var(--text-sm);
 }
 
+.quick-actions {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-4) 0;
+  flex-wrap: wrap;
+}
+
+.trust-banner {
+  background: var(--info-bg);
+  border: 1px solid oklch(50% 0.08 255);
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-5);
+  margin-bottom: var(--space-6);
+}
+.trust-banner strong {
+  display: block;
+  margin-bottom: var(--space-2);
+  color: var(--info);
+}
+.trust-banner p {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0;
+}
+
 .compliance-strip {
   display: flex;
   align-items: center;
@@ -2656,6 +2704,12 @@ body {
 .score-good { color: var(--success); }
 .score-mid { color: var(--warning); }
 .score-bad { color: var(--danger); }
+
+.data-table td .score-good,
+.data-table td .score-mid,
+.data-table td .score-bad {
+  font-variant-numeric: tabular-nums;
+}
 
 /* ── Tabs ──────────────────────────────────────────────────── */
 .tabs {
