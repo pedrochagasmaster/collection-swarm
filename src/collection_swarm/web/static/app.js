@@ -52,6 +52,11 @@ function pageFromHash() {
   return decodeURIComponent(location.hash.replace(/^#/, '')) || 'dashboard';
 }
 
+function isPageHash(hash = location.hash) {
+  const page = decodeURIComponent(String(hash || '').replace(/^#/, '')) || 'dashboard';
+  return KNOWN_PAGES.has(page);
+}
+
 function renderUnknownPage(page) {
   mainEl.innerHTML = `
     <div class="page-header">
@@ -94,6 +99,7 @@ window.addEventListener('popstate', (e) => {
 
 window.addEventListener('hashchange', () => {
   const page = pageFromHash();
+  if (!isPageHash()) return;
   if (page === currentPage) return;
   if (!beforeNavigate(page)) {
     history.replaceState({ page: currentPage, params: _lastPageParams[currentPage] || {} }, '', `#${currentPage}`);
@@ -1160,10 +1166,10 @@ async function renderMatrix(params = {}) {
         <div class="card-header"><h2>Matrix Setup</h2></div>
         <div class="card-body">
           <form class="control-form" onsubmit="startMatrixRun(event)">
-            <div class="form-field"><label>Profiles</label><div class="checkbox-grid" onchange="updateMatrixCount()">${profiles}</div></div>
-            <div class="form-field"><label>Strategies</label><div class="checkbox-grid" onchange="updateMatrixCount()">${strategies}</div></div>
-            <div class="form-field"><label>Conversation models</label><p class="field-summary">Each checked model role-plays both collector and debtor.</p><div class="checkbox-grid model-grid">${conversationModels}</div></div>
-            <div class="form-field"><label>Judge models</label><p class="field-summary">Each checked judge scores every generated transcript.</p><div class="checkbox-grid model-grid">${judgeModels}</div></div>
+            <div class="form-field"><label>Profiles</label>${checkboxGroupActions('matrix-profiles')}<div class="checkbox-grid" onchange="updateMatrixCount()">${profiles}</div></div>
+            <div class="form-field"><label>Strategies</label>${checkboxGroupActions('matrix-strategies')}<div class="checkbox-grid" onchange="updateMatrixCount()">${strategies}</div></div>
+            <div class="form-field"><label>Conversation models</label><p class="field-summary">Each checked model role-plays both collector and debtor.</p>${checkboxGroupActions('matrix-conversation-models')}<div class="checkbox-grid model-grid">${conversationModels}</div></div>
+            <div class="form-field"><label>Judge models</label><p class="field-summary">Each checked judge scores every generated transcript.</p>${checkboxGroupActions('matrix-judge-models')}<div class="checkbox-grid model-grid">${judgeModels}</div></div>
             <div class="btn-row">
               ${inputField('matrix-reps', 'Reps', options.defaults.reps || 1, 1, 100, "updateMatrixCount()")}
               ${inputField('matrix-concurrency', 'Concurrency', 2, 1, 10)}
@@ -1452,6 +1458,22 @@ function clearPoll(key) {
 
 const _pollFailCounts = {};
 
+function handlePollFailure(pollKey, panelId, statusId = null) {
+  _pollFailCounts[pollKey] = (_pollFailCounts[pollKey] || 0) + 1;
+  if (_pollFailCounts[pollKey] >= 10) {
+    clearPoll(pollKey);
+    const panel = $(`#${panelId}`);
+    const status = statusId ? $(`#${statusId}`) : null;
+    if (status) status.innerHTML = statusBadge('failed');
+    if (panel) panel.innerHTML = emptyState('Connection Lost', 'Unable to reach the server. Reload the page before starting another job.');
+    showToast('Polling stopped: connection lost', 'error', 10000);
+    return;
+  }
+  if (_pollFailCounts[pollKey] === 3) {
+    showToast('Connection interrupted, retrying\u2026', 'error', 6000);
+  }
+}
+
 async function pollJob(jobId, panelId, statusId, pollKey) {
   try {
     const job = await api(`/jobs/${pathPart(jobId)}`);
@@ -1470,19 +1492,7 @@ async function pollJob(jobId, panelId, statusId, pollKey) {
       if (job.status === 'cancelled') showToast('Job cancelled', 'info');
     }
   } catch (_) {
-    _pollFailCounts[pollKey] = (_pollFailCounts[pollKey] || 0) + 1;
-    if (_pollFailCounts[pollKey] >= 10) {
-      clearPoll(pollKey);
-      const panel = $(`#${panelId}`);
-      const status = $(`#${statusId}`);
-      if (status) status.innerHTML = statusBadge('failed');
-      if (panel) panel.innerHTML = emptyState('Connection Lost', 'Unable to reach the server. Reload the page before starting another job.');
-      showToast('Polling stopped: connection lost', 'error', 10000);
-      return;
-    }
-    if (_pollFailCounts[pollKey] === 3) {
-      showToast('Connection interrupted, retrying\u2026', 'error', 6000);
-    }
+    handlePollFailure(pollKey, panelId, statusId);
   }
 }
 
@@ -1817,6 +1827,7 @@ async function renderBenchmarks() {
               <button class="btn btn-primary" type="submit" id="benchmark-btn">Run benchmark</button>
               <button class="btn" type="button" onclick="selectProductionBenchmarkModels()">Production set</button>
               <button class="btn" type="button" onclick="selectAllBenchmarkModels()">Select all</button>
+              <button class="btn" type="button" onclick="clearBenchmarkModels()">Clear all</button>
             </div>
           </form>
         </div>

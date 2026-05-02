@@ -139,6 +139,7 @@ class TestPlaybook:
         data = resp.json()
         assert data["format"] == "html"
         assert "<h1>" in data["content"]
+        assert data["simulation_count"] == 12
 
     def test_playbook_html_strips_unsafe_markup(
         self,
@@ -596,17 +597,22 @@ class TestSPA:
         assert '<div class="nav-label">Overview</div>' in html
 
         assert "window.addEventListener('hashchange'" in js
+        assert "isPageHash()" in js
         assert "updateDocumentTitle(page)" in js
         assert "handleRunRowKey(event" in js
         assert "quick-actions" in js
         assert "Synthetic Analysis" in js
         assert "generatePlaybookTOC" in js
+        assert "data.simulation_count" in js
         assert "startCalibration" in js
         assert "submitCalibrationLabels" in js
         assert "Polling stopped" in js
+        assert "handlePollFailure" in js
         assert "aria-valuetext" in js
         assert "Models not available" in js
         assert "selected = []" in js
+        assert "checkboxGroupActions('matrix-profiles')" in js
+        assert "clearBenchmarkModels()" in js
 
         assert "--text-xs: 0.75rem" in css
         assert "--text-tertiary: oklch(50% 0.008 275)" in css

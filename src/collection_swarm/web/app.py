@@ -469,7 +469,7 @@ def create_app(
     # ── Playbook (rendered) ─────────────────────────────────────────
 
     @app.get("/api/playbook")
-    def get_playbook(format: str = Query("html", description="html or markdown")) -> dict[str, str]:
+    def get_playbook(format: str = Query("html", description="html or markdown")) -> dict[str, Any]:
         store = _store()
         config = _config()
         rankings = [compare_strategies(pid, store) for pid in config.profiles]
@@ -481,8 +481,9 @@ def create_app(
             max_escalation_risk=config.simulation.max_escalation_risk,
         )
         md_text = generate_playbook(rankings, exclusions, store)
+        simulation_count = len(store.list_runs(status="completed"))
         if format == "markdown":
-            return {"format": "markdown", "content": md_text}
+            return {"format": "markdown", "content": md_text, "simulation_count": simulation_count}
         html = markdown.markdown(md_text, extensions=["tables", "fenced_code"])
         html = bleach.clean(
             html,
@@ -491,7 +492,7 @@ def create_app(
             protocols=PLAYBOOK_ALLOWED_PROTOCOLS,
             strip=True,
         )
-        return {"format": "html", "content": html}
+        return {"format": "html", "content": html, "simulation_count": simulation_count}
 
     # ── Config info ─────────────────────────────────────────────────
 
