@@ -270,6 +270,8 @@ DRAW_THRESHOLD = 0.05
 class EloRating(BaseModel):
     entity_type: Literal["strategy", "profile"]
     entity_id: str
+    conversation_model: str = ""
+    judge_model: str = ""
     rating: float = 1500.0
     games_played: int = 0
     wins: int = 0
@@ -281,6 +283,8 @@ class EloUpdate(BaseModel):
     entity_type: Literal["strategy", "profile"]
     entity_id: str
     opponent_id: str
+    conversation_model: str = ""
+    judge_model: str = ""
     simulation_id: str
     rating_before: float
     rating_after: float

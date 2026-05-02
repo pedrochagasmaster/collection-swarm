@@ -667,6 +667,21 @@ body {
   padding: var(--space-2) 0;
 }
 
+.arena-sparkline {
+  width: 100%;
+  height: 54px;
+  margin-bottom: var(--space-2);
+  overflow: visible;
+}
+
+.arena-sparkline polyline {
+  fill: none;
+  stroke: var(--accent-primary);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .arena-history-item {
   display: grid;
   grid-template-columns: minmax(120px, 1fr) minmax(120px, 2fr) minmax(80px, 1fr);

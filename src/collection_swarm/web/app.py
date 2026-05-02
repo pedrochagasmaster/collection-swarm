@@ -484,8 +484,15 @@ def create_app(
         if entity_type not in {None, "strategy", "profile"}:
             raise HTTPException(status_code=400, detail="entity_type must be strategy or profile")
         store = _store()
-        strategies = [] if entity_type == "profile" else store.get_elo_ratings("strategy")
-        profiles = [] if entity_type == "strategy" else store.get_elo_ratings("profile")
+        config = _config()
+        conversation_model = config.default_conversation_model
+        judge_model = config.default_judge_model
+        strategies = (
+            []
+            if entity_type == "profile"
+            else store.get_elo_ratings("strategy", conversation_model, judge_model)
+        )
+        profiles = [] if entity_type == "strategy" else store.get_elo_ratings("profile", conversation_model, judge_model)
         return {
             "strategies": [model_dump_jsonable(rating) for rating in strategies],
             "profiles": [model_dump_jsonable(rating) for rating in profiles],
@@ -1005,8 +1012,14 @@ async def _run_tournament_job(
                 )
 
         for round_number in range(1, tournament_config.rounds + 1):
-            strategy_ratings = [store.get_elo_rating("strategy", strategy_id) for strategy_id in strategy_ids]
-            profile_ratings = [store.get_elo_rating("profile", profile_id) for profile_id in profile_ids]
+            strategy_ratings = [
+                store.get_elo_rating("strategy", strategy_id, conversation_model, judge_model)
+                for strategy_id in strategy_ids
+            ]
+            profile_ratings = [
+                store.get_elo_rating("profile", profile_id, conversation_model, judge_model)
+                for profile_id in profile_ids
+            ]
             pairings = (
                 arena.round_robin_pairings(strategy_ids, profile_ids)
                 if tournament_config.format == "round_robin"
@@ -1042,8 +1055,18 @@ async def _run_tournament_job(
                         job.errors.append(simulation.error_message or f"{simulation.id} failed")
                     if simulation.judgment is not None:
                         updates = arena.update_ratings(
-                            store.get_elo_rating("strategy", simulation.strategy_id),
-                            store.get_elo_rating("profile", simulation.profile_id),
+                            store.get_elo_rating(
+                                "strategy",
+                                simulation.strategy_id,
+                                simulation.conversation_model,
+                                simulation.judge_model,
+                            ),
+                            store.get_elo_rating(
+                                "profile",
+                                simulation.profile_id,
+                                simulation.conversation_model,
+                                simulation.judge_model,
+                            ),
                             simulation.judgment,
                             simulation.id,
                             scoring=tournament_config.scoring,

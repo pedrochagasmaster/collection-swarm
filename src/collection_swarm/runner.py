@@ -133,8 +133,12 @@ async def run_tournament(
             return await engine.run_simulation(config.profile(cell.profile_id), config.strategy(cell.strategy_id))
 
     for round_number in range(1, tournament_config.rounds + 1):
-        strategy_ratings = [store.get_elo_rating("strategy", strategy_id) for strategy_id in strategies]
-        profile_ratings = [store.get_elo_rating("profile", profile_id) for profile_id in profiles]
+        strategy_ratings = [
+            store.get_elo_rating("strategy", strategy_id, conversation_model, judge_model) for strategy_id in strategies
+        ]
+        profile_ratings = [
+            store.get_elo_rating("profile", profile_id, conversation_model, judge_model) for profile_id in profiles
+        ]
         if tournament_config.format == "round_robin":
             pairings = arena.round_robin_pairings(strategies, profiles)
         else:
@@ -156,8 +160,18 @@ async def run_tournament(
             history.add((simulation.strategy_id, simulation.profile_id))
             if simulation.judgment is None:
                 continue
-            strategy_rating = store.get_elo_rating("strategy", simulation.strategy_id)
-            profile_rating = store.get_elo_rating("profile", simulation.profile_id)
+            strategy_rating = store.get_elo_rating(
+                "strategy",
+                simulation.strategy_id,
+                simulation.conversation_model,
+                simulation.judge_model,
+            )
+            profile_rating = store.get_elo_rating(
+                "profile",
+                simulation.profile_id,
+                simulation.conversation_model,
+                simulation.judge_model,
+            )
             updates = arena.update_ratings(
                 strategy_rating,
                 profile_rating,

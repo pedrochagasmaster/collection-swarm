@@ -111,6 +111,33 @@ def test_swiss_pairings_avoids_repeats() -> None:
     assert swiss_pairings(strategies, profiles, history={("s1", "p1")}) == [("s1", "p2"), ("s2", "p1")]
 
 
+def test_swiss_pairings_finds_non_greedy_no_repeat_assignment() -> None:
+    strategies = [
+        EloRating(entity_type="strategy", entity_id="s1", rating=1600),
+        EloRating(entity_type="strategy", entity_id="s2", rating=1500),
+    ]
+    profiles = [
+        EloRating(entity_type="profile", entity_id="p1", rating=1600),
+        EloRating(entity_type="profile", entity_id="p2", rating=1500),
+    ]
+
+    assert swiss_pairings(strategies, profiles, history={("s2", "p2")}) == [("s1", "p2"), ("s2", "p1")]
+
+
+def test_swiss_pairings_prioritizes_unplayed_byes_next_round() -> None:
+    strategies = [
+        EloRating(entity_type="strategy", entity_id="s1", games_played=1, rating=1700),
+        EloRating(entity_type="strategy", entity_id="s2", games_played=0, rating=1400),
+    ]
+    profiles = [
+        EloRating(entity_type="profile", entity_id="p1", games_played=1, rating=1700),
+        EloRating(entity_type="profile", entity_id="p2", games_played=0, rating=1400),
+        EloRating(entity_type="profile", entity_id="p3", games_played=0, rating=1300),
+    ]
+
+    assert swiss_pairings(strategies, profiles, history=set()) == [("s2", "p2"), ("s1", "p3")]
+
+
 def test_round_robin_pairings_covers_all() -> None:
     assert round_robin_pairings(["s1", "s2"], ["p1", "p2", "p3"]) == [
         ("s1", "p1"),

@@ -2325,7 +2325,15 @@ window.toggleArenaHistory = async function(entityId) {
 };
 
 function arenaHistoryHTML(history) {
-  return `<div class="arena-history">${history.map(update => `
+  const values = history.map(update => Number(update.rating_after));
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const points = values.map((value, index) => {
+    const x = history.length === 1 ? 50 : (index / (history.length - 1)) * 100;
+    const y = max === min ? 50 : 90 - ((value - min) / (max - min)) * 80;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  return `<div class="arena-sparkline" aria-label="Elo rating history sparkline"><svg viewBox="0 0 100 100" preserveAspectRatio="none"><polyline points="${points}" fill="none" stroke="currentColor" stroke-width="3" vector-effect="non-scaling-stroke"/></svg></div><div class="arena-history">${history.map(update => `
     <div class="arena-history-item">
       <span>${Number(update.rating_before).toFixed(1)} → ${Number(update.rating_after).toFixed(1)}</span>
       <span>vs ${escapeHTML(fmtId(update.opponent_id))}</span>

@@ -96,6 +96,27 @@ def test_save_and_read_elo_update(tmp_path) -> None:
     assert history[0].simulation_id == "sim_test"
 
 
+def test_elo_ratings_are_scoped_by_model_pair(tmp_path) -> None:
+    store = SimulationStore(tmp_path / "runs.sqlite")
+    base = {
+        "entity_type": "strategy",
+        "entity_id": "empathetic_payment_plan",
+        "opponent_id": "cooperative_hardship",
+        "simulation_id": "sim_test",
+        "rating_before": 1500,
+        "rating_after": 1510,
+        "effective_score": 0.8,
+        "expected_score": 0.5,
+    }
+
+    store.save_elo_update(EloUpdate(**base, conversation_model="model_a", judge_model="judge_a"))
+    store.save_elo_update(EloUpdate(**base, conversation_model="model_b", judge_model="judge_a"))
+
+    assert store.get_elo_rating("strategy", "empathetic_payment_plan", "model_a", "judge_a").games_played == 1
+    assert store.get_elo_rating("strategy", "empathetic_payment_plan", "model_b", "judge_a").games_played == 1
+    assert store.get_elo_rating("strategy", "empathetic_payment_plan", "model_c", "judge_a").games_played == 0
+
+
 def test_elo_history_returns_chronological_updates(tmp_path) -> None:
     store = SimulationStore(tmp_path / "runs.sqlite")
     for idx in range(2):

@@ -74,13 +74,15 @@ class SimulationStore:
                 CREATE TABLE IF NOT EXISTS elo_ratings (
                     entity_type TEXT NOT NULL,
                     entity_id TEXT NOT NULL,
+                    conversation_model TEXT NOT NULL DEFAULT '',
+                    judge_model TEXT NOT NULL DEFAULT '',
                     rating REAL NOT NULL,
                     games_played INTEGER NOT NULL,
                     wins INTEGER NOT NULL,
                     losses INTEGER NOT NULL,
                     draws INTEGER NOT NULL,
                     updated_at TEXT NOT NULL,
-                    PRIMARY KEY (entity_type, entity_id)
+                    PRIMARY KEY (entity_type, entity_id, conversation_model, judge_model)
                 )
                 """
             )
@@ -92,6 +94,8 @@ class SimulationStore:
                     entity_type TEXT NOT NULL,
                     entity_id TEXT NOT NULL,
                     opponent_id TEXT NOT NULL,
+                    conversation_model TEXT NOT NULL DEFAULT '',
+                    judge_model TEXT NOT NULL DEFAULT '',
                     simulation_id TEXT NOT NULL,
                     rating_before REAL NOT NULL,
                     rating_after REAL NOT NULL,
@@ -114,6 +118,15 @@ class SimulationStore:
                 )
                 """
             )
+            self._ensure_column(connection, "elo_ratings", "conversation_model", "TEXT NOT NULL DEFAULT ''")
+            self._ensure_column(connection, "elo_ratings", "judge_model", "TEXT NOT NULL DEFAULT ''")
+            self._ensure_column(connection, "elo_history", "conversation_model", "TEXT NOT NULL DEFAULT ''")
+            self._ensure_column(connection, "elo_history", "judge_model", "TEXT NOT NULL DEFAULT ''")
+
+    def _ensure_column(self, connection: sqlite3.Connection, table: str, column: str, definition: str) -> None:
+        columns = {row["name"] for row in connection.execute(f"PRAGMA table_info({table})").fetchall()}
+        if column not in columns:
+            connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
     def save_run(self, result: SimulationResult) -> None:
         self.save_runs([result])
@@ -311,29 +324,62 @@ class SimulationStore:
             for row in rows
         }
 
-    def get_elo_ratings(self, entity_type: str | None = None) -> list[EloRating]:
+    def get_elo_ratings(
+        self,
+        entity_type: str | None = None,
+        conversation_model: str | None = None,
+        judge_model: str | None = None,
+    ) -> list[EloRating]:
         sql = "SELECT * FROM elo_ratings"
-        params: tuple[Any, ...] = ()
+        filters: list[str] = []
+        params: list[Any] = []
         if entity_type is not None:
-            sql += " WHERE entity_type = ?"
-            params = (entity_type,)
+            filters.append("entity_type = ?")
+            params.append(entity_type)
+        if conversation_model is not None:
+            filters.append("conversation_model = ?")
+            params.append(conversation_model)
+        if judge_model is not None:
+            filters.append("judge_model = ?")
+            params.append(judge_model)
+        if filters:
+            sql += " WHERE " + " AND ".join(filters)
         sql += " ORDER BY rating DESC, entity_id"
         with self._connect() as connection:
-            rows = connection.execute(sql, params).fetchall()
+            rows = connection.execute(sql, tuple(params)).fetchall()
         return [EloRating.model_validate(dict(row)) for row in rows]
 
-    def get_elo_rating(self, entity_type: str, entity_id: str) -> EloRating:
+    def get_elo_rating(
+        self,
+        entity_type: str,
+        entity_id: str,
+        conversation_model: str = "",
+        judge_model: str = "",
+    ) -> EloRating:
         with self._connect() as connection:
             row = connection.execute(
-                "SELECT * FROM elo_ratings WHERE entity_type = ? AND entity_id = ?",
-                (entity_type, entity_id),
+                """
+                SELECT * FROM elo_ratings
+                WHERE entity_type = ? AND entity_id = ? AND conversation_model = ? AND judge_model = ?
+                """,
+                (entity_type, entity_id, conversation_model, judge_model),
             ).fetchone()
         if row is None:
-            return EloRating(entity_type=entity_type, entity_id=entity_id)  # type: ignore[arg-type]
+            return EloRating(
+                entity_type=entity_type,  # type: ignore[arg-type]
+                entity_id=entity_id,
+                conversation_model=conversation_model,
+                judge_model=judge_model,
+            )
         return EloRating.model_validate(dict(row))
 
     def save_elo_update(self, update: EloUpdate, tournament_id: str | None = None) -> None:
-        current = self.get_elo_rating(update.entity_type, update.entity_id)
+        current = self.get_elo_rating(
+            update.entity_type,
+            update.entity_id,
+            update.conversation_model,
+            update.judge_model,
+        )
         wins = current.wins
         losses = current.losses
         draws = current.draws
@@ -347,12 +393,15 @@ class SimulationStore:
             connection.execute(
                 """
                 INSERT OR REPLACE INTO elo_ratings (
-                    entity_type, entity_id, rating, games_played, wins, losses, draws, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    entity_type, entity_id, conversation_model, judge_model,
+                    rating, games_played, wins, losses, draws, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     update.entity_type,
                     update.entity_id,
+                    update.conversation_model,
+                    update.judge_model,
                     update.rating_after,
                     current.games_played + 1,
                     wins,
@@ -364,15 +413,17 @@ class SimulationStore:
             connection.execute(
                 """
                 INSERT INTO elo_history (
-                    tournament_id, entity_type, entity_id, opponent_id, simulation_id,
+                    tournament_id, entity_type, entity_id, opponent_id, conversation_model, judge_model, simulation_id,
                     rating_before, rating_after, effective_score, expected_score, timestamp
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     tournament_id,
                     update.entity_type,
                     update.entity_id,
                     update.opponent_id,
+                    update.conversation_model,
+                    update.judge_model,
                     update.simulation_id,
                     update.rating_before,
                     update.rating_after,
@@ -508,6 +559,8 @@ def _elo_update_from_row(row: sqlite3.Row) -> EloUpdate:
         entity_type=row["entity_type"],
         entity_id=row["entity_id"],
         opponent_id=row["opponent_id"],
+        conversation_model=row["conversation_model"],
+        judge_model=row["judge_model"],
         simulation_id=row["simulation_id"],
         rating_before=float(row["rating_before"]),
         rating_after=float(row["rating_after"]),
