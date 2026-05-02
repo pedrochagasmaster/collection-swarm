@@ -147,6 +147,13 @@ class TestPlaybook:
         assert data["format"] == "markdown"
         assert "# Collection Playbook" in data["content"]
 
+    def test_playbook_html_strips_script_tags(self, seeded_client: TestClient) -> None:
+        resp = seeded_client.get("/api/playbook?format=html")
+        assert resp.status_code == 200
+        content = resp.json()["content"]
+        assert "<script>" not in content.lower()
+        assert "onerror=" not in content.lower()
+
 
 class TestConfig:
     def test_list_profiles(self, seeded_client: TestClient) -> None:

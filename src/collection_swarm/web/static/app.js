@@ -2006,14 +2006,14 @@ function benchHeatmapHTML(assessments, models, roles) {
   function heatColor(score) {
     if (score === null) return 'var(--bg-elevated)';
     if (score >= 9) return 'var(--success)';
-    if (score >= 7) return 'oklch(68% 0.14 155)';
+    if (score >= 7) return 'var(--fit-strong)';
     if (score >= 5) return 'var(--warning)';
-    if (score >= 3) return 'oklch(68% 0.14 55)';
+    if (score >= 3) return 'var(--fit-moderate)';
     return 'var(--danger)';
   }
   function textColor(score) {
     if (score === null) return 'var(--text-tertiary)';
-    return score >= 5 ? 'oklch(15% 0 0)' : 'oklch(95% 0 0)';
+    return score >= 5 ? 'var(--text-inverse)' : 'var(--text-primary)';
   }
 
   return `
@@ -2034,9 +2034,9 @@ function benchHeatmapHTML(assessments, models, roles) {
       </div>
       <div class="bench-hm-legend">
         <span style="background:var(--danger)"></span><span>1-2</span>
-        <span style="background:oklch(68% 0.14 55)"></span><span>3-4</span>
+        <span style="background:var(--fit-moderate)"></span><span>3-4</span>
         <span style="background:var(--warning)"></span><span>5-6</span>
-        <span style="background:oklch(68% 0.14 155)"></span><span>7-8</span>
+        <span style="background:var(--fit-strong)"></span><span>7-8</span>
         <span style="background:var(--success)"></span><span>9-10</span>
       </div>
     </div>`;
@@ -2054,7 +2054,7 @@ function benchBarChartHTML(assessments, models, roles) {
     if (!scores || !scores.length) return 0;
     return scores.reduce((a, b) => a + b, 0) / scores.length;
   }
-  const roleColors = { collector: 'var(--accent-primary)', debtor: 'oklch(65% 0.17 310)', judge: 'var(--warning)' };
+  const roleColors = { collector: 'var(--accent-primary)', debtor: 'var(--debtor-accent)', judge: 'var(--warning)' };
 
   return `
     <div class="bench-barchart-wrap">
@@ -2083,9 +2083,9 @@ function benchFitDistHTML(assessments, roles) {
   const fitOrder = ['Primary recommendation', 'Strong candidate', 'Usable with caution', 'Unsafe without parser hardening', 'Unavailable'];
   const fitColors = {
     'Primary recommendation': 'var(--success)',
-    'Strong candidate': 'oklch(68% 0.14 155)',
+    'Strong candidate': 'var(--fit-strong)',
     'Usable with caution': 'var(--warning)',
-    'Unsafe without parser hardening': 'oklch(68% 0.14 55)',
+    'Unsafe without parser hardening': 'var(--fit-moderate)',
     'Unavailable': 'var(--danger)',
   };
   const fitShort = {
@@ -2293,8 +2293,10 @@ async function renderArena() {
     api('/jobs'),
     api('/arena/tournaments'),
   ]);
-  const strategies = checkboxList('arena-strategies', options.strategies.map(s => [s.id, fmtId(s.id)]));
-  const profiles = checkboxList('arena-profiles', options.profiles.map(p => [p.id, fmtId(p.id)]));
+  const allStrategyIds = options.strategies.map(s => s.id);
+  const allProfileIds = options.profiles.map(p => p.id);
+  const strategies = checkboxList('arena-strategies', options.strategies.map(s => [s.id, fmtId(s.id)]), allStrategyIds);
+  const profiles = checkboxList('arena-profiles', options.profiles.map(p => [p.id, fmtId(p.id)]), allProfileIds);
   const conversationOpts = modelSelectOptions(options.conversation_models, options.defaults.conversation_model);
   const judgeOpts = modelSelectOptions(options.judge_models, options.defaults.judge_model);
   const tournamentJobs = jobs.filter(job => job.kind === 'tournament');
