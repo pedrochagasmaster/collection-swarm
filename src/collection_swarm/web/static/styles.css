@@ -27,7 +27,7 @@
 
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace;
-  --text-xs: 0.6875rem;
+  --text-xs: 0.75rem;
   --text-sm: 0.8125rem;
   --text-base: 0.875rem;
   --text-lg: 1rem;
@@ -107,6 +107,13 @@
   --chart-6: oklch(70% 0.18 55);
   --chart-7: oklch(68% 0.17 155);
 
+  --fit-strong: oklch(68% 0.14 155);
+  --fit-moderate: oklch(68% 0.14 55);
+  --fit-strong-bg: oklch(20% 0.04 155);
+  --fit-moderate-bg: oklch(22% 0.04 55);
+  --bench-text-on-light: oklch(15% 0 0);
+  --bench-text-on-dark: oklch(95% 0 0);
+
   --scrollbar-thumb: oklch(30% 0.01 275);
   --scrollbar-track: transparent;
 
@@ -131,7 +138,7 @@
 
   --text-primary: oklch(18% 0.01 275);
   --text-secondary: oklch(45% 0.01 275);
-  --text-tertiary: oklch(60% 0.008 275);
+  --text-tertiary: oklch(50% 0.008 275);
   --text-inverse: oklch(99% 0.003 275);
 
   --accent-primary: oklch(50% 0.22 275);
@@ -176,6 +183,13 @@
   --chart-6: oklch(60% 0.18 55);
   --chart-7: oklch(48% 0.17 155);
 
+  --fit-strong: oklch(45% 0.17 155);
+  --fit-moderate: oklch(55% 0.16 55);
+  --fit-strong-bg: oklch(96% 0.03 155);
+  --fit-moderate-bg: oklch(96% 0.03 55);
+  --bench-text-on-light: oklch(15% 0 0);
+  --bench-text-on-dark: oklch(95% 0 0);
+
   --scrollbar-thumb: oklch(80% 0.006 275);
   --scrollbar-track: transparent;
 
@@ -208,8 +222,7 @@ body {
   html { scroll-behavior: auto; }
 
   *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
+    animation: none !important;
     transition-duration: 0.01ms !important;
   }
 }
@@ -350,6 +363,9 @@ body {
   display: flex;
   align-items: center;
   gap: var(--space-3);
+  position: sticky;
+  bottom: 0;
+  background: var(--bg-surface);
 }
 
 .theme-toggle {
@@ -597,6 +613,12 @@ body {
   background: var(--bg-active);
 }
 
+.data-table tbody tr:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -2px;
+  background: var(--bg-hover);
+}
+
 .data-table tbody td {
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--border-subtle);
@@ -612,6 +634,10 @@ body {
   font-size: var(--text-xs);
   color: var(--text-secondary);
   padding-left: var(--space-6);
+}
+
+.data-table td:nth-child(n+9) {
+  font-variant-numeric: tabular-nums;
 }
 
 .data-table tbody td.run-action-cell {
@@ -1220,7 +1246,7 @@ body {
   cursor: pointer;
   transition: background var(--dur-fast) var(--ease-out-quart),
               color var(--dur-fast) var(--ease-out-quart);
-  min-height: 28px;
+  min-height: 36px;
 }
 
 .filter-clear:hover {
@@ -1328,7 +1354,7 @@ body {
 }
 
 .btn-compact {
-  min-height: 30px;
+  min-height: 36px;
   padding: var(--space-1) var(--space-3);
   font-size: var(--text-xs);
 }
@@ -2132,9 +2158,9 @@ body {
 }
 
 .bench-fit-badge.fit-primary { background: var(--success-bg); color: var(--success); border: 1px solid var(--success-border); }
-.bench-fit-badge.fit-strong { background: oklch(20% 0.04 155); color: oklch(68% 0.14 155); border: 1px solid oklch(35% 0.08 155); }
+.bench-fit-badge.fit-strong { background: var(--fit-strong-bg); color: var(--fit-strong); border: 1px solid var(--success-border); }
 .bench-fit-badge.fit-caution { background: var(--warning-bg); color: var(--warning); border: 1px solid var(--warning-border); }
-.bench-fit-badge.fit-unsafe { background: oklch(20% 0.04 55); color: oklch(68% 0.14 55); border: 1px solid oklch(35% 0.08 55); }
+.bench-fit-badge.fit-unsafe { background: var(--fit-moderate-bg); color: var(--fit-moderate); border: 1px solid var(--warning-border); }
 .bench-fit-badge.fit-unavailable { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger-border); }
 
 /* Config health */
@@ -2932,6 +2958,113 @@ body {
 [data-theme="dark"] .playbook-content li,
 [data-theme="dark"] .playbook-content td {
   font-weight: 350;
+}
+
+/* ── Quick Actions Strip ───────────────────────────────────── */
+.quick-actions {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-4) 0;
+  flex-wrap: wrap;
+}
+
+/* ── Trust Banner ──────────────────────────────────────────── */
+.trust-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-lg);
+  background: var(--info-bg);
+  border: 1px solid var(--info);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-5);
+}
+
+.trust-banner svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--info);
+}
+
+.trust-banner strong {
+  display: block;
+  color: var(--text-primary);
+  margin-bottom: var(--space-1);
+}
+
+.trust-banner p {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+/* ── Playbook TOC ──────────────────────────────────────────── */
+.playbook-toc {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4) var(--space-5);
+  margin-bottom: var(--space-6);
+  background: var(--bg-elevated);
+}
+
+.playbook-toc strong {
+  display: block;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: var(--space-3);
+}
+
+.playbook-toc ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.playbook-toc li a {
+  display: block;
+  padding: var(--space-1) var(--space-2);
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: var(--text-sm);
+  border-radius: var(--radius-sm);
+  transition: background var(--dur-fast) var(--ease-out-quart),
+              color var(--dur-fast) var(--ease-out-quart);
+}
+
+.playbook-toc li a:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.playbook-toc li.toc-indent a {
+  padding-left: var(--space-6);
+  font-size: var(--text-xs);
+}
+
+/* ── Skip Link ─────────────────────────────────────────────── */
+.skip-link {
+  position: absolute;
+  z-index: 100;
+  top: -100px;
+  left: 0;
+  padding: var(--space-2) var(--space-4);
+  background: var(--accent-primary);
+  color: var(--text-inverse);
+  font-weight: 600;
+  border-radius: 0 0 var(--radius-md) 0;
+  transition: top var(--dur-fast) var(--ease-out-quart);
+  text-decoration: none;
+  font-size: var(--text-sm);
+}
+
+.skip-link:focus {
+  top: 0;
 }
 
 /* ── Utility: sr-only ──────────────────────────────────────── */
