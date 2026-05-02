@@ -3,8 +3,8 @@ from __future__ import annotations
 import pytest
 
 from collection_swarm.config import load_app_config
-from collection_swarm.models import TournamentConfig
-from collection_swarm.runner import build_matrix, run_tournament
+from collection_swarm.models import EvolutionConfig, HardeningConfig, TournamentConfig
+from collection_swarm.runner import build_matrix, run_evolution_cycle, run_tournament
 from collection_swarm.store import SimulationStore
 
 
@@ -67,3 +67,47 @@ async def test_run_tournament_round_robin_updates_elo_ratings(tmp_path) -> None:
     assert len(ratings) == 4
     assert any(rating.rating != 1500.0 for rating in ratings)
     assert store.get_tournament(result.id).total_games == 4
+
+
+@pytest.mark.asyncio
+async def test_run_evolution_cycle_saves_evolved_strategy(tmp_path) -> None:
+    config = load_app_config("config")
+    store = SimulationStore(tmp_path / "runs.sqlite")
+
+    results = await run_evolution_cycle(
+        config,
+        store,
+        EvolutionConfig(evolver_model_id="local-scripted", population_size=20, cull_bottom_n=0),
+        TournamentConfig(format="swiss", rounds=1),
+        generations=1,
+        profile_ids=["cooperative_hardship"],
+        strategy_ids=["empathetic_payment_plan"],
+        concurrency=1,
+    )
+
+    assert len(results) == 1
+    evolved = store.list_evolved_strategies()
+    assert evolved
+    assert evolved[0][0].id.startswith("evo_")
+
+
+@pytest.mark.asyncio
+async def test_run_evolution_cycle_can_harden_profiles(tmp_path) -> None:
+    config = load_app_config("config")
+    store = SimulationStore(tmp_path / "runs.sqlite")
+
+    await run_evolution_cycle(
+        config,
+        store,
+        EvolutionConfig(evolver_model_id="local-scripted", cull_bottom_n=0),
+        TournamentConfig(format="swiss", rounds=1),
+        generations=1,
+        profile_ids=["cooperative_hardship"],
+        strategy_ids=["empathetic_payment_plan"],
+        hardening_config=HardeningConfig(enabled=True, hardener_model_id="local-scripted"),
+        concurrency=1,
+    )
+
+    hardened = store.list_evolved_profiles()
+    assert hardened
+    assert hardened[0][0].id.startswith("hard_")

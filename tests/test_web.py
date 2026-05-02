@@ -336,6 +336,35 @@ class TestArena:
         assert tournament["total_games"] == 1
 
 
+class TestEvolutionAndCalibration:
+    def test_evolution_pool_empty(self, empty_client: TestClient) -> None:
+        resp = empty_client.get("/api/evolution/pool")
+
+        assert resp.status_code == 200
+        assert resp.json()["strategies"] == []
+
+    def test_calibration_results_empty(self, empty_client: TestClient) -> None:
+        resp = empty_client.get("/api/calibration/results")
+
+        assert resp.status_code == 200
+        assert resp.json()["label_count"] == 0
+
+    def test_upload_calibration_labels(self, empty_client: TestClient) -> None:
+        resp = empty_client.post(
+            "/api/calibration/labels",
+            json=[
+                {
+                    "transcript_id": "sim_missing",
+                    "human_scores": {"payment_probability": 0.7},
+                    "labeler_id": "analyst",
+                }
+            ],
+        )
+
+        assert resp.status_code == 200
+        assert resp.json()["saved"] == 1
+
+
 class TestModelBenchmarks:
     def test_benchmark_options_include_models_and_roles(self, empty_client: TestClient) -> None:
         resp = empty_client.get("/api/model-benchmarks/options")

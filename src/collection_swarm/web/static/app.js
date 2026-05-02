@@ -447,6 +447,8 @@ async function renderPage(page, params = {}) {
       case 'playbook': await renderPlaybook(); break;
       case 'compliance': await renderCompliance(); break;
       case 'arena': await renderArena(); break;
+      case 'evolution': await renderEvolution(); break;
+      case 'calibration': await renderCalibration(); break;
       case 'benchmarks': await renderBenchmarks(); break;
       case 'profiles': await renderProfiles(); break;
       case 'strategies': await renderStrategies(); break;
@@ -2339,6 +2341,90 @@ function arenaHistoryHTML(history) {
       <span>vs ${escapeHTML(fmtId(update.opponent_id))}</span>
       <span>score ${Number(update.effective_score).toFixed(2)}</span>
     </div>`).join('')}</div>`;
+}
+
+// ── Evolution ────────────────────────────────────────────────────
+
+async function renderEvolution() {
+  const pool = await api('/evolution/pool');
+  const strategies = pool.strategies || [];
+  const profiles = pool.profiles || [];
+  mainEl.innerHTML = `
+    <div class="page-header">
+      <h1>Evolution</h1>
+      <p>Generated strategy and debtor pools from adversarial tournament feedback.</p>
+    </div>
+    <div class="grid-2">
+      <section class="card">
+        <div class="card-header"><h2>Strategy Pool</h2></div>
+        <div class="card-body">
+          ${strategies.length ? evolutionTable(strategies, 'strategy') : emptyState('No Evolved Strategies', 'Run the evolve command or API to generate candidates.')}
+        </div>
+      </section>
+      <section class="card">
+        <div class="card-header"><h2>Debtor Pool</h2></div>
+        <div class="card-body">
+          ${profiles.length ? evolutionTable(profiles, 'profile') : emptyState('No Hardened Profiles', 'Enable debtor hardening in an evolution cycle to populate this pool.')}
+        </div>
+      </section>
+    </div>`;
+}
+
+function evolutionTable(items, type) {
+  const rows = items.map(item => {
+    const lineage = item.lineage || {};
+    const generation = lineage.generation ?? 0;
+    const parent = type === 'strategy' ? (lineage.parent_ids || []).join(', ') : lineage.parent_id || '';
+    const descriptor = type === 'strategy' ? lineage.mutation_type : lineage.hardening_type;
+    return `<tr>
+      <td>${escapeHTML(item.id)}</td>
+      <td>${generation}</td>
+      <td>${escapeHTML(parent || 'seed')}</td>
+      <td>${escapeHTML(fmtId(descriptor || 'generated'))}</td>
+    </tr>`;
+  }).join('');
+  return `<table class="data-table"><thead><tr><th>ID</th><th>Generation</th><th>Parent</th><th>Type</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+// ── Calibration ──────────────────────────────────────────────────
+
+async function renderCalibration() {
+  const [results, variants] = await Promise.all([
+    api('/calibration/results'),
+    api('/calibration/variants'),
+  ]);
+  const metrics = Object.entries(results.correlations || {}).map(([metric, value]) => `
+    <div class="judgment-score-item">
+      <span class="judgment-score-label">${escapeHTML(fmtId(metric))}</span>
+      <div class="score-bar-wrap">
+        <div class="score-bar"><div class="score-bar-fill" style="width:${Math.max(0, Math.min(1, Number(value) || 0)) * 100}%;background:var(--info)"></div></div>
+        <span class="score-bar-label">${Number(value || 0).toFixed(2)} corr</span>
+      </div>
+    </div>`).join('');
+  mainEl.innerHTML = `
+    <div class="page-header">
+      <h1>Calibration</h1>
+      <p>Compare judge scores with human labels and track prompt variants.</p>
+    </div>
+    <div class="grid-2">
+      <section class="card">
+        <div class="card-header"><h2>Judge Alignment</h2></div>
+        <div class="card-body">
+          <div class="overview-strip" style="margin-bottom:var(--space-4)">
+            <div class="overview-item"><span class="overview-label">Labels</span><span class="overview-value">${fmtNum(results.label_count || 0)}</span></div>
+            <div class="overview-sep" aria-hidden="true"></div>
+            <div class="overview-item"><span class="overview-label">Score</span><span class="overview-value">${Number(results.overall_score || 0).toFixed(2)}</span></div>
+          </div>
+          ${metrics || emptyState('No Labels', 'Upload calibration labels with the API or CLI to compute correlations.')}
+        </div>
+      </section>
+      <section class="card">
+        <div class="card-header"><h2>Prompt Variants</h2></div>
+        <div class="card-body">
+          ${variants.length ? variants.map(v => `<div class="job-summary"><span>${escapeHTML(v.id)}</span><span>score ${Number(v.calibration_score || 0).toFixed(2)}</span></div>`).join('') : emptyState('No Variants', 'Use calibrate --optimize to store a scored judge prompt variant.')}
+        </div>
+      </section>
+    </div>`;
 }
 
 // ── Profiles ───────────────────────────────────────────────────

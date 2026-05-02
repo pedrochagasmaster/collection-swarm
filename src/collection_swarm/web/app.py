@@ -39,7 +39,7 @@ from collection_swarm.model_evaluation import (
     write_report,
 )
 from collection_swarm.models import EndedBy, MatrixCell, Message, SimulationResult, TournamentConfig, TournamentResult, model_dump_jsonable, utc_now
-from collection_swarm.runner import build_matrix, run_tournament
+from collection_swarm.runner import build_matrix
 from collection_swarm.store import SimulationStore
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -512,6 +512,38 @@ def create_app(
             return model_dump_jsonable(_store().get_tournament(tournament_id))
         except KeyError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @app.get("/api/evolution/pool")
+    def evolution_pool() -> dict[str, list[dict[str, Any]]]:
+        strategies = []
+        for strategy, lineage in _store().list_evolved_strategies():
+            item = model_dump_jsonable(strategy)
+            item["lineage"] = model_dump_jsonable(lineage)
+            strategies.append(item)
+        profiles = []
+        for profile, lineage in _store().list_evolved_profiles():
+            item = model_dump_jsonable(profile)
+            item["lineage"] = model_dump_jsonable(lineage)
+            profiles.append(item)
+        return {"strategies": strategies, "profiles": profiles}
+
+    @app.get("/api/calibration/results")
+    def calibration_results() -> dict[str, Any]:
+        from collection_swarm.calibration import evaluate_judge
+
+        return model_dump_jsonable(evaluate_judge(_store().list_calibration_labels(), _store()))
+
+    @app.post("/api/calibration/labels")
+    def upload_calibration_labels(payload: list[dict[str, Any]]) -> dict[str, Any]:
+        from collection_swarm.calibration import CalibrationLabel
+
+        labels = [CalibrationLabel.model_validate(item) for item in payload]
+        _store().save_calibration_labels(labels)
+        return {"saved": len(labels)}
+
+    @app.get("/api/calibration/variants")
+    def calibration_variants() -> list[dict[str, Any]]:
+        return _store().list_judge_variants()
 
     # ── Model benchmark APIs ────────────────────────────────────────
 

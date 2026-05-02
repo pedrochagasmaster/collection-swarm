@@ -313,6 +313,43 @@ class TournamentResult(BaseModel):
     total_cost_usd: float = 0.0
 
 
+class StrategyLineage(BaseModel):
+    strategy_id: str
+    parent_ids: list[str] = Field(default_factory=list)
+    generation: int = 0
+    mutation_type: str = "seed"
+    mutation_description: str = ""
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    culled_at: datetime | None = None
+
+
+class EvolutionConfig(BaseModel):
+    population_size: int = Field(default=20, ge=1)
+    top_k: int = Field(default=3, ge=1)
+    bottom_k: int = Field(default=3, ge=1)
+    cull_bottom_n: int = Field(default=3, ge=0)
+    mutation_rate: float = Field(default=0.5, ge=0.0, le=1.0)
+    crossover_rate: float = Field(default=0.3, ge=0.0, le=1.0)
+    evolver_model_id: str | None = None
+
+
+class ProfileLineage(BaseModel):
+    profile_id: str
+    parent_id: str | None = None
+    generation: int = 0
+    hardening_type: str = "seed"
+    hardening_description: str = ""
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    culled_at: datetime | None = None
+
+
+class HardeningConfig(BaseModel):
+    enabled: bool = False
+    hardener_model_id: str | None = None
+    max_drift: float = 200.0
+    realism_check: bool = False
+
+
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
 

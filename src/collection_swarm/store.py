@@ -17,7 +17,11 @@ from collection_swarm.models import (
     MatrixCell,
     Message,
     PaymentOutcome,
+    Profile,
+    ProfileLineage,
     SimulationResult,
+    Strategy,
+    StrategyLineage,
     StrategyStats,
     TournamentConfig,
     TournamentResult,
@@ -115,6 +119,57 @@ class SimulationStore:
                     started_at TEXT NOT NULL,
                     completed_at TEXT,
                     total_cost_usd REAL NOT NULL
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS evolved_strategies (
+                    id TEXT PRIMARY KEY,
+                    generation INTEGER NOT NULL DEFAULT 0,
+                    parent_ids_json TEXT,
+                    mutation_type TEXT,
+                    mutation_description TEXT,
+                    strategy_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    culled_at TEXT
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS evolved_profiles (
+                    id TEXT PRIMARY KEY,
+                    generation INTEGER NOT NULL DEFAULT 0,
+                    parent_id TEXT,
+                    hardening_type TEXT,
+                    hardening_description TEXT,
+                    profile_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    culled_at TEXT
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS calibration_labels (
+                    transcript_id TEXT NOT NULL,
+                    metric TEXT NOT NULL,
+                    human_score REAL NOT NULL,
+                    labeler_id TEXT NOT NULL,
+                    labeled_at TEXT NOT NULL,
+                    PRIMARY KEY (transcript_id, metric, labeler_id)
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS judge_prompt_variants (
+                    id TEXT PRIMARY KEY,
+                    system_prompt TEXT NOT NULL,
+                    transcript_prompt TEXT NOT NULL,
+                    calibration_score REAL,
+                    created_at TEXT NOT NULL
                 )
                 """
             )
@@ -481,6 +536,137 @@ class SimulationStore:
             rows = connection.execute("SELECT * FROM tournaments ORDER BY started_at DESC").fetchall()
         return [_tournament_from_row(row) for row in rows]
 
+    def save_evolved_strategy(self, strategy: Strategy, lineage: StrategyLineage) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO evolved_strategies (
+                    id, generation, parent_ids_json, mutation_type, mutation_description,
+                    strategy_json, created_at, culled_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    strategy.id,
+                    lineage.generation,
+                    json.dumps(lineage.parent_ids),
+                    lineage.mutation_type,
+                    lineage.mutation_description,
+                    json.dumps(model_dump_jsonable(strategy)),
+                    lineage.created_at.isoformat(),
+                    lineage.culled_at.isoformat() if lineage.culled_at else None,
+                ),
+            )
+
+    def get_evolved_strategy(self, strategy_id: str) -> Strategy | None:
+        with self._connect() as connection:
+            row = connection.execute("SELECT strategy_json FROM evolved_strategies WHERE id = ?", (strategy_id,)).fetchone()
+        return Strategy.model_validate(json.loads(row["strategy_json"])) if row else None
+
+    def list_evolved_strategies(self, include_culled: bool = False) -> list[tuple[Strategy, StrategyLineage]]:
+        sql = "SELECT * FROM evolved_strategies"
+        if not include_culled:
+            sql += " WHERE culled_at IS NULL"
+        sql += " ORDER BY generation, created_at"
+        with self._connect() as connection:
+            rows = connection.execute(sql).fetchall()
+        return [(_strategy_from_evolved_row(row), _strategy_lineage_from_row(row)) for row in rows]
+
+    def cull_evolved_strategy(self, strategy_id: str) -> None:
+        with self._connect() as connection:
+            connection.execute("UPDATE evolved_strategies SET culled_at = ? WHERE id = ?", (datetime.now().isoformat(), strategy_id))
+
+    def get_evolved_strategy_pool(self) -> dict[str, Strategy]:
+        return {strategy.id: strategy for strategy, _ in self.list_evolved_strategies()}
+
+    def save_evolved_profile(self, profile: Profile, lineage: ProfileLineage) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO evolved_profiles (
+                    id, generation, parent_id, hardening_type, hardening_description,
+                    profile_json, created_at, culled_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    profile.id,
+                    lineage.generation,
+                    lineage.parent_id,
+                    lineage.hardening_type,
+                    lineage.hardening_description,
+                    json.dumps(model_dump_jsonable(profile)),
+                    lineage.created_at.isoformat(),
+                    lineage.culled_at.isoformat() if lineage.culled_at else None,
+                ),
+            )
+
+    def get_evolved_profile(self, profile_id: str) -> Profile | None:
+        with self._connect() as connection:
+            row = connection.execute("SELECT profile_json FROM evolved_profiles WHERE id = ?", (profile_id,)).fetchone()
+        return Profile.model_validate(json.loads(row["profile_json"])) if row else None
+
+    def list_evolved_profiles(self, include_culled: bool = False) -> list[tuple[Profile, ProfileLineage]]:
+        sql = "SELECT * FROM evolved_profiles"
+        if not include_culled:
+            sql += " WHERE culled_at IS NULL"
+        sql += " ORDER BY generation, created_at"
+        with self._connect() as connection:
+            rows = connection.execute(sql).fetchall()
+        return [(_profile_from_evolved_row(row), _profile_lineage_from_row(row)) for row in rows]
+
+    def cull_evolved_profile(self, profile_id: str) -> None:
+        with self._connect() as connection:
+            connection.execute("UPDATE evolved_profiles SET culled_at = ? WHERE id = ?", (datetime.now().isoformat(), profile_id))
+
+    def get_evolved_profile_pool(self) -> dict[str, Profile]:
+        return {profile.id: profile for profile, _ in self.list_evolved_profiles()}
+
+    def save_calibration_labels(self, labels: list[Any]) -> None:
+        with self._connect() as connection:
+            for label in labels:
+                for metric, score in label.human_scores.items():
+                    connection.execute(
+                        """
+                        INSERT OR REPLACE INTO calibration_labels (
+                            transcript_id, metric, human_score, labeler_id, labeled_at
+                        ) VALUES (?, ?, ?, ?, ?)
+                        """,
+                        (label.transcript_id, metric, score, label.labeler_id, label.timestamp.isoformat()),
+                    )
+
+    def list_calibration_labels(self) -> list[Any]:
+        from collection_swarm.calibration import CalibrationLabel
+
+        grouped: dict[tuple[str, str, str], dict[str, float]] = {}
+        with self._connect() as connection:
+            rows = connection.execute("SELECT * FROM calibration_labels ORDER BY labeled_at, transcript_id").fetchall()
+        timestamps: dict[tuple[str, str, str], str] = {}
+        for row in rows:
+            key = (row["transcript_id"], row["labeler_id"], row["labeled_at"])
+            grouped.setdefault(key, {})[row["metric"]] = float(row["human_score"])
+            timestamps[key] = row["labeled_at"]
+        return [
+            CalibrationLabel(transcript_id=tid, labeler_id=labeler, timestamp=datetime.fromisoformat(timestamps[(tid, labeler, ts)]), human_scores=scores)
+            for (tid, labeler, ts), scores in grouped.items()
+        ]
+
+    def save_judge_variant(self, system_prompt: str, transcript_prompt: str, calibration_score: float | None = None) -> str:
+        variant_id = f"judge_{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO judge_prompt_variants (
+                    id, system_prompt, transcript_prompt, calibration_score, created_at
+                ) VALUES (?, ?, ?, ?, ?)
+                """,
+                (variant_id, system_prompt, transcript_prompt, calibration_score, datetime.now().isoformat()),
+            )
+        return variant_id
+
+    def list_judge_variants(self) -> list[dict[str, Any]]:
+        with self._connect() as connection:
+            rows = connection.execute("SELECT * FROM judge_prompt_variants ORDER BY created_at DESC").fetchall()
+        return [dict(row) for row in rows]
+
 
 def _enum_value(value: Any) -> str | None:
     if value is None:
@@ -579,4 +765,36 @@ def _tournament_from_row(row: sqlite3.Row) -> TournamentResult:
         started_at=datetime.fromisoformat(row["started_at"]),
         completed_at=datetime.fromisoformat(row["completed_at"]) if row["completed_at"] else None,
         total_cost_usd=float(row["total_cost_usd"] or 0.0),
+    )
+
+
+def _strategy_from_evolved_row(row: sqlite3.Row) -> Strategy:
+    return Strategy.model_validate(json.loads(row["strategy_json"]))
+
+
+def _strategy_lineage_from_row(row: sqlite3.Row) -> StrategyLineage:
+    return StrategyLineage(
+        strategy_id=row["id"],
+        parent_ids=json.loads(row["parent_ids_json"] or "[]"),
+        generation=int(row["generation"] or 0),
+        mutation_type=row["mutation_type"] or "seed",
+        mutation_description=row["mutation_description"] or "",
+        created_at=datetime.fromisoformat(row["created_at"]),
+        culled_at=datetime.fromisoformat(row["culled_at"]) if row["culled_at"] else None,
+    )
+
+
+def _profile_from_evolved_row(row: sqlite3.Row) -> Profile:
+    return Profile.model_validate(json.loads(row["profile_json"]))
+
+
+def _profile_lineage_from_row(row: sqlite3.Row) -> ProfileLineage:
+    return ProfileLineage(
+        profile_id=row["id"],
+        parent_id=row["parent_id"],
+        generation=int(row["generation"] or 0),
+        hardening_type=row["hardening_type"] or "seed",
+        hardening_description=row["hardening_description"] or "",
+        created_at=datetime.fromisoformat(row["created_at"]),
+        culled_at=datetime.fromisoformat(row["culled_at"]) if row["culled_at"] else None,
     )

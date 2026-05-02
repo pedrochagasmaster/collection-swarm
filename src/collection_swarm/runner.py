@@ -13,7 +13,9 @@ from collection_swarm.agents.judge import Judge
 from collection_swarm.backends.router import LLMRouter
 from collection_swarm.config import AppConfig
 from collection_swarm.engine import SimulationEngine
-from collection_swarm.models import MatrixCell, SimulationResult, TournamentConfig, TournamentResult, utc_now
+from collection_swarm.adversarial import harden_profiles
+from collection_swarm.evolution import evolve_strategies
+from collection_swarm.models import EvolutionConfig, HardeningConfig, MatrixCell, ProfileLineage, SimulationResult, StrategyLineage, TournamentConfig, TournamentResult, utc_now
 from collection_swarm.store import SimulationStore
 
 
@@ -107,10 +109,14 @@ async def run_tournament(
 
     profiles = profile_ids or list(config.profiles)
     strategies = strategy_ids or list(config.strategies)
+    strategy_pool = {**config.strategies, **store.get_evolved_strategy_pool()}
+    profile_pool = {**config.profiles, **store.get_evolved_profile_pool()}
     for profile_id in profiles:
-        config.profile(profile_id)
+        if profile_id not in profile_pool:
+            config.profile(profile_id)
     for strategy_id in strategies:
-        config.strategy(strategy_id)
+        if strategy_id not in strategy_pool:
+            config.strategy(strategy_id)
 
     result = TournamentResult(config=tournament_config)
     history: set[tuple[str, str]] = set()
@@ -130,7 +136,7 @@ async def run_tournament(
                 stalemate_window=settings.stalemate_window,
                 stalemate_similarity_threshold=settings.stalemate_similarity_threshold,
             )
-            return await engine.run_simulation(config.profile(cell.profile_id), config.strategy(cell.strategy_id))
+            return await engine.run_simulation(profile_pool[cell.profile_id], strategy_pool[cell.strategy_id])
 
     for round_number in range(1, tournament_config.rounds + 1):
         strategy_ratings = [
@@ -193,3 +199,71 @@ async def run_tournament(
     result.completed_at = utc_now()
     store.save_tournament(result)
     return result
+
+
+async def run_evolution_cycle(
+    config: AppConfig,
+    store: SimulationStore,
+    evolution_config: EvolutionConfig,
+    tournament_config: TournamentConfig,
+    generations: int = 5,
+    profile_ids: list[str] | None = None,
+    strategy_ids: list[str] | None = None,
+    hardening_config: HardeningConfig | None = None,
+    conversation_model: str | None = None,
+    judge_model: str | None = None,
+    concurrency: int = 2,
+    on_generation_complete: Callable[[int, TournamentResult], Awaitable[None]] | None = None,
+) -> list[TournamentResult]:
+    router = LLMRouter(config.models, cursor_sdk_prompts=config.prompts.cursor_sdk)
+    results: list[TournamentResult] = []
+    active_strategy_ids = list(strategy_ids or config.strategies)
+    for generation in range(1, generations + 1):
+        tournament = await run_tournament(
+            config,
+            store,
+            tournament_config,
+            profile_ids=profile_ids,
+            strategy_ids=active_strategy_ids,
+            conversation_model=conversation_model,
+            judge_model=judge_model,
+            concurrency=concurrency,
+        )
+        results.append(tournament)
+        ratings = store.get_elo_ratings("strategy", conversation_model or config.default_conversation_model, judge_model or config.default_judge_model)
+        sorted_ids = [rating.entity_id for rating in ratings if rating.entity_id in active_strategy_ids]
+        if not sorted_ids:
+            sorted_ids = active_strategy_ids
+        all_strategies = {**config.strategies, **store.get_evolved_strategy_pool()}
+        top = [all_strategies[strategy_id] for strategy_id in sorted_ids[: evolution_config.top_k] if strategy_id in all_strategies]
+        bottom = [all_strategies[strategy_id] for strategy_id in sorted_ids[-evolution_config.bottom_k :] if strategy_id in all_strategies]
+        evolved = await evolve_strategies(top, bottom, [], evolution_config, router)
+        for strategy in evolved:
+            lineage = StrategyLineage(
+                strategy_id=strategy.id,
+                parent_ids=[strategy.id for strategy in top[:2]],
+                generation=generation,
+                mutation_type="llm",
+                mutation_description="Generated from tournament leaderboard feedback.",
+            )
+            store.save_evolved_strategy(strategy, lineage)
+            if strategy.id not in active_strategy_ids:
+                active_strategy_ids.append(strategy.id)
+        if hardening_config and hardening_config.enabled:
+            profile_pool = {**config.profiles, **store.get_evolved_profile_pool()}
+            active_profile_ids = list(profile_ids or config.profiles)
+            seed_profiles = [profile_pool[profile_id] for profile_id in active_profile_ids if profile_id in profile_pool]
+            hardened = await harden_profiles(seed_profiles[: evolution_config.bottom_k], [], hardening_config, router)
+            for profile in hardened:
+                parent_id = seed_profiles[0].id if seed_profiles else None
+                lineage = ProfileLineage(
+                    profile_id=profile.id,
+                    parent_id=parent_id,
+                    generation=generation,
+                    hardening_type="llm",
+                    hardening_description="Generated from successful collection transcripts.",
+                )
+                store.save_evolved_profile(profile, lineage)
+        if on_generation_complete is not None:
+            await on_generation_complete(generation, tournament)
+    return results
