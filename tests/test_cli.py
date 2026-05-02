@@ -44,3 +44,63 @@ def test_model_report_cli_writes_markdown(tmp_path) -> None:
     assert result.exit_code == 0
     assert "Wrote model-role report" in result.output
     assert "Cursor Model Role Evaluation" in output_path.read_text(encoding="utf-8")
+
+
+def test_tournament_cli_swiss(tmp_path) -> None:
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--db",
+            str(tmp_path / "arena.sqlite"),
+            "tournament",
+            "--format",
+            "swiss",
+            "--rounds",
+            "1",
+            "--profiles",
+            "cooperative_hardship,hostile_avoidant",
+            "--strategies",
+            "empathetic_payment_plan,neutral_reminder",
+            "--conversation-model",
+            "local-scripted",
+            "--judge-model",
+            "local-judge",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Tournament" in result.output
+    assert "2 games" in result.output
+
+
+def test_leaderboard_and_reset_elo_cli(tmp_path) -> None:
+    db_path = tmp_path / "arena.sqlite"
+    runner = CliRunner()
+    runner.invoke(
+        cli,
+        [
+            "--db",
+            str(db_path),
+            "tournament",
+            "--rounds",
+            "1",
+            "--profiles",
+            "cooperative_hardship",
+            "--strategies",
+            "empathetic_payment_plan",
+            "--conversation-model",
+            "local-scripted",
+            "--judge-model",
+            "local-judge",
+        ],
+    )
+
+    leaderboard = runner.invoke(cli, ["--db", str(db_path), "leaderboard"])
+    reset = runner.invoke(cli, ["--db", str(db_path), "reset-elo"])
+    empty = runner.invoke(cli, ["--db", str(db_path), "leaderboard"])
+
+    assert leaderboard.exit_code == 0
+    assert "empathetic_payment_plan" in leaderboard.output
+    assert reset.exit_code == 0
+    assert "Reset Elo ratings" in reset.output
+    assert "No Elo ratings" in empty.output

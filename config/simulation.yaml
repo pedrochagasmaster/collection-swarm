@@ -9,6 +9,13 @@ matrix:
 compliance:
   min_compliance_score: 0.8
   max_escalation_risk: 0.3
+arena:
+  default_format: swiss
+  default_rounds: 4
+  k_factor_initial: 32
+  k_factor_stable: 16
+  k_factor_threshold: 30
+  scoring: payment_x_compliance
 objection_taxonomy:
 - inability_to_pay
 - disputes_debt

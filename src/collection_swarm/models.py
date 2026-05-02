@@ -182,12 +182,22 @@ class ConversationSettings(BaseModel):
     stalemate_similarity_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
 
 
+class ArenaSettings(BaseModel):
+    default_format: Literal["swiss", "round_robin"] = "swiss"
+    default_rounds: int = Field(default=4, ge=1)
+    k_factor_initial: float = 32.0
+    k_factor_stable: float = 16.0
+    k_factor_threshold: int = 30
+    scoring: Literal["payment_x_compliance", "payment_only"] = "payment_x_compliance"
+
+
 class SimulationSettings(BaseModel):
     conversation: ConversationSettings = Field(default_factory=ConversationSettings)
     default_repetitions: int = Field(default=1, ge=1)
     min_compliance_score: float = Field(default=0.8, ge=0.0, le=1.0)
     max_escalation_risk: float = Field(default=0.3, ge=0.0, le=1.0)
     objection_taxonomy: list[str] = Field(default_factory=list)
+    arena: ArenaSettings = Field(default_factory=ArenaSettings)
 
 
 class Judgment(BaseModel):
@@ -252,6 +262,51 @@ class MatrixCell(BaseModel, frozen=True):
     strategy_id: str
     conversation_model: str
     judge_model: str
+
+
+DRAW_THRESHOLD = 0.05
+
+
+class EloRating(BaseModel):
+    entity_type: Literal["strategy", "profile"]
+    entity_id: str
+    rating: float = 1500.0
+    games_played: int = 0
+    wins: int = 0
+    losses: int = 0
+    draws: int = 0
+
+
+class EloUpdate(BaseModel):
+    entity_type: Literal["strategy", "profile"]
+    entity_id: str
+    opponent_id: str
+    simulation_id: str
+    rating_before: float
+    rating_after: float
+    effective_score: float
+    expected_score: float
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class TournamentConfig(BaseModel):
+    format: Literal["round_robin", "swiss"] = "swiss"
+    rounds: int = Field(default=4, ge=1)
+    reps_per_pairing: int = Field(default=1, ge=1)
+    k_factor_initial: float = 32.0
+    k_factor_stable: float = 16.0
+    k_factor_threshold: int = 30
+    scoring: Literal["payment_x_compliance", "payment_only"] = "payment_x_compliance"
+
+
+class TournamentResult(BaseModel):
+    id: str = Field(default_factory=lambda: f"tourn_{uuid4().hex[:10]}")
+    config: TournamentConfig
+    rounds_completed: int = 0
+    total_games: int = 0
+    started_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    completed_at: datetime | None = None
+    total_cost_usd: float = 0.0
 
 
 def utc_now() -> datetime:

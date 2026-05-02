@@ -264,6 +264,78 @@ class TestRunJobs:
         assert "strategy" in resp.json()["detail"]
 
 
+class TestArena:
+    def test_leaderboard_empty(self, empty_client: TestClient) -> None:
+        resp = empty_client.get("/api/arena/leaderboard")
+
+        assert resp.status_code == 200
+        assert resp.json() == {"strategies": [], "profiles": []}
+
+    def test_launch_tournament_job(self, empty_client: TestClient) -> None:
+        resp = empty_client.post(
+            "/api/jobs/tournaments",
+            json={
+                "format": "swiss",
+                "rounds": 1,
+                "profile_ids": ["cooperative_hardship", "hostile_avoidant"],
+                "strategy_ids": ["empathetic_payment_plan", "neutral_reminder"],
+                "conversation_model": "local-scripted",
+                "judge_model": "local-judge",
+                "concurrency": 2,
+            },
+        )
+
+        assert resp.status_code == 200
+        job = _wait_for_job(empty_client, resp.json()["id"])
+        assert job["status"] == "completed"
+        assert job["kind"] == "tournament"
+        assert job["total"] == 2
+        assert job["completed"] == 2
+
+    def test_leaderboard_after_tournament_and_history(self, empty_client: TestClient) -> None:
+        resp = empty_client.post(
+            "/api/jobs/tournaments",
+            json={
+                "format": "round_robin",
+                "rounds": 1,
+                "profile_ids": ["cooperative_hardship"],
+                "strategy_ids": ["empathetic_payment_plan"],
+                "conversation_model": "local-scripted",
+                "judge_model": "local-judge",
+            },
+        )
+        job = _wait_for_job(empty_client, resp.json()["id"])
+        assert job["status"] == "completed"
+
+        leaderboard = empty_client.get("/api/arena/leaderboard").json()
+        history = empty_client.get("/api/arena/history/empathetic_payment_plan").json()
+
+        assert leaderboard["strategies"][0]["entity_id"] == "empathetic_payment_plan"
+        assert leaderboard["profiles"][0]["entity_id"] == "cooperative_hardship"
+        assert history[0]["entity_id"] == "empathetic_payment_plan"
+
+    def test_list_tournaments(self, empty_client: TestClient) -> None:
+        resp = empty_client.post(
+            "/api/jobs/tournaments",
+            json={
+                "format": "swiss",
+                "rounds": 1,
+                "profile_ids": ["cooperative_hardship"],
+                "strategy_ids": ["empathetic_payment_plan"],
+                "conversation_model": "local-scripted",
+                "judge_model": "local-judge",
+            },
+        )
+        job = _wait_for_job(empty_client, resp.json()["id"])
+
+        tournaments = empty_client.get("/api/arena/tournaments").json()
+        tournament = empty_client.get(f"/api/arena/tournaments/{tournaments[0]['id']}").json()
+
+        assert job["status"] == "completed"
+        assert len(tournaments) == 1
+        assert tournament["total_games"] == 1
+
+
 class TestModelBenchmarks:
     def test_benchmark_options_include_models_and_roles(self, empty_client: TestClient) -> None:
         resp = empty_client.get("/api/model-benchmarks/options")

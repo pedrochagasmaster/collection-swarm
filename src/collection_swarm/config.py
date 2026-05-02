@@ -8,7 +8,7 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, Field
 
-from collection_swarm.models import ModelConfig, Profile, PromptConfig, SimulationSettings, Strategy
+from collection_swarm.models import ArenaSettings, ModelConfig, Profile, PromptConfig, SimulationSettings, Strategy
 
 
 DEFAULT_CONFIG_DIR = Path("config")
@@ -121,6 +121,7 @@ def load_simulation_settings(path: Path) -> SimulationSettings:
         "min_compliance_score": raw.get("compliance", {}).get("min_compliance_score", 0.8),
         "max_escalation_risk": raw.get("compliance", {}).get("max_escalation_risk", 0.3),
         "objection_taxonomy": raw.get("objection_taxonomy", []),
+        "arena": ArenaSettings.model_validate(raw.get("arena", {})),
     }
     return SimulationSettings.model_validate(normalized)
 

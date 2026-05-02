@@ -9,13 +9,18 @@ from pathlib import Path
 from typing import Any
 
 from collection_swarm.models import (
+    DRAW_THRESHOLD,
     EndedBy,
+    EloRating,
+    EloUpdate,
     Judgment,
     MatrixCell,
     Message,
     PaymentOutcome,
     SimulationResult,
     StrategyStats,
+    TournamentConfig,
+    TournamentResult,
     model_dump_jsonable,
 )
 
@@ -61,6 +66,51 @@ class SimulationStore:
                     total_input_tokens INTEGER,
                     total_output_tokens INTEGER,
                     estimated_cost_usd REAL
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS elo_ratings (
+                    entity_type TEXT NOT NULL,
+                    entity_id TEXT NOT NULL,
+                    rating REAL NOT NULL,
+                    games_played INTEGER NOT NULL,
+                    wins INTEGER NOT NULL,
+                    losses INTEGER NOT NULL,
+                    draws INTEGER NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    PRIMARY KEY (entity_type, entity_id)
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS elo_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tournament_id TEXT,
+                    entity_type TEXT NOT NULL,
+                    entity_id TEXT NOT NULL,
+                    opponent_id TEXT NOT NULL,
+                    simulation_id TEXT NOT NULL,
+                    rating_before REAL NOT NULL,
+                    rating_after REAL NOT NULL,
+                    effective_score REAL NOT NULL,
+                    expected_score REAL NOT NULL,
+                    timestamp TEXT NOT NULL
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS tournaments (
+                    id TEXT PRIMARY KEY,
+                    config_json TEXT NOT NULL,
+                    rounds_completed INTEGER NOT NULL,
+                    total_games INTEGER NOT NULL,
+                    started_at TEXT NOT NULL,
+                    completed_at TEXT,
+                    total_cost_usd REAL NOT NULL
                 )
                 """
             )
@@ -261,6 +311,125 @@ class SimulationStore:
             for row in rows
         }
 
+    def get_elo_ratings(self, entity_type: str | None = None) -> list[EloRating]:
+        sql = "SELECT * FROM elo_ratings"
+        params: tuple[Any, ...] = ()
+        if entity_type is not None:
+            sql += " WHERE entity_type = ?"
+            params = (entity_type,)
+        sql += " ORDER BY rating DESC, entity_id"
+        with self._connect() as connection:
+            rows = connection.execute(sql, params).fetchall()
+        return [EloRating.model_validate(dict(row)) for row in rows]
+
+    def get_elo_rating(self, entity_type: str, entity_id: str) -> EloRating:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM elo_ratings WHERE entity_type = ? AND entity_id = ?",
+                (entity_type, entity_id),
+            ).fetchone()
+        if row is None:
+            return EloRating(entity_type=entity_type, entity_id=entity_id)  # type: ignore[arg-type]
+        return EloRating.model_validate(dict(row))
+
+    def save_elo_update(self, update: EloUpdate, tournament_id: str | None = None) -> None:
+        current = self.get_elo_rating(update.entity_type, update.entity_id)
+        wins = current.wins
+        losses = current.losses
+        draws = current.draws
+        if update.effective_score > 0.5 + DRAW_THRESHOLD:
+            wins += 1
+        elif update.effective_score < 0.5 - DRAW_THRESHOLD:
+            losses += 1
+        else:
+            draws += 1
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO elo_ratings (
+                    entity_type, entity_id, rating, games_played, wins, losses, draws, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    update.entity_type,
+                    update.entity_id,
+                    update.rating_after,
+                    current.games_played + 1,
+                    wins,
+                    losses,
+                    draws,
+                    update.timestamp.isoformat(),
+                ),
+            )
+            connection.execute(
+                """
+                INSERT INTO elo_history (
+                    tournament_id, entity_type, entity_id, opponent_id, simulation_id,
+                    rating_before, rating_after, effective_score, expected_score, timestamp
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    tournament_id,
+                    update.entity_type,
+                    update.entity_id,
+                    update.opponent_id,
+                    update.simulation_id,
+                    update.rating_before,
+                    update.rating_after,
+                    update.effective_score,
+                    update.expected_score,
+                    update.timestamp.isoformat(),
+                ),
+            )
+
+    def get_elo_history(self, entity_id: str) -> list[EloUpdate]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT * FROM elo_history
+                WHERE entity_id = ?
+                ORDER BY timestamp, id
+                """,
+                (entity_id,),
+            ).fetchall()
+        return [_elo_update_from_row(row) for row in rows]
+
+    def reset_elo_ratings(self) -> None:
+        with self._connect() as connection:
+            connection.execute("DELETE FROM elo_ratings")
+            connection.execute("DELETE FROM elo_history")
+
+    def save_tournament(self, result: TournamentResult) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO tournaments (
+                    id, config_json, rounds_completed, total_games, started_at, completed_at, total_cost_usd
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    result.id,
+                    json.dumps(model_dump_jsonable(result.config)),
+                    result.rounds_completed,
+                    result.total_games,
+                    result.started_at.isoformat(),
+                    result.completed_at.isoformat() if result.completed_at else None,
+                    result.total_cost_usd,
+                ),
+            )
+
+    def get_tournament(self, tournament_id: str) -> TournamentResult:
+        with self._connect() as connection:
+            row = connection.execute("SELECT * FROM tournaments WHERE id = ?", (tournament_id,)).fetchone()
+        if row is None:
+            raise KeyError(f"unknown tournament '{tournament_id}'")
+        return _tournament_from_row(row)
+
+    def list_tournaments(self) -> list[TournamentResult]:
+        with self._connect() as connection:
+            rows = connection.execute("SELECT * FROM tournaments ORDER BY started_at DESC").fetchall()
+        return [_tournament_from_row(row) for row in rows]
+
 
 def _enum_value(value: Any) -> str | None:
     if value is None:
@@ -331,4 +500,30 @@ def _result_from_row(row: sqlite3.Row) -> SimulationResult:
         total_input_tokens=int(row["total_input_tokens"] or 0),
         total_output_tokens=int(row["total_output_tokens"] or 0),
         estimated_cost_usd=float(row["estimated_cost_usd"] or 0.0),
+    )
+
+
+def _elo_update_from_row(row: sqlite3.Row) -> EloUpdate:
+    return EloUpdate(
+        entity_type=row["entity_type"],
+        entity_id=row["entity_id"],
+        opponent_id=row["opponent_id"],
+        simulation_id=row["simulation_id"],
+        rating_before=float(row["rating_before"]),
+        rating_after=float(row["rating_after"]),
+        effective_score=float(row["effective_score"]),
+        expected_score=float(row["expected_score"]),
+        timestamp=datetime.fromisoformat(row["timestamp"]),
+    )
+
+
+def _tournament_from_row(row: sqlite3.Row) -> TournamentResult:
+    return TournamentResult(
+        id=row["id"],
+        config=TournamentConfig.model_validate(json.loads(row["config_json"])),
+        rounds_completed=int(row["rounds_completed"] or 0),
+        total_games=int(row["total_games"] or 0),
+        started_at=datetime.fromisoformat(row["started_at"]),
+        completed_at=datetime.fromisoformat(row["completed_at"]) if row["completed_at"] else None,
+        total_cost_usd=float(row["total_cost_usd"] or 0.0),
     )
