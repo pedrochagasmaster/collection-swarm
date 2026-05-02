@@ -2154,9 +2154,9 @@ body {
 }
 
 .bench-fit-badge.fit-primary { background: var(--success-bg); color: var(--success); border: 1px solid var(--success-border); }
-.bench-fit-badge.fit-strong { background: oklch(20% 0.04 155); color: oklch(68% 0.14 155); border: 1px solid oklch(35% 0.08 155); }
+.bench-fit-badge.fit-strong { background: var(--fit-strong-bg); color: var(--fit-strong); border: 1px solid var(--success-border); }
 .bench-fit-badge.fit-caution { background: var(--warning-bg); color: var(--warning); border: 1px solid var(--warning-border); }
-.bench-fit-badge.fit-unsafe { background: oklch(20% 0.04 55); color: oklch(68% 0.14 55); border: 1px solid oklch(35% 0.08 55); }
+.bench-fit-badge.fit-unsafe { background: var(--fit-weak-bg); color: var(--fit-weak); border: 1px solid var(--warning-border); }
 .bench-fit-badge.fit-unavailable { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger-border); }
 
 /* Config health */
@@ -3000,3 +3000,42 @@ body {
   white-space: nowrap;
   border: 0;
 }
+
+.skip-link {
+  position: absolute;
+  z-index: 100;
+  top: -100px;
+  left: 0;
+  padding: 8px 16px;
+  background: var(--accent-primary);
+  color: var(--text-inverse);
+  font-weight: 600;
+  border-radius: 0 0 8px 0;
+  transition: top 0.15s;
+}
+
+/* ── Playbook TOC ──────────────────────────────────────────── */
+.playbook-toc {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-5);
+  margin-bottom: var(--space-6);
+  max-height: 260px;
+  overflow-y: auto;
+}
+.playbook-toc strong {
+  display: block;
+  margin-bottom: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+.toc-link {
+  display: block;
+  padding: var(--space-1) 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  text-decoration: none;
+  cursor: pointer;
+}
+.toc-link:hover { color: var(--accent-primary); }
+.toc-link.toc-indent { padding-left: var(--space-5); }
