@@ -23,10 +23,7 @@ class ScriptedBackend:
         # to "devedor" inside the collector's system prompt.
         if any(marker in system for marker in ("judge", "evaluator", "juiz avaliador")):
             content = self._judge_response(history)
-        elif (
-            "you are the debtor" in system
-            or "voc\u00ea \u00e9 o devedor" in system
-        ):
+        elif "you are the debtor" in system or "voc\u00ea \u00e9 o devedor" in system:
             content = self._debtor_response(system, history.lower())
         else:
             content = self._collector_response(system, history.lower())
@@ -115,15 +112,12 @@ class ScriptedBackend:
                 "do liquidante (willbank.com.br) e voltamos a falar quando estiver tudo claro. "
                 "Se ajudar, também consigo um primeiro valor menor ou um retorno em data combinada."
             )
-        return (
-            "Que valor ou data ficaria realista pra você pra darmos um próximo passo?"
-        )
+        return "Que valor ou data ficaria realista pra você pra darmos um próximo passo?"
 
     def _debtor_response(self, system: str, history: str) -> str:
         if any(term in system for term in ["dispute", "written proof", "wants_written_proof", "disputer"]):
             if not any(
-                marker in history
-                for marker in ["written validation", "written proof", "fatura detalhada", "contrato"]
+                marker in history for marker in ["written validation", "written proof", "fatura detalhada", "contrato"]
             ):
                 return (
                     "Antes de falar de pagamento, preciso da fatura detalhada e do contrato "
@@ -135,41 +129,30 @@ class ScriptedBackend:
             )
         if any(term in system for term in ["scam", "suspects_scam", "distrustful", "skeptical"]):
             if not any(
-                marker in history
-                for marker in ["liquidante", "willbank.com.br", "bcb.gov.br", "banco central"]
+                marker in history for marker in ["liquidante", "willbank.com.br", "bcb.gov.br", "banco central"]
             ):
                 return (
                     "Como sei que isso não é golpe? Me passe o nome do liquidante e o canal oficial "
                     "antes de qualquer coisa."
                 )
-            return (
-                "Vou confirmar essas informações nos canais oficiais e te retorno. [END_CONVERSATION]"
-            )
+            return "Vou confirmar essas informações nos canais oficiais e te retorno. [END_CONVERSATION]"
         if any(term in system for term in ["hardship", "can_pay_partial", "temporary_liquidity_block"]):
             if any(marker in system for marker in ["blocked_funds", "saldo bloqueado", "temporary_liquidity_block"]):
                 if any(marker in history for marker in ["entrada baixa", "limite mensal", "boleto registrado"]):
-                    return "R$ 80 por mês no boleto registrado cabe pra mim. Pode mandar por escrito. [END_CONVERSATION]"
+                    return (
+                        "R$ 80 por mês no boleto registrado cabe pra mim. Pode mandar por escrito. [END_CONVERSATION]"
+                    )
                 return "Meu dinheiro ficou bloqueado, então só consigo algo pequeno e por boleto oficial."
             if any(marker in system for marker in ["150", "r$ 150", "r$150"]):
-                return (
-                    "Não consigo pagar tudo, mas R$ 100 por mês eu topo se for em boleto."
-                )
-            return (
-                "Tô numa fase apertada, mas consigo segurar uma parcela pequena no boleto."
-            )
+                return "Não consigo pagar tudo, mas R$ 100 por mês eu topo se for em boleto."
+            return "Tô numa fase apertada, mas consigo segurar uma parcela pequena no boleto."
         if any(term in system for term in ["angry", "hostile", "avoidance", "avoidant"]):
-            return (
-                "Cansei dessas ligações. Manda tudo por escrito. [END_CONVERSATION]"
-            )
+            return "Cansei dessas ligações. Manda tudo por escrito. [END_CONVERSATION]"
         if any(term in system for term in ["confused", "questions_validity"]):
             return (
-                "Achei que com o Will tendo quebrado eu nem precisava pagar. Você pode me explicar "
-                "como funciona agora?"
+                "Achei que com o Will tendo quebrado eu nem precisava pagar. Você pode me explicar como funciona agora?"
             )
-        return (
-            "Esqueci esse boleto. Se me mandarem a confirmação por escrito, "
-            "eu pago essa semana."
-        )
+        return "Esqueci esse boleto. Se me mandarem a confirmação por escrito, eu pago essa semana."
 
     def _judge_response(self, history: str) -> str:
         lower_history = history.lower()
@@ -180,8 +163,7 @@ class ScriptedBackend:
             outcome = "payment_plan"
             probability = 0.72
         elif any(
-            marker in lower_history
-            for marker in ["payment this week", "will pay", "vou pagar", "pago essa semana"]
+            marker in lower_history for marker in ["payment this week", "will pay", "vou pagar", "pago essa semana"]
         ):
             outcome = "promise_to_pay"
             probability = 0.65

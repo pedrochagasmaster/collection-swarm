@@ -3,14 +3,12 @@
 from __future__ import annotations
 
 import re
-
-import yaml
 from uuid import uuid4
 
+import yaml
 from pydantic import ValidationError
 
-from collection_swarm.models import Constraint
-from collection_swarm.models import HardeningConfig, LLMMessage, Profile
+from collection_swarm.models import Constraint, HardeningConfig, LLMMessage, Profile
 
 
 async def harden_profiles(
@@ -20,7 +18,9 @@ async def harden_profiles(
     router,
 ) -> list[Profile]:
     model_id = config.hardener_model_id or "local-scripted"
-    response = await router.complete(model_id, [LLMMessage(role="user", content=_build_hardener_prompt(easy_profiles, winning_transcripts))])
+    response = await router.complete(
+        model_id, [LLMMessage(role="user", content=_build_hardener_prompt(easy_profiles, winning_transcripts))]
+    )
     profiles: list[Profile] = []
     for item in _parse_hardened_profiles(response.content):
         try:

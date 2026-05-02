@@ -10,7 +10,6 @@ from pydantic import BaseModel, Field
 
 from collection_swarm.models import ArenaSettings, ModelConfig, Profile, PromptConfig, SimulationSettings, Strategy
 
-
 DEFAULT_CONFIG_DIR = Path("config")
 
 
@@ -69,7 +68,10 @@ def _items_by_id(raw: Any, key: str) -> list[dict[str, Any]]:
     if isinstance(raw, dict) and key in raw:
         raw = raw[key]
     if isinstance(raw, dict):
-        return [dict(value, id=item_id) if isinstance(value, dict) and "id" not in value else value for item_id, value in raw.items()]
+        return [
+            dict(value, id=item_id) if isinstance(value, dict) and "id" not in value else value
+            for item_id, value in raw.items()
+        ]
     if isinstance(raw, list):
         return raw
     raise ValueError(f"expected {key} to be a list or mapping")

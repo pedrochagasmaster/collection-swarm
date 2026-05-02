@@ -43,6 +43,4 @@ class NimBackend:
 
 
 def _estimate_cost(model: ModelConfig, input_tokens: int, output_tokens: int) -> float:
-    return (input_tokens / 1_000_000 * model.input_cost_per_m) + (
-        output_tokens / 1_000_000 * model.output_cost_per_m
-    )
+    return (input_tokens / 1_000_000 * model.input_cost_per_m) + (output_tokens / 1_000_000 * model.output_cost_per_m)

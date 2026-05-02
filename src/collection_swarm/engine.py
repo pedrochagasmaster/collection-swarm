@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from datetime import timezone
+from datetime import UTC
 from difflib import SequenceMatcher
 from inspect import isawaitable
 
@@ -75,7 +75,7 @@ class SimulationEngine:
             result.status = "failed"
             result.error_message = str(exc)
             result.turn_count = len(result.transcript)
-            result.ended_at = utc_now().astimezone(timezone.utc)
+            result.ended_at = utc_now().astimezone(UTC)
             await _notify_progress(on_progress, result)
             return result
 

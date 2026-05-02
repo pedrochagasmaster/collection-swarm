@@ -12,7 +12,7 @@ import json
 import re
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
@@ -503,7 +503,7 @@ def build_model_role_report(
     )
     return ModelRoleReport(
         title=title,
-        generated_at=generated_at or datetime.now(timezone.utc),
+        generated_at=generated_at or datetime.now(UTC),
         scenario=scenario,
         probes=probe_tuple,
         assessments=assessments,
@@ -628,9 +628,7 @@ def render_markdown_report(report: ModelRoleReport) -> str:
         ]
     )
     for status in report.config_statuses:
-        lines.append(
-            f"| `{status.configured_id}` | `{status.model_name}` | {status.live_status} | {status.action} |"
-        )
+        lines.append(f"| `{status.configured_id}` | `{status.model_name}` | {status.live_status} | {status.action} |")
     lines.extend(["", "## Role Assessments", ""])
     for role in ("collector", "debtor", "judge"):
         lines.extend(

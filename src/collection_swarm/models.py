@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any, Literal
 from uuid import uuid4
@@ -48,7 +48,7 @@ class ConstraintRule(BaseModel):
     action: str | None = None
 
     @model_validator(mode="after")
-    def validate_required_fields(self) -> "ConstraintRule":
+    def validate_required_fields(self) -> ConstraintRule:
         if self.type == "max_payment" and self.amount is None:
             raise ValueError("max_payment constraint rules require amount")
         if self.type == "required_action" and not self.action:
@@ -223,7 +223,7 @@ class SimulationResult(BaseModel):
     strategy_id: str
     conversation_model: str
     judge_model: str
-    started_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    started_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     ended_at: datetime | None = None
     turn_count: int = 0
     ended_by: EndedBy | None = None
@@ -244,7 +244,7 @@ class SimulationResult(BaseModel):
     @classmethod
     def ensure_timezone(cls, value: datetime | None) -> datetime | None:
         if value is not None and value.tzinfo is None:
-            return value.replace(tzinfo=timezone.utc)
+            return value.replace(tzinfo=UTC)
         return value
 
 
@@ -290,7 +290,7 @@ class EloUpdate(BaseModel):
     rating_after: float
     effective_score: float
     expected_score: float
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class TournamentConfig(BaseModel):
@@ -308,7 +308,7 @@ class TournamentResult(BaseModel):
     config: TournamentConfig
     rounds_completed: int = 0
     total_games: int = 0
-    started_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    started_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     completed_at: datetime | None = None
     total_cost_usd: float = 0.0
 
@@ -319,7 +319,7 @@ class StrategyLineage(BaseModel):
     generation: int = 0
     mutation_type: str = "seed"
     mutation_description: str = ""
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     culled_at: datetime | None = None
 
 
@@ -339,7 +339,7 @@ class ProfileLineage(BaseModel):
     generation: int = 0
     hardening_type: str = "seed"
     hardening_description: str = ""
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     culled_at: datetime | None = None
 
 
@@ -351,7 +351,7 @@ class HardeningConfig(BaseModel):
 
 
 def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def model_dump_jsonable(model: BaseModel) -> dict[str, Any]:

@@ -9,3 +9,8 @@ output/
 .env
 node_modules/
 cursor_sdk_bridge/node_modules/
+artifacts/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+*.log

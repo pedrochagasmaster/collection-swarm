@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -38,9 +39,20 @@ from collection_swarm.model_evaluation import (
     run_live_role_probes,
     write_report,
 )
-from collection_swarm.models import EndedBy, MatrixCell, Message, SimulationResult, TournamentConfig, TournamentResult, model_dump_jsonable, utc_now
+from collection_swarm.models import (
+    EndedBy,
+    MatrixCell,
+    Message,
+    SimulationResult,
+    TournamentConfig,
+    TournamentResult,
+    model_dump_jsonable,
+    utc_now,
+)
 from collection_swarm.runner import build_matrix
 from collection_swarm.store import SimulationStore
+
+logger = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -191,7 +203,13 @@ def create_app(
     config_dir: Path = Path("config"),
     db_path: Path = Path("output/collection_swarm.sqlite"),
 ) -> FastAPI:
-    app = FastAPI(title="Collection Swarm Dashboard", version="0.1.0")
+    app = FastAPI(
+        title="Collection Swarm Dashboard",
+        version="0.1.0",
+        docs_url="/docs",
+        redoc_url="/redoc",
+        openapi_url="/openapi.json",
+    )
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
     app.state.jobs = {}
     app.state.manual_sessions = {}
@@ -219,7 +237,7 @@ def create_app(
                 if job_id not in app.state.benchmark_reports:
                     app.state.benchmark_reports[job_id] = data
             except Exception:
-                pass
+                logger.debug("Skipping unreadable benchmark file: %s", path)
 
     _load_saved_benchmark_reports()
 
@@ -273,9 +291,7 @@ def create_app(
         for r in runs:
             if r.judgment:
                 judged += 1
-                outcome_counts[r.judgment.payment_outcome] = (
-                    outcome_counts.get(r.judgment.payment_outcome, 0) + 1
-                )
+                outcome_counts[r.judgment.payment_outcome] = outcome_counts.get(r.judgment.payment_outcome, 0) + 1
                 score_sums["payment_probability"] += r.judgment.payment_probability
                 score_sums["compliance_score"] += r.judgment.compliance_score
                 score_sums["debtor_satisfaction"] += r.judgment.debtor_satisfaction
@@ -347,8 +363,8 @@ def create_app(
         store = _store()
         try:
             r = store.get_run(run_id)
-        except KeyError:
-            raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found")
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found") from exc
         result = json.loads(r.model_dump_json())
         result["started_at"] = r.started_at.isoformat() if r.started_at else None
         result["ended_at"] = r.ended_at.isoformat() if r.ended_at else None
@@ -417,7 +433,6 @@ def create_app(
         strategy_id: str | None = Query(None),
     ) -> dict[str, Any]:
         store = _store()
-        config = _config()
         strat_id = strategy_id
         if not strat_id:
             ranking = compare_strategies(profile_id, store)
@@ -505,11 +520,11 @@ def create_app(
         conversation_model = conversation_model or config.default_conversation_model
         judge_model = judge_model or config.default_judge_model
         strategies = (
-            []
-            if entity_type == "profile"
-            else store.get_elo_ratings("strategy", conversation_model, judge_model)
+            [] if entity_type == "profile" else store.get_elo_ratings("strategy", conversation_model, judge_model)
         )
-        profiles = [] if entity_type == "strategy" else store.get_elo_ratings("profile", conversation_model, judge_model)
+        profiles = (
+            [] if entity_type == "strategy" else store.get_elo_ratings("profile", conversation_model, judge_model)
+        )
         return {
             "strategies": [model_dump_jsonable(rating) for rating in strategies],
             "profiles": [model_dump_jsonable(rating) for rating in profiles],
@@ -634,7 +649,9 @@ def create_app(
         )
         app.state.jobs[job.id] = job
         app.state.tasks[job.id] = asyncio.create_task(
-            _run_single_job(job, config, _store(), payload.profile_id, payload.strategy_id, conversation_model, judge_model)
+            _run_single_job(
+                job, config, _store(), payload.profile_id, payload.strategy_id, conversation_model, judge_model
+            )
         )
         return job.snapshot()
 
@@ -644,7 +661,9 @@ def create_app(
         profile_ids = payload.profile_ids if payload.profile_ids is not None else list(config.profiles)
         strategy_ids = payload.strategy_ids if payload.strategy_ids is not None else list(config.strategies)
         conversation_models = (
-            payload.conversation_models if payload.conversation_models is not None else [config.default_conversation_model]
+            payload.conversation_models
+            if payload.conversation_models is not None
+            else [config.default_conversation_model]
         )
         judge_models = payload.judge_models if payload.judge_models is not None else [config.default_judge_model]
         if not profile_ids:
@@ -675,7 +694,9 @@ def create_app(
             message=f"Queued {len(cells)} matrix simulations.",
         )
         app.state.jobs[job.id] = job
-        app.state.tasks[job.id] = asyncio.create_task(_run_matrix_job(job, config, _store(), cells, payload.concurrency))
+        app.state.tasks[job.id] = asyncio.create_task(
+            _run_matrix_job(job, config, _store(), cells, payload.concurrency)
+        )
         return job.snapshot()
 
     @app.post("/api/jobs/tournaments")
@@ -967,17 +988,23 @@ async def _run_single_job(
 
         async def on_progress(result: SimulationResult) -> None:
             result.turn_count = len(result.transcript)
-            job.current_run = result.model_copy(update={"status": "running" if result.ended_at is None else result.status})
+            job.current_run = result.model_copy(
+                update={"status": "running" if result.ended_at is None else result.status}
+            )
             job.message = f"{result.turn_count} turn{'s' if result.turn_count != 1 else ''} recorded."
 
-        result = await engine.run_simulation(config.profile(profile_id), config.strategy(strategy_id), on_progress=on_progress)
+        result = await engine.run_simulation(
+            config.profile(profile_id), config.strategy(strategy_id), on_progress=on_progress
+        )
         store.save_run(result)
         job.current_run = result
         job.result_ids = [result.id]
         job.completed = 1 if result.status == "completed" else 0
         job.failed = 1 if result.status == "failed" else 0
         job.status = "completed" if result.status == "completed" else "failed"
-        job.message = "Simulation completed." if result.status == "completed" else result.error_message or "Simulation failed."
+        job.message = (
+            "Simulation completed." if result.status == "completed" else result.error_message or "Simulation failed."
+        )
         job.ended_at = utc_now().isoformat()
     except asyncio.CancelledError:
         raise
@@ -1011,7 +1038,9 @@ async def _run_matrix_job(
                             )
                             job.message = f"Running {cell.profile_id} x {cell.strategy_id}; {job.completed + job.failed}/{job.total} finished."
 
-                    result = await engine.run_simulation(config.profile(cell.profile_id), config.strategy(cell.strategy_id), on_progress=on_progress)
+                    result = await engine.run_simulation(
+                        config.profile(cell.profile_id), config.strategy(cell.strategy_id), on_progress=on_progress
+                    )
                     store.save_run(result)
                     async with lock:
                         job.result_ids.append(result.id)
@@ -1072,7 +1101,9 @@ async def _run_tournament_job(
                         job.current_run = partial.model_copy(
                             update={"status": "running" if partial.ended_at is None else partial.status}
                         )
-                        job.message = f"Running round {result.rounds_completed + 1}: {cell.strategy_id} x {cell.profile_id}."
+                        job.message = (
+                            f"Running round {result.rounds_completed + 1}: {cell.strategy_id} x {cell.profile_id}."
+                        )
 
                 return await engine.run_simulation(
                     profiles[cell.profile_id],
@@ -1316,7 +1347,9 @@ async def _append_ai_turn(session: ManualSession, config, role: str) -> None:
     settings = config.simulation.conversation
     if role == "collector":
         agent = CollectorAgent(router, result.conversation_model, config.prompts.collector)
-        response = await agent.generate_turn(config.strategy(result.strategy_id), profile.account_data, result.transcript)
+        response = await agent.generate_turn(
+            config.strategy(result.strategy_id), profile.account_data, result.transcript
+        )
     else:
         agent = DebtorAgent(router, result.conversation_model, config.prompts.debtor)
         response = await agent.generate_turn(profile, result.transcript)

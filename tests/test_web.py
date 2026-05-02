@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -410,9 +409,9 @@ class TestEvolutionAndCalibration:
             ),
             StrategyLineage(strategy_id="evo_ui", generation=1),
         )
-        profile = store.get_run if False else None
         config_profile = empty_client.get("/api/config/profiles").json()[0]
         from collection_swarm.models import Profile
+
         store.save_evolved_profile(
             Profile.model_validate({**config_profile, "id": "hard_ui"}),
             ProfileLineage(profile_id="hard_ui", parent_id=config_profile["id"], generation=1),
@@ -451,8 +450,16 @@ class TestModelBenchmarks:
     ) -> None:
         async def fake_run_live_role_probes(*args, **kwargs):
             return (
-                RoleProbe("gpt-5.5", "collector", "ok", 0.01, "This is an attempt to collect a debt for a $1,250 medical balance."),
-                RoleProbe("gpt-5.5", "debtor", "ok", 0.01, "My hours were cut and I can realistically pay $100 a month."),
+                RoleProbe(
+                    "gpt-5.5",
+                    "collector",
+                    "ok",
+                    0.01,
+                    "This is an attempt to collect a debt for a $1,250 medical balance.",
+                ),
+                RoleProbe(
+                    "gpt-5.5", "debtor", "ok", 0.01, "My hours were cut and I can realistically pay $100 a month."
+                ),
             )
 
         monkeypatch.setattr("collection_swarm.web.app.run_live_role_probes", fake_run_live_role_probes)
@@ -575,6 +582,7 @@ class TestSeedData:
 
     def test_seed_data_has_judgments(self, tmp_path: Path) -> None:
         from collection_swarm.store import SimulationStore
+
         db_path = tmp_path / "seed_test.sqlite"
         generate_seed_data(db_path=db_path, num_runs=12)
         store = SimulationStore(db_path)

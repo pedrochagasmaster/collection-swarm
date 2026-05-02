@@ -3,19 +3,29 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 
 from collection_swarm import arena
+from collection_swarm.adversarial import harden_profiles
 from collection_swarm.agents.collector import CollectorAgent
 from collection_swarm.agents.debtor import DebtorAgent
 from collection_swarm.agents.judge import Judge
 from collection_swarm.backends.router import LLMRouter
 from collection_swarm.config import AppConfig
 from collection_swarm.engine import SimulationEngine
-from collection_swarm.adversarial import harden_profiles
 from collection_swarm.evolution import cull_strategies, evolve_strategies
-from collection_swarm.models import EvolutionConfig, HardeningConfig, MatrixCell, ProfileLineage, SimulationResult, StrategyLineage, TournamentConfig, TournamentResult, utc_now
+from collection_swarm.models import (
+    EvolutionConfig,
+    HardeningConfig,
+    MatrixCell,
+    ProfileLineage,
+    SimulationResult,
+    StrategyLineage,
+    TournamentConfig,
+    TournamentResult,
+    utc_now,
+)
 from collection_swarm.store import SimulationStore
 
 
@@ -231,21 +241,32 @@ async def run_evolution_cycle(
             concurrency=concurrency,
         )
         results.append(tournament)
-        ratings = store.get_elo_ratings("strategy", conversation_model or config.default_conversation_model, judge_model or config.default_judge_model)
+        ratings = store.get_elo_ratings(
+            "strategy",
+            conversation_model or config.default_conversation_model,
+            judge_model or config.default_judge_model,
+        )
         sorted_ids = [rating.entity_id for rating in ratings if rating.entity_id in active_strategy_ids]
         if not sorted_ids:
             sorted_ids = active_strategy_ids
         all_strategies = {**config.strategies, **store.get_evolved_strategy_pool()}
-        top = [all_strategies[strategy_id] for strategy_id in sorted_ids[: evolution_config.top_k] if strategy_id in all_strategies]
-        bottom = [all_strategies[strategy_id] for strategy_id in sorted_ids[-evolution_config.bottom_k :] if strategy_id in all_strategies]
+        top = [
+            all_strategies[strategy_id]
+            for strategy_id in sorted_ids[: evolution_config.top_k]
+            if strategy_id in all_strategies
+        ]
+        bottom = [
+            all_strategies[strategy_id]
+            for strategy_id in sorted_ids[-evolution_config.bottom_k :]
+            if strategy_id in all_strategies
+        ]
         failed_runs = [
             run
             for run in store.list_runs(status="completed")
             if run.strategy_id in {strategy.id for strategy in bottom} and run.transcript
         ]
         failure_transcripts = [
-            "\n".join(f"{message.role}: {message.content}" for message in run.transcript)
-            for run in failed_runs[:5]
+            "\n".join(f"{message.role}: {message.content}" for message in run.transcript) for run in failed_runs[:5]
         ]
         evolved = await evolve_strategies(top, bottom, failure_transcripts, evolution_config, router)
         for strategy in evolved:
@@ -278,7 +299,9 @@ async def run_evolution_cycle(
                         active_strategy_ids.remove(strategy.id)
         if hardening_config and hardening_config.enabled:
             profile_pool = {**config.profiles, **store.get_evolved_profile_pool()}
-            seed_profiles = [profile_pool[profile_id] for profile_id in active_profile_ids if profile_id in profile_pool]
+            seed_profiles = [
+                profile_pool[profile_id] for profile_id in active_profile_ids if profile_id in profile_pool
+            ]
             hardened = await harden_profiles(seed_profiles[: evolution_config.bottom_k], [], hardening_config, router)
             for profile in hardened:
                 parent_id = seed_profiles[0].id if seed_profiles else None

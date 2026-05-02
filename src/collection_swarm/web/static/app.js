@@ -1425,6 +1425,8 @@ window.showJob = async function(jobId, panelId, statusId) {
 
 // ── Transcript slideout ────────────────────────────────────────
 
+let _slideoutPreviousFocus = null;
+
 window.openTranscript = async function(runId) {
   const overlay = $('#slideout-overlay');
   const panel = $('#slideout-panel');
@@ -2249,7 +2251,7 @@ async function renderArena() {
 
 function arenaLeaderboardCard(title, ratings) {
   const rows = ratings.map((rating, index) => `
-    <tr onclick="toggleArenaHistory(${jsArg(rating.entity_id)})">
+    <tr tabindex="0" role="button" aria-label="Toggle history for ${escapeAttr(fmtId(rating.entity_id))}" onclick="toggleArenaHistory(${jsArg(rating.entity_id)})" onkeydown="handleArenaRowKey(event, ${jsArg(rating.entity_id)})">
       <td>${index + 1}</td>
       <td>${escapeHTML(fmtId(rating.entity_id))}</td>
       <td><span class="elo-badge ${eloClass(rating.rating)}">${Number(rating.rating).toFixed(1)}</span></td>
@@ -2266,6 +2268,12 @@ function arenaLeaderboardCard(title, ratings) {
       </div>
     </section>`;
 }
+
+window.handleArenaRowKey = function(event, entityId) {
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  event.preventDefault();
+  toggleArenaHistory(entityId);
+};
 
 function eloClass(rating) {
   return rating > 1550 ? 'elo-high' : rating < 1450 ? 'elo-low' : 'elo-mid';
@@ -2321,9 +2329,14 @@ window.toggleArenaHistory = async function(entityId) {
   if (!row) return;
   row.hidden = !row.hidden;
   if (row.hidden || row.dataset.loaded) return;
-  const history = await api(`/arena/history/${pathPart(entityId)}`);
-  row.dataset.loaded = 'true';
-  row.innerHTML = `<td colspan="5">${history.length ? arenaHistoryHTML(history) : '<div class="status-line">No history for this entity.</div>'}</td>`;
+  try {
+    row.innerHTML = '<td colspan="5"><div class="status-line">Loading history…</div></td>';
+    const history = await api(`/arena/history/${pathPart(entityId)}`);
+    row.dataset.loaded = 'true';
+    row.innerHTML = `<td colspan="5">${history.length ? arenaHistoryHTML(history) : '<div class="status-line">No history for this entity.</div>'}</td>`;
+  } catch (err) {
+    row.innerHTML = `<td colspan="5">${emptyState('Failed to load history', err.message)}</td>`;
+  }
 };
 
 function arenaHistoryHTML(history) {

@@ -137,11 +137,6 @@ every persona and strategy are documented in
 | `willbank_benefit_dependent_household` | Vulnerable hardship | R$ 760 card + bills | Benefits and essential expenses take priority |
 | `willbank_fgc_waiting_high_balance` | Angry reimbursement-waiting | R$ 3 900 card installments | Will pay after FGC/liquidator milestone |
 | `willbank_low_digital_access` | Low digital access | R$ 520 card invoice | Cannot access app or generate boleto unaided |
-| `willbank_blocked_balance_hardship` | Anxious hardship | R$ 930 cartão Will | Blocked salary/reserve — needs low-entry boleto plan |
-| `willbank_micro_merchant_cashflow` | Pragmatic merchant | R$ 1 480 cartão Will | Irregular post-liquidation cash flow |
-| `willbank_benefit_dependent_household` | Vulnerable hardship | R$ 760 cartão/basic bills | Essential expenses take priority |
-| `willbank_fgc_waiting_high_balance` | Angry/high balance | R$ 3 900 cartão Will | Will pay after FGC/liquidator milestone |
-| `willbank_low_digital_access` | Low digital access | R$ 520 cartão Will | Cannot access app or generate boleto |
 
 ### Included Strategies
 
@@ -160,11 +155,6 @@ every persona and strategy are documented in
 | `overindebtedness_stabilization` | Nonjudgmental structured | One recommended option | Documented hardship review |
 | `reimbursement_milestone_callback` | Calm respectful | Bridge agreement until reimbursement | Callback tied to official milestone |
 | `low_digital_access_guidance` | Patient step-by-step | Assisted official-channel resolution | Written step-by-step instructions |
-| `blocked_balance_hardship_plan` | Empathetic practical | Micro-installment + fee review | Low-entry boleto path |
-| `micro_merchant_cashflow_alignment` | Collaborative | Weekly/payday-aligned installments | Written schedule review |
-| `overindebtedness_stabilization` | Nonjudgmental | One recommended default option | Documented hardship review |
-| `reimbursement_milestone_callback` | Calm respectful | Bridge until reimbursement | Official-milestone callback |
-| `low_digital_access_guidance` | Patient | Step-by-step boleto guidance | Written instructions |
 
 Profiles and strategies are defined in YAML and are fully extensible — add your own in `config/debtor_profiles.yaml` and `config/collector_strategies.yaml`.
 
@@ -365,7 +355,7 @@ A key design choice: debtor profiles include **machine-readable constraints**. F
 pytest -q
 ```
 
-The test suite (12 files, 21+ tests) covers:
+The test suite covers:
 
 - Config loading and validation
 - Domain model serialization

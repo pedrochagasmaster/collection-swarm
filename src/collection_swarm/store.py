@@ -4,15 +4,15 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from collection_swarm.models import (
     DRAW_THRESHOLD,
-    EndedBy,
     EloRating,
     EloUpdate,
+    EndedBy,
     Judgment,
     MatrixCell,
     Message,
@@ -28,6 +28,8 @@ from collection_swarm.models import (
     model_dump_jsonable,
 )
 
+SCHEMA_VERSION = 2
+
 
 class SimulationStore:
     def __init__(self, path: Path | str = "output/collection_swarm.sqlite") -> None:
@@ -40,143 +42,184 @@ class SimulationStore:
         connection.row_factory = sqlite3.Row
         return connection
 
+    def _get_schema_version(self, connection: sqlite3.Connection) -> int:
+        tables = {
+            row["name"] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+        }
+        if "schema_version" not in tables:
+            return 0
+        row = connection.execute("SELECT version FROM schema_version ORDER BY version DESC LIMIT 1").fetchone()
+        return int(row["version"]) if row else 0
+
+    def schema_version(self) -> int:
+        with self._connect() as connection:
+            return self._get_schema_version(connection)
+
     def _init_schema(self) -> None:
         with self._connect() as connection:
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS runs (
-                    id TEXT PRIMARY KEY,
-                    status TEXT NOT NULL,
-                    error_message TEXT,
-                    profile_id TEXT NOT NULL,
-                    strategy_id TEXT NOT NULL,
-                    conversation_model TEXT NOT NULL,
-                    judge_model TEXT NOT NULL,
-                    started_at TEXT NOT NULL,
-                    ended_at TEXT,
-                    turn_count INTEGER,
-                    ended_by TEXT,
-                    transcript_json TEXT,
-                    judge_reasoning TEXT,
-                    payment_outcome TEXT,
-                    payment_probability REAL,
-                    debtor_satisfaction REAL,
-                    compliance_score REAL,
-                    conversation_efficiency INTEGER,
-                    rapport_built REAL,
-                    escalation_risk REAL,
-                    end_reason TEXT,
-                    constraint_violations_json TEXT,
-                    total_input_tokens INTEGER,
-                    total_output_tokens INTEGER,
-                    estimated_cost_usd REAL
-                )
-                """
+            current = self._get_schema_version(connection)
+            if current < 1:
+                self._apply_v1(connection)
+            if current < 2:
+                self._apply_v2(connection)
+
+    def _apply_v1(self, connection: sqlite3.Connection) -> None:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS schema_version (
+                version INTEGER PRIMARY KEY,
+                applied_at TEXT NOT NULL
             )
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS elo_ratings (
-                    entity_type TEXT NOT NULL,
-                    entity_id TEXT NOT NULL,
-                    conversation_model TEXT NOT NULL DEFAULT '',
-                    judge_model TEXT NOT NULL DEFAULT '',
-                    rating REAL NOT NULL,
-                    games_played INTEGER NOT NULL,
-                    wins INTEGER NOT NULL,
-                    losses INTEGER NOT NULL,
-                    draws INTEGER NOT NULL,
-                    updated_at TEXT NOT NULL,
-                    PRIMARY KEY (entity_type, entity_id, conversation_model, judge_model)
-                )
-                """
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS runs (
+                id TEXT PRIMARY KEY,
+                status TEXT NOT NULL,
+                error_message TEXT,
+                profile_id TEXT NOT NULL,
+                strategy_id TEXT NOT NULL,
+                conversation_model TEXT NOT NULL,
+                judge_model TEXT NOT NULL,
+                started_at TEXT NOT NULL,
+                ended_at TEXT,
+                turn_count INTEGER,
+                ended_by TEXT,
+                transcript_json TEXT,
+                judge_reasoning TEXT,
+                payment_outcome TEXT,
+                payment_probability REAL,
+                debtor_satisfaction REAL,
+                compliance_score REAL,
+                conversation_efficiency INTEGER,
+                rapport_built REAL,
+                escalation_risk REAL,
+                end_reason TEXT,
+                constraint_violations_json TEXT,
+                total_input_tokens INTEGER,
+                total_output_tokens INTEGER,
+                estimated_cost_usd REAL
             )
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS elo_history (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    tournament_id TEXT,
-                    entity_type TEXT NOT NULL,
-                    entity_id TEXT NOT NULL,
-                    opponent_id TEXT NOT NULL,
-                    conversation_model TEXT NOT NULL DEFAULT '',
-                    judge_model TEXT NOT NULL DEFAULT '',
-                    simulation_id TEXT NOT NULL,
-                    rating_before REAL NOT NULL,
-                    rating_after REAL NOT NULL,
-                    effective_score REAL NOT NULL,
-                    expected_score REAL NOT NULL,
-                    timestamp TEXT NOT NULL
-                )
-                """
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS elo_ratings (
+                entity_type TEXT NOT NULL,
+                entity_id TEXT NOT NULL,
+                conversation_model TEXT NOT NULL DEFAULT '',
+                judge_model TEXT NOT NULL DEFAULT '',
+                rating REAL NOT NULL,
+                games_played INTEGER NOT NULL,
+                wins INTEGER NOT NULL,
+                losses INTEGER NOT NULL,
+                draws INTEGER NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (entity_type, entity_id, conversation_model, judge_model)
             )
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS tournaments (
-                    id TEXT PRIMARY KEY,
-                    config_json TEXT NOT NULL,
-                    rounds_completed INTEGER NOT NULL,
-                    total_games INTEGER NOT NULL,
-                    started_at TEXT NOT NULL,
-                    completed_at TEXT,
-                    total_cost_usd REAL NOT NULL
-                )
-                """
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS elo_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tournament_id TEXT,
+                entity_type TEXT NOT NULL,
+                entity_id TEXT NOT NULL,
+                opponent_id TEXT NOT NULL,
+                conversation_model TEXT NOT NULL DEFAULT '',
+                judge_model TEXT NOT NULL DEFAULT '',
+                simulation_id TEXT NOT NULL,
+                rating_before REAL NOT NULL,
+                rating_after REAL NOT NULL,
+                effective_score REAL NOT NULL,
+                expected_score REAL NOT NULL,
+                timestamp TEXT NOT NULL
             )
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS evolved_strategies (
-                    id TEXT PRIMARY KEY,
-                    generation INTEGER NOT NULL DEFAULT 0,
-                    parent_ids_json TEXT,
-                    mutation_type TEXT,
-                    mutation_description TEXT,
-                    strategy_json TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    culled_at TEXT
-                )
-                """
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS tournaments (
+                id TEXT PRIMARY KEY,
+                config_json TEXT NOT NULL,
+                rounds_completed INTEGER NOT NULL,
+                total_games INTEGER NOT NULL,
+                started_at TEXT NOT NULL,
+                completed_at TEXT,
+                total_cost_usd REAL NOT NULL
             )
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS evolved_profiles (
-                    id TEXT PRIMARY KEY,
-                    generation INTEGER NOT NULL DEFAULT 0,
-                    parent_id TEXT,
-                    hardening_type TEXT,
-                    hardening_description TEXT,
-                    profile_json TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    culled_at TEXT
-                )
-                """
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS evolved_strategies (
+                id TEXT PRIMARY KEY,
+                generation INTEGER NOT NULL DEFAULT 0,
+                parent_ids_json TEXT,
+                mutation_type TEXT,
+                mutation_description TEXT,
+                strategy_json TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                culled_at TEXT
             )
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS calibration_labels (
-                    transcript_id TEXT NOT NULL,
-                    metric TEXT NOT NULL,
-                    human_score REAL NOT NULL,
-                    labeler_id TEXT NOT NULL,
-                    labeled_at TEXT NOT NULL,
-                    PRIMARY KEY (transcript_id, metric, labeler_id)
-                )
-                """
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS evolved_profiles (
+                id TEXT PRIMARY KEY,
+                generation INTEGER NOT NULL DEFAULT 0,
+                parent_id TEXT,
+                hardening_type TEXT,
+                hardening_description TEXT,
+                profile_json TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                culled_at TEXT
             )
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS judge_prompt_variants (
-                    id TEXT PRIMARY KEY,
-                    system_prompt TEXT NOT NULL,
-                    transcript_prompt TEXT NOT NULL,
-                    calibration_score REAL,
-                    created_at TEXT NOT NULL
-                )
-                """
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS calibration_labels (
+                transcript_id TEXT NOT NULL,
+                metric TEXT NOT NULL,
+                human_score REAL NOT NULL,
+                labeler_id TEXT NOT NULL,
+                labeled_at TEXT NOT NULL,
+                PRIMARY KEY (transcript_id, metric, labeler_id)
             )
-            self._ensure_column(connection, "elo_ratings", "conversation_model", "TEXT NOT NULL DEFAULT ''")
-            self._ensure_column(connection, "elo_ratings", "judge_model", "TEXT NOT NULL DEFAULT ''")
-            self._ensure_column(connection, "elo_history", "conversation_model", "TEXT NOT NULL DEFAULT ''")
-            self._ensure_column(connection, "elo_history", "judge_model", "TEXT NOT NULL DEFAULT ''")
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS judge_prompt_variants (
+                id TEXT PRIMARY KEY,
+                system_prompt TEXT NOT NULL,
+                transcript_prompt TEXT NOT NULL,
+                calibration_score REAL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        self._ensure_column(connection, "elo_ratings", "conversation_model", "TEXT NOT NULL DEFAULT ''")
+        self._ensure_column(connection, "elo_ratings", "judge_model", "TEXT NOT NULL DEFAULT ''")
+        self._ensure_column(connection, "elo_history", "conversation_model", "TEXT NOT NULL DEFAULT ''")
+        self._ensure_column(connection, "elo_history", "judge_model", "TEXT NOT NULL DEFAULT ''")
+        connection.execute(
+            "INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES (?, ?)",
+            (1, datetime.now(tz=UTC).isoformat()),
+        )
+
+    def _apply_v2(self, connection: sqlite3.Connection) -> None:
+        connection.execute("CREATE INDEX IF NOT EXISTS idx_runs_status ON runs (status)")
+        connection.execute("CREATE INDEX IF NOT EXISTS idx_runs_profile_strategy ON runs (profile_id, strategy_id)")
+        connection.execute("CREATE INDEX IF NOT EXISTS idx_elo_history_entity ON elo_history (entity_id, timestamp)")
+        connection.execute(
+            "INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES (?, ?)",
+            (2, datetime.now(tz=UTC).isoformat()),
+        )
 
     def _ensure_column(self, connection: sqlite3.Connection, table: str, column: str, definition: str) -> None:
         columns = {row["name"] for row in connection.execute(f"PRAGMA table_info({table})").fetchall()}
@@ -559,7 +602,9 @@ class SimulationStore:
 
     def get_evolved_strategy(self, strategy_id: str) -> Strategy | None:
         with self._connect() as connection:
-            row = connection.execute("SELECT strategy_json FROM evolved_strategies WHERE id = ?", (strategy_id,)).fetchone()
+            row = connection.execute(
+                "SELECT strategy_json FROM evolved_strategies WHERE id = ?", (strategy_id,)
+            ).fetchone()
         return Strategy.model_validate(json.loads(row["strategy_json"])) if row else None
 
     def list_evolved_strategies(self, include_culled: bool = False) -> list[tuple[Strategy, StrategyLineage]]:
@@ -573,7 +618,10 @@ class SimulationStore:
 
     def cull_evolved_strategy(self, strategy_id: str) -> None:
         with self._connect() as connection:
-            connection.execute("UPDATE evolved_strategies SET culled_at = ? WHERE id = ?", (datetime.now(tz=timezone.utc).isoformat(), strategy_id))
+            connection.execute(
+                "UPDATE evolved_strategies SET culled_at = ? WHERE id = ?",
+                (datetime.now(tz=UTC).isoformat(), strategy_id),
+            )
 
     def get_evolved_strategy_pool(self) -> dict[str, Strategy]:
         return {strategy.id: strategy for strategy, _ in self.list_evolved_strategies()}
@@ -615,7 +663,9 @@ class SimulationStore:
 
     def cull_evolved_profile(self, profile_id: str) -> None:
         with self._connect() as connection:
-            connection.execute("UPDATE evolved_profiles SET culled_at = ? WHERE id = ?", (datetime.now(tz=timezone.utc).isoformat(), profile_id))
+            connection.execute(
+                "UPDATE evolved_profiles SET culled_at = ? WHERE id = ?", (datetime.now(tz=UTC).isoformat(), profile_id)
+            )
 
     def get_evolved_profile_pool(self) -> dict[str, Profile]:
         return {profile.id: profile for profile, _ in self.list_evolved_profiles()}
@@ -645,12 +695,19 @@ class SimulationStore:
             grouped.setdefault(key, {})[row["metric"]] = float(row["human_score"])
             timestamps[key] = row["labeled_at"]
         return [
-            CalibrationLabel(transcript_id=tid, labeler_id=labeler, timestamp=datetime.fromisoformat(timestamps[(tid, labeler, ts)]), human_scores=scores)
+            CalibrationLabel(
+                transcript_id=tid,
+                labeler_id=labeler,
+                timestamp=datetime.fromisoformat(timestamps[(tid, labeler, ts)]),
+                human_scores=scores,
+            )
             for (tid, labeler, ts), scores in grouped.items()
         ]
 
-    def save_judge_variant(self, system_prompt: str, transcript_prompt: str, calibration_score: float | None = None) -> str:
-        now = datetime.now(tz=timezone.utc)
+    def save_judge_variant(
+        self, system_prompt: str, transcript_prompt: str, calibration_score: float | None = None
+    ) -> str:
+        now = datetime.now(tz=UTC)
         variant_id = f"judge_{now.strftime('%Y%m%d%H%M%S%f')}"
         with self._connect() as connection:
             connection.execute(
