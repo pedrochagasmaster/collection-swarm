@@ -79,6 +79,8 @@ def _build_evolver_prompt(top: list[Strategy], bottom: list[Strategy], transcrip
 
 
 def _fallback_strategy(top: list[Strategy], bottom: list[Strategy]) -> Strategy:
+    if not top and not bottom:
+        raise ValueError("Cannot create fallback strategy without at least one parent")
     parent = top[0] if top else bottom[0]
     return parent.model_copy(
         update={

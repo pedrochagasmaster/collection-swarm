@@ -251,7 +251,7 @@ async def run_evolution_cycle(
         for strategy in evolved:
             lineage = StrategyLineage(
                 strategy_id=strategy.id,
-                parent_ids=[strategy.id for strategy in top[:2]],
+                parent_ids=[s.id for s in top[:2]],
                 generation=generation,
                 mutation_type="llm",
                 mutation_description="Generated from tournament leaderboard feedback.",
