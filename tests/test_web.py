@@ -139,6 +139,25 @@ class TestPlaybook:
         data = resp.json()
         assert data["format"] == "html"
         assert "<h1>" in data["content"]
+        assert data["simulation_count"] == 12
+
+    def test_playbook_html_strips_unsafe_markup(
+        self,
+        seeded_client: TestClient,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(
+            "collection_swarm.web.app.generate_playbook",
+            lambda *args, **kwargs: "# Safe\n\n<script>alert(1)</script><img src=x onerror=alert(2)>[ok](javascript:alert(3))",
+        )
+
+        resp = seeded_client.get("/api/playbook?format=html")
+
+        assert resp.status_code == 200
+        content = resp.json()["content"]
+        assert "<script" not in content
+        assert "onerror" not in content
+        assert "javascript:" not in content
 
     def test_playbook_markdown(self, seeded_client: TestClient) -> None:
         resp = seeded_client.get("/api/playbook?format=markdown")
@@ -565,6 +584,46 @@ class TestSPA:
     def test_static_js(self, seeded_client: TestClient) -> None:
         resp = seeded_client.get("/static/app.js")
         assert resp.status_code == 200
+
+    def test_static_assets_include_ux_report_fixes(self, seeded_client: TestClient) -> None:
+        html = seeded_client.get("/").text
+        css = seeded_client.get("/static/styles.css").text
+        js = seeded_client.get("/static/app.js").text
+
+        assert '<a href="#main-content" class="skip-link">' in html
+        assert 'aria-live="polite"' not in html.split('<main class="main-content"', 1)[1].split(">", 1)[0]
+        assert 'name="theme-color"' in html
+        assert 'fonts.googleapis.com' not in html
+        assert '<div class="nav-label">Overview</div>' in html
+
+        assert "window.addEventListener('hashchange'" in js
+        assert "isPageHash()" in js
+        assert "updateDocumentTitle(page)" in js
+        assert "handleRunRowKey(event" in js
+        assert "quick-actions" in js
+        assert "Synthetic Analysis" in js
+        assert "generatePlaybookTOC" in js
+        assert "data.simulation_count" in js
+        assert "startCalibration" in js
+        assert "submitCalibrationLabels" in js
+        assert "Polling stopped" in js
+        assert "handlePollFailure" in js
+        assert "aria-valuetext" in js
+        assert "Models not available" in js
+        assert "selected = []" in js
+        assert "checkboxGroupActions('matrix-profiles')" in js
+        assert "clearBenchmarkModels()" in js
+
+        assert "--text-xs: 0.75rem" in css
+        assert "--text-tertiary: oklch(50% 0.008 275)" in css
+        assert "animation: none !important" in css
+        assert ".data-table tbody tr:focus-visible" in css
+        assert ".quick-actions" in css
+        assert ".trust-banner" in css
+        assert ".playbook-toc" in css
+        assert ".sidebar-footer" in css and "position: sticky" in css
+        assert "--fit-strong" in css and "--fit-unsafe" in css
+        assert "min-width: 44px" in css
 
 
 class TestSeedData:
