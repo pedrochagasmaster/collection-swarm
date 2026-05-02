@@ -708,14 +708,657 @@ The dominant cost remains the **simulation calls** themselves (Collector + Debto
 
 ---
 
-## Next Steps
+## Implementation Plan: Options A → B → C → D
 
-If the team wants to proceed, the recommended first step is **Option A (Elo Arena)**:
+The following plan is grounded in the actual codebase structure and accounts for
+side effects, regressions, UI changes, and test coverage at every step.
 
-1. Add `EloRating` model and `elo_ratings` table to the store.
-2. Build `arena.py` with Elo math and Swiss-system matchmaking.
-3. Add `run_tournament()` to `runner.py`.
-4. Wire up a `tournament` CLI command and basic web leaderboard.
-5. Run a tournament with the existing 13 strategies × 15 profiles to validate.
+---
 
-This gives us the foundation (proper competitive rating, matchmaking, tournament infrastructure) that every subsequent option builds on — and it's implementable without any new LLM calls or dependencies.
+### Phase 1: Option A — Elo Arena + Tournaments
+
+#### 1.1 New File: `src/collection_swarm/arena.py`
+
+Core module — pure functions, no IO or async. Contains:
+
+- **`elo_expected(rating_a, rating_b) -> float`** — standard expected-score formula.
+- **`elo_update(rating, expected, actual, k) -> float`** — single Elo update.
+- **`effective_score(judgment) -> float`** — converts `Judgment` to game score. Default: `payment_probability * compliance_score`. Returns 0.0 if judgment is None.
+- **`k_factor(games_played, initial=32, stable=16, threshold=30) -> float`** — K decay.
+- **`update_ratings(strategy_rating, profile_rating, judgment) -> tuple[EloUpdate, EloUpdate]`** — computes both sides' updates from one game result.
+- **`swiss_pairings(strategy_ratings, profile_ratings, history) -> list[tuple[str, str]]`** — Swiss matchmaker. Sorts both pools by Elo descending, pairs #1 with #1, etc. Avoids repeat matchups within a tournament (uses `history` set). Falls back to next-available if all opponents at a rank have been played.
+- **`round_robin_pairings(strategy_ids, profile_ids) -> list[tuple[str, str]]`** — Cartesian product.
+
+**Side effects / regressions:** None — pure functions. No existing code is modified.
+
+**Tests:** `tests/test_arena.py`
+- `test_elo_expected_equal_ratings` — both at 1500, expected = 0.5.
+- `test_elo_expected_strong_vs_weak` — 1800 vs 1200, expected > 0.9.
+- `test_elo_update_win` — winner gains, loser loses, sum is zero.
+- `test_elo_update_draw` — equal ratings + 0.5 score → no movement.
+- `test_effective_score_multiplies_payment_and_compliance` — 0.8 × 0.9 = 0.72.
+- `test_effective_score_none_judgment` — returns 0.0.
+- `test_k_factor_decay` — K=32 when games < 30, K=16 when ≥ 30.
+- `test_swiss_pairings_pairs_by_rank` — top strategy gets top profile.
+- `test_swiss_pairings_avoids_repeats` — second round skips already-played.
+- `test_round_robin_pairings_covers_all` — len = strategies × profiles.
+
+#### 1.2 Model Changes: `src/collection_swarm/models.py`
+
+Add at end of file (after `model_dump_jsonable`):
+
+```python
+class EloRating(BaseModel):
+    entity_type: Literal["strategy", "profile"]
+    entity_id: str
+    rating: float = 1500.0
+    games_played: int = 0
+    wins: int = 0
+    losses: int = 0
+    draws: int = 0
+
+class EloUpdate(BaseModel):
+    entity_type: Literal["strategy", "profile"]
+    entity_id: str
+    opponent_id: str
+    simulation_id: str
+    rating_before: float
+    rating_after: float
+    effective_score: float
+    expected_score: float
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class TournamentConfig(BaseModel):
+    format: Literal["round_robin", "swiss"] = "swiss"
+    rounds: int = 4
+    reps_per_pairing: int = 1
+    k_factor_initial: float = 32.0
+    k_factor_stable: float = 16.0
+    k_factor_threshold: int = 30
+    scoring: Literal["payment_x_compliance", "payment_only"] = "payment_x_compliance"
+
+class TournamentResult(BaseModel):
+    id: str = Field(default_factory=lambda: f"tourn_{uuid4().hex[:10]}")
+    config: TournamentConfig
+    rounds_completed: int = 0
+    total_games: int = 0
+    started_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    completed_at: datetime | None = None
+    total_cost_usd: float = 0.0
+```
+
+**Side effects / regressions:**
+- New models are purely additive. No existing model changes.
+- `models.py` has `from __future__ import annotations` so forward references work.
+- `Literal` is already imported. `uuid4`, `datetime`, `timezone` are already imported.
+- `test_models.py` — check it still passes (it only tests `PaymentOutcome`, `ConstraintRule`).
+
+**Tests:** `tests/test_models.py` — add tests for `EloRating` defaults, `TournamentConfig` validation.
+
+#### 1.3 Store Changes: `src/collection_swarm/store.py`
+
+Add inside `_init_schema()` after the `runs` table CREATE:
+
+```sql
+CREATE TABLE IF NOT EXISTS elo_ratings (...)
+CREATE TABLE IF NOT EXISTS elo_history (...)
+CREATE TABLE IF NOT EXISTS tournaments (...)
+```
+
+Add methods to `SimulationStore`:
+- `get_elo_ratings(entity_type=None) -> list[EloRating]`
+- `get_elo_rating(entity_type, entity_id) -> EloRating` (returns default 1500 if not found)
+- `save_elo_update(update: EloUpdate, tournament_id: str | None) -> None`
+- `save_tournament(result: TournamentResult) -> None`
+- `get_tournament(tournament_id: str) -> TournamentResult`
+- `list_tournaments() -> list[TournamentResult]`
+- `get_elo_history(entity_id: str) -> list[EloUpdate]`
+- `reset_elo_ratings() -> None` (DELETE FROM elo_ratings + elo_history)
+
+**Side effects / regressions:**
+- `_init_schema()` already uses `CREATE TABLE IF NOT EXISTS`, so adding more tables is safe for existing DBs.
+- The new tables don't affect the existing `runs` table or any existing queries.
+- `test_store.py` uses `tmp_path` for fresh DBs, so the schema additions are automatically tested.
+- CRITICAL: The `save_elo_update` method must update both `elo_ratings` (upsert) and insert into `elo_history`. Use `INSERT OR REPLACE` for `elo_ratings` keyed on `(entity_type, entity_id)`.
+
+**Tests:** `tests/test_store.py` — add:
+- `test_elo_rating_defaults_to_1500`
+- `test_save_and_read_elo_update`
+- `test_elo_history_returns_chronological_updates`
+- `test_reset_elo_ratings_clears_all`
+- `test_save_and_read_tournament`
+
+#### 1.4 Runner Changes: `src/collection_swarm/runner.py`
+
+Add `run_tournament()` async function:
+
+```python
+async def run_tournament(
+    config: AppConfig,
+    store: SimulationStore,
+    tournament_config: TournamentConfig,
+    profile_ids: list[str] | None = None,
+    strategy_ids: list[str] | None = None,
+    conversation_model: str | None = None,
+    judge_model: str | None = None,
+    concurrency: int = 2,
+    on_round_complete: Callable | None = None,
+) -> TournamentResult:
+```
+
+Flow:
+1. Initialize Elo ratings for all strategies and profiles (load from store, or default 1500).
+2. For each round:
+   a. Generate pairings (Swiss or round-robin based on config).
+   b. Convert pairings to `MatrixCell` objects.
+   c. Run all cells concurrently using existing `SimulationEngine` (reuse `_make_engine` pattern from runner).
+   d. For each completed simulation, compute Elo updates and persist via `store.save_elo_update()`.
+   e. Save simulation results via `store.save_run()`.
+   f. Call `on_round_complete` callback if provided.
+3. Save `TournamentResult` via `store.save_tournament()`.
+
+**Side effects / regressions:**
+- `build_matrix` and `run_matrix` are unchanged. No regression on existing matrix runs.
+- Existing `RunSummary` dataclass is unchanged.
+- Import of `TournamentConfig`, `TournamentResult`, `EloRating`, `EloUpdate` from models.
+- Import of `arena` functions.
+- The `concurrency` semaphore pattern mirrors the existing `run_matrix` implementation.
+
+**Tests:** `tests/test_runner.py` — add:
+- `test_run_tournament_swiss_completes` — 2 strategies × 2 profiles × 2 rounds, scripted backend.
+- `test_run_tournament_round_robin_completes`
+- `test_run_tournament_updates_elo_ratings` — check ratings diverged from 1500 after tournament.
+- `test_run_tournament_saves_results` — simulation results in store.
+
+#### 1.5 CLI Changes: `src/collection_swarm/cli.py`
+
+Add `tournament` command:
+
+```python
+@cli.command()
+@click.option("--format", "tournament_format", type=click.Choice(["swiss", "round_robin"]), default="swiss")
+@click.option("--rounds", default=4, type=int)
+@click.option("--profiles", default=None)
+@click.option("--strategies", default=None)
+@click.option("--conversation-model", default=None)
+@click.option("--judge-model", default=None)
+@click.option("--concurrency", default=2, type=int)
+@click.pass_context
+def tournament(ctx, tournament_format, rounds, profiles, strategies, conversation_model, judge_model, concurrency):
+```
+
+Also add `leaderboard` command:
+
+```python
+@cli.command()
+@click.option("--type", "entity_type", type=click.Choice(["strategy", "profile", "all"]), default="all")
+@click.pass_context
+def leaderboard(ctx, entity_type):
+```
+
+Also add `reset-elo` command:
+
+```python
+@cli.command("reset-elo")
+@click.pass_context
+def reset_elo(ctx):
+```
+
+**Side effects / regressions:**
+- New Click commands don't affect existing commands.
+- Need to import `TournamentConfig` from models and `run_tournament` from runner.
+- The `_print_result` helper is unchanged.
+- `test_cli.py` uses `CliRunner` — existing tests pass because new commands are additive.
+
+**Tests:** `tests/test_cli.py` — add:
+- `test_tournament_cli_swiss` — `CliRunner().invoke(cli, ["tournament", "--rounds", "1", ...])`.
+- `test_leaderboard_cli` — runs after tournament produces output.
+- `test_reset_elo_cli` — resets and confirms empty leaderboard.
+
+#### 1.6 Web API Changes: `src/collection_swarm/web/app.py`
+
+Add endpoints inside `create_app()`:
+
+```python
+# ── Arena / Tournament APIs ─────────────────────────────────────
+
+@app.get("/api/arena/leaderboard")
+def arena_leaderboard(entity_type: str | None = Query(None)):
+    ...
+
+@app.get("/api/arena/history/{entity_id}")
+def arena_history(entity_id: str):
+    ...
+
+@app.post("/api/jobs/tournaments")
+async def launch_tournament(payload: TournamentLaunchRequest):
+    ...
+
+@app.get("/api/arena/tournaments")
+def list_tournaments():
+    ...
+
+@app.get("/api/arena/tournaments/{tournament_id}")
+def get_tournament(tournament_id: str):
+    ...
+```
+
+Add `TournamentLaunchRequest` Pydantic model near other request models:
+
+```python
+class TournamentLaunchRequest(BaseModel):
+    format: str = "swiss"
+    rounds: int = Field(default=4, ge=1, le=20)
+    profile_ids: list[str] | None = None
+    strategy_ids: list[str] | None = None
+    conversation_model: str | None = None
+    judge_model: str | None = None
+    reps_per_pairing: int = Field(default=1, ge=1, le=10)
+    concurrency: int = Field(default=2, ge=1, le=10)
+```
+
+**Side effects / regressions:**
+- New endpoints don't conflict with any existing path prefix (`/api/arena/` is new).
+- Job launching follows the exact same pattern as `_run_single_job` / `_run_matrix_job` with `WebRunJob` and `asyncio.create_task`.
+- Need to add `kind="tournament"` to `WebRunJob` support.
+- The `_run_tournament_job` background task saves results per round, same pattern as `_run_matrix_job`.
+- Tournament progress is polled via existing `GET /api/jobs/{job_id}`.
+
+**Tests:** `tests/test_web.py` — add `TestArena` class:
+- `test_leaderboard_empty` — returns empty lists when no tournaments run.
+- `test_launch_tournament_job` — launch + poll to completion.
+- `test_leaderboard_after_tournament` — ratings exist after tournament.
+- `test_arena_history` — returns chronological EloUpdates.
+
+#### 1.7 Frontend: `static/index.html` + `static/app.js` + `static/styles.css`
+
+**index.html:** Add sidebar nav button for "Arena" page in the "Analysis" section, after "Compliance" and before "Model Benchmarks":
+
+```html
+<button class="nav-link" data-page="arena" onclick="navigateTo('arena')">
+  <svg ...><!-- trophy/crown icon --></svg>
+  Arena
+</button>
+```
+
+**app.js:** Add `case 'arena': await renderArena(); break;` to `renderPage` switch.
+
+Add `renderArena()` function (~150 lines) that:
+1. Fetches `GET /api/arena/leaderboard`.
+2. Renders two leaderboard tables (strategies sorted by Elo desc, profiles sorted by Elo desc).
+3. Each row shows: rank, entity_id, rating (with color-coded badge), games_played, W-L-D.
+4. Click a row to expand Elo history chart (sparkline of rating over time, fetched from `/api/arena/history/{id}`).
+5. "Launch Tournament" button at top that opens a config form (format, rounds, profile/strategy selection) and POSTs to `/api/jobs/tournaments`, then polls progress.
+
+**styles.css:** Add leaderboard table styles reusing existing table patterns. Add rating badge styles (green > 1550, yellow 1450-1550, red < 1450). Add Elo sparkline styles.
+
+**Side effects / regressions:**
+- Adding a nav button to `index.html` shifts the sidebar. Verify all `data-page` attributes are unique.
+- Adding a `case` to the `renderPage` switch requires the function to exist or the `default` case catches it.
+- The `emptyState()` and `skeleton()` helpers are reused — no new global utilities needed.
+- Mobile sidebar breakpoints already handle scrollable nav — additional items should work.
+- `test_web.py TestSPA` tests `index_returns_html` — "Collection Swarm" in text still passes.
+
+#### 1.8 Simulation YAML Changes: `config/simulation.yaml`
+
+Add optional `arena` section:
+
+```yaml
+arena:
+  default_format: swiss
+  default_rounds: 4
+  k_factor_initial: 32
+  k_factor_stable: 16
+  k_factor_threshold: 30
+  scoring: payment_x_compliance
+```
+
+Update `SimulationSettings` in `models.py` to include `arena: ArenaSettings | None = None`.
+Update `load_simulation_settings` in `config.py` to parse `arena` key.
+
+**Side effects / regressions:**
+- `ArenaSettings` has all defaults, so existing `simulation.yaml` files without `arena` section work unchanged.
+- `load_simulation_settings` currently accesses `conversation`, `matrix`, `compliance`, `objection_taxonomy`. Adding `arena` follows the same pattern.
+- No test regression — `test_config.py` tests `load_app_config` successfully with existing files.
+
+---
+
+### Phase 2: Option B — LLM-Driven Strategy Evolution
+
+#### 2.1 New File: `src/collection_swarm/evolution.py`
+
+Core module. Contains:
+
+- **`EvolutionConfig`** — Pydantic model with `population_size`, `mutation_rate`, `crossover_rate`, `cull_bottom_n`, `evolver_model_id`.
+- **`StrategyLineage`** — tracks parent_ids, generation, mutation_type, mutation_description.
+- **`evolve_strategies(top_strategies, bottom_strategies, failure_transcripts, config, router) -> list[Strategy]`** — async function that prompts an LLM "Evolver" with:
+  - Top-K strategies and their Elo ratings.
+  - Bottom-K strategies and their failure transcripts.
+  - Asks for mutations, crossovers, and fixes.
+  - Parses output as YAML, validates with `Strategy.model_validate()`.
+  - Returns new `Strategy` objects with generated IDs (e.g., `gen2_empathetic_v1`).
+- **`cull_strategies(strategy_pool, elo_ratings, keep_n) -> list[Strategy]`** — removes lowest-Elo strategies, but never removes seed (generation 0) strategies.
+- **`_build_evolver_prompt(top, bottom, transcripts) -> str`** — prompt engineering.
+- **`_parse_evolved_strategies(llm_output) -> list[dict]`** — YAML extraction from LLM response.
+
+**Side effects / regressions:**
+- New file, no existing code modified.
+- Uses `LLMRouter.complete()` for the Evolver call — same interface as agents.
+- Evolved strategies need a model ID for the evolver. This must be a configured model (e.g., `cursor-composer-2` or an NIM model). Error if not configured.
+
+**Risk: Incoherent strategies.** Mitigation:
+- Validate every evolved strategy with `Strategy.model_validate()` — Pydantic rejects invalid shapes.
+- Gate evolved strategies: they enter the pool with provisional Elo (1500) and must survive one tournament round to stay. Strategies that score below a minimum threshold after 5 games are auto-culled.
+- Log all evolved strategies with their lineage for auditability.
+
+**Tests:** `tests/test_evolution.py`
+- `test_parse_evolved_strategies_valid_yaml` — mock LLM output → valid Strategy objects.
+- `test_parse_evolved_strategies_rejects_garbage` — malformed output → empty list, no crash.
+- `test_cull_strategies_preserves_seed` — generation-0 strategies never removed.
+- `test_cull_strategies_removes_lowest_elo`
+- Integration test with scripted backend: `test_evolve_strategies_produces_valid_output` — uses scripted backend returning canned YAML.
+
+#### 2.2 Store Changes for Evolution
+
+Add to `_init_schema()`:
+
+```sql
+CREATE TABLE IF NOT EXISTS evolved_strategies (
+    id TEXT PRIMARY KEY,
+    generation INTEGER NOT NULL DEFAULT 0,
+    parent_ids_json TEXT,
+    mutation_type TEXT,
+    mutation_description TEXT,
+    strategy_json TEXT NOT NULL,
+    elo_rating REAL DEFAULT 1500.0,
+    created_at TEXT NOT NULL,
+    culled_at TEXT
+);
+```
+
+Add methods:
+- `save_evolved_strategy(strategy, lineage) -> None`
+- `list_evolved_strategies(include_culled=False) -> list[tuple[Strategy, StrategyLineage]]`
+- `cull_evolved_strategy(strategy_id) -> None`
+- `get_full_strategy_pool(config) -> dict[str, Strategy]` — merges seed YAML strategies + non-culled evolved strategies.
+
+**Side effects / regressions:**
+- `AppConfig.strategies` currently returns only YAML-loaded strategies. The `get_full_strategy_pool` approach keeps config unchanged and merges at the runner level.
+- `build_matrix` uses `config.strategies` directly — it's unchanged unless explicitly passed evolved strategy IDs.
+- `run_tournament` will call `get_full_strategy_pool` to include evolved strategies in the tournament pool.
+- **Regression risk:** `config.strategy(id)` will raise `KeyError` for evolved strategy IDs since they're not in YAML. Need to add a fallback that checks the store. This modifies `AppConfig` or (better) the tournament runner bypasses `config.strategy()` and loads from store directly.
+
+#### 2.3 Runner Changes for Evolution
+
+Add `run_evolution_cycle()`:
+
+```python
+async def run_evolution_cycle(
+    config: AppConfig,
+    store: SimulationStore,
+    evolution_config: EvolutionConfig,
+    tournament_config: TournamentConfig,
+    generations: int = 5,
+    concurrency: int = 2,
+    on_generation_complete: Callable | None = None,
+) -> list[TournamentResult]:
+```
+
+Flow per generation:
+1. Load current strategy pool (seed + survived evolved).
+2. Run a tournament (reuse `run_tournament`).
+3. Read Elo leaderboard. Extract top-K and bottom-K.
+4. Fetch failure transcripts for bottom-K from store.
+5. Call `evolve_strategies()` to generate new candidates.
+6. Save new strategies to `evolved_strategies` table.
+7. Cull bottom-N strategies (never cull seed).
+8. Repeat.
+
+#### 2.4 CLI for Evolution
+
+```python
+@cli.command("evolve")
+@click.option("--generations", default=5, type=int)
+@click.option("--population-size", default=20, type=int)
+@click.option("--evolver-model", default=None, help="Model ID for the strategy evolver LLM.")
+@click.option("--tournament-rounds", default=4, type=int)
+@click.option("--concurrency", default=2, type=int)
+@click.pass_context
+def evolve(ctx, generations, population_size, evolver_model, tournament_rounds, concurrency):
+```
+
+#### 2.5 Web API for Evolution
+
+```
+POST /api/jobs/evolution       → Launch evolution cycle
+GET  /api/evolution/pool       → Current strategy pool (seed + evolved, with Elo and lineage)
+GET  /api/evolution/genealogy  → Strategy family tree (parent_ids → children)
+```
+
+#### 2.6 Frontend for Evolution
+
+Add "Evolution" page to sidebar (in Analysis section). Renders:
+- **Strategy Pool Table:** All strategies (seed marked with badge, evolved with generation number), sorted by Elo.
+- **Genealogy Tree:** Visual representation of strategy lineage (parent → children). CSS-only tree using indentation and connecting lines.
+- **Launch Evolution Button:** Config form (generations, population size, evolver model dropdown). POSTs to `/api/jobs/evolution`, polls progress like matrix jobs.
+- **Generation Timeline:** Shows which strategies were created/culled each generation.
+
+**Side effects / regressions:**
+- `renderPage` switch gets a new `case 'evolution'`.
+- Sidebar gets another nav button — verify mobile scroll still works with 12+ items.
+- Evolution jobs use `WebRunJob` with `kind="evolution"` — the job snapshot format is compatible.
+- **CRITICAL:** Evolved strategies stored in SQLite are NOT in `config/collector_strategies.yaml`. Any code path that calls `config.strategy(id)` with an evolved ID will fail. Audit all callers:
+  - `engine.py` `run_simulation()` receives `Strategy` object directly — SAFE.
+  - `runner.py` `run_cell()` calls `config.strategy(cell.strategy_id)` — NEEDS FIX for evolved strategies.
+  - `web/app.py` `_run_single_job` calls `config.strategy()` — NEEDS FIX.
+  - `web/app.py` compliance/playbook/dashboard endpoints use `config.strategies` dict — need to merge evolved strategies.
+  
+  **Fix approach:** Add `store.get_strategy(strategy_id) -> Strategy | None` and modify `run_cell` / web handlers to check store if `config.strategy()` raises `KeyError`. Alternatively, create a `StrategyResolver` that wraps both sources.
+
+---
+
+### Phase 3: Option C — Adversarial Debtor Hardening
+
+#### 3.1 New File: `src/collection_swarm/adversarial.py`
+
+- **`HardeningConfig`** — `hardener_model_id`, `max_drift` (max Elo distance from seed), `realism_check` (bool).
+- **`ProfileLineage`** — tracks parent_id, generation, hardening_type, description.
+- **`harden_profiles(easy_profiles, winning_transcripts, config, router) -> list[Profile]`** — async function that prompts an LLM "Hardener" to:
+  - Analyze transcripts where the strategy won easily.
+  - Propose tougher debtor variants: new objections, tighter constraints, modified backstories.
+  - Preserve core archetype (a `cooperative` debtor stays cooperative, just harder).
+  - Output as YAML, validated with `Profile.model_validate()`.
+- **`check_realism(profile, router, model_id) -> float`** — asks Judge-role LLM "Is this debtor profile realistic? Score 0-1." Rejects profiles below threshold.
+- **`_build_hardener_prompt(profiles, transcripts) -> str`**
+
+**Side effects / regressions:**
+- Same pattern as `evolution.py` — new file, uses `LLMRouter.complete()`.
+- Hardened profiles stored in DB, same `KeyError` issue as evolved strategies.
+- **Constraint coherence risk:** A hardened profile might have `max_payment: 10` which is below any realistic amount. Mitigation: validate constraints against `debt_amount` (max_payment should be ≥ 1% of debt).
+- **Arms race divergence risk:** Debtors get unrealistically hard, strategies get unrealistically aggressive. Mitigation: anchor drift — each hardened profile's Elo cannot exceed seed Elo + `max_drift`. If it does, stop hardening that lineage.
+
+**Tests:** `tests/test_adversarial.py`
+- `test_harden_profiles_preserves_archetype`
+- `test_harden_profiles_adds_constraint`
+- `test_check_realism_rejects_absurd_profile`
+- `test_hardened_profile_validates_with_pydantic`
+
+#### 3.2 Store Changes for Hardened Profiles
+
+```sql
+CREATE TABLE IF NOT EXISTS evolved_profiles (
+    id TEXT PRIMARY KEY,
+    generation INTEGER NOT NULL DEFAULT 0,
+    parent_id TEXT,
+    hardening_type TEXT,
+    hardening_description TEXT,
+    profile_json TEXT NOT NULL,
+    elo_rating REAL DEFAULT 1500.0,
+    created_at TEXT NOT NULL,
+    culled_at TEXT
+);
+```
+
+Methods mirror `evolved_strategies`: `save_evolved_profile`, `list_evolved_profiles`, `cull_evolved_profile`, `get_full_profile_pool`.
+
+#### 3.3 Co-Evolution Runner
+
+Modify `run_evolution_cycle` to accept an optional `HardeningConfig`. When provided:
+1. After each tournament, evolve strategies AND harden profiles.
+2. Both pools grow; both get culled.
+3. The next tournament uses both expanded pools.
+
+**Side effects / regressions:**
+- `run_evolution_cycle` signature changes (new optional param). Existing callers pass `None` → behavior unchanged.
+- Same `config.profile(id)` KeyError issue as with evolved strategies. Same fix: `ProfileResolver` or store fallback.
+- **Dashboard regression:** `GET /api/dashboard` returns `profiles: list(config.profiles.keys())`. Evolved profiles won't appear unless we merge. Same for `strategies`. The dashboard endpoint must be updated to include evolved entities.
+
+#### 3.4 Web API and Frontend for Hardening
+
+- Extend `/api/evolution/pool` to include profiles.
+- Add "Debtor Pool" tab to the Evolution page showing hardened profiles with lineage.
+- Add toggle to Evolution launch form: "Enable debtor hardening" checkbox.
+
+---
+
+### Phase 4: Option D — Judge Calibration
+
+#### 4.1 New File: `src/collection_swarm/calibration.py`
+
+- **`CalibrationLabel`** — Pydantic model: `transcript_id`, `human_scores: dict[str, float]` (same fields as `Judgment`: payment_probability, compliance_score, etc.), `labeler_id`, `timestamp`.
+- **`CalibrationResult`** — per-metric Pearson correlation, MAE, and overall calibration score.
+- **`load_calibration_labels(path) -> list[CalibrationLabel]`** — load from JSON file.
+- **`evaluate_judge(labels, store) -> CalibrationResult`** — for each labeled transcript, compare Judge's stored `Judgment` scores against human labels. Compute per-metric correlation.
+- **`optimize_judge_prompt(labels, config, router, iterations=10) -> tuple[str, CalibrationResult]`** — LLM-driven prompt optimization loop:
+  1. Run Judge on calibration set with current prompt.
+  2. Compute correlation.
+  3. Ask an "Optimizer" LLM to suggest prompt improvements based on where the Judge disagrees with humans.
+  4. Test improved prompt.
+  5. Keep the prompt with highest correlation.
+  6. Repeat for N iterations.
+
+**Side effects / regressions:**
+- The Judge prompt lives in `config/prompts.yaml` under `judge.system` and `judge.transcript`. `optimize_judge_prompt` returns a new prompt string but does NOT modify the YAML file. The caller decides whether to save it.
+- **CRITICAL:** If the optimized prompt is auto-saved to YAML, ALL subsequent simulations use the new prompt. This changes Judge behavior, which changes all Elo ratings. Recommendation: store optimized prompts in a `judge_prompt_variants` table and allow selecting which variant to use per tournament/simulation.
+- No regression on existing Judge code — `judge.py` is unchanged.
+
+#### 4.2 Store Changes for Calibration
+
+```sql
+CREATE TABLE IF NOT EXISTS calibration_labels (
+    transcript_id TEXT NOT NULL,
+    metric TEXT NOT NULL,
+    human_score REAL NOT NULL,
+    labeler_id TEXT,
+    labeled_at TEXT NOT NULL,
+    PRIMARY KEY (transcript_id, metric, labeler_id)
+);
+
+CREATE TABLE IF NOT EXISTS judge_prompt_variants (
+    id TEXT PRIMARY KEY,
+    system_prompt TEXT NOT NULL,
+    transcript_prompt TEXT NOT NULL,
+    calibration_score REAL,
+    created_at TEXT NOT NULL
+);
+```
+
+#### 4.3 CLI for Calibration
+
+```python
+@cli.command("calibrate")
+@click.option("--labels", type=click.Path(path_type=Path), required=True, help="Path to calibration labels JSON.")
+@click.option("--optimize", is_flag=True, help="Run LLM-driven prompt optimization.")
+@click.option("--iterations", default=10, type=int)
+@click.pass_context
+def calibrate(ctx, labels, optimize, iterations):
+```
+
+#### 4.4 Web API for Calibration
+
+```
+POST /api/calibration/labels     → Upload calibration labels (JSON body)
+GET  /api/calibration/results    → Current calibration metrics (per-metric correlation)
+POST /api/jobs/calibration       → Launch prompt optimization
+GET  /api/calibration/variants   → List judge prompt variants with scores
+```
+
+#### 4.5 Frontend for Calibration
+
+Add "Calibration" page to sidebar (in Analysis section). Renders:
+- **Calibration Dashboard:** Per-metric correlation bars (green > 0.8, yellow 0.5-0.8, red < 0.5).
+- **Upload Labels:** File input + JSON paste area for calibration labels.
+- **Prompt Variants Table:** All judge prompt variants with their calibration scores. Active variant highlighted.
+- **Launch Optimization Button:** Starts prompt optimization job.
+
+---
+
+### Cross-Cutting Concerns
+
+#### Database Migration Safety
+
+All new tables use `CREATE TABLE IF NOT EXISTS`. Existing databases get new tables on first access. No ALTER TABLE on `runs`. Zero-downtime upgrade.
+
+#### Config Backward Compatibility
+
+All new config sections (`arena`, `evolution`, `adversarial`, `calibration`) are optional with full defaults. Existing `simulation.yaml` files work unchanged. `SimulationSettings` uses `Field(default_factory=...)` or `| None = None` for new fields.
+
+#### Import Graph
+
+```
+arena.py      → models.py (EloRating, EloUpdate, Judgment)
+evolution.py  → models.py (Strategy, StrategyLineage), backends/router.py
+adversarial.py → models.py (Profile, ProfileLineage), backends/router.py
+calibration.py → models.py (Judgment, CalibrationLabel), store.py, backends/router.py
+runner.py     → arena.py, evolution.py, adversarial.py (optional imports)
+```
+
+No circular imports. `arena.py` has zero IO dependencies (pure functions). `evolution.py` and `adversarial.py` depend on `LLMRouter` but not on each other.
+
+#### Test Isolation
+
+All tests use `tmp_path` for databases. No test depends on external LLM services — scripted/heuristic backends are used. Evolution and adversarial tests mock `LLMRouter.complete()` to return canned YAML. Calibration tests use synthetic labels.
+
+#### Existing Test Regression Checklist
+
+| Test File | Risk | Mitigation |
+|-----------|------|------------|
+| `test_models.py` | New model imports could shadow | New models are at end of file, no name conflicts |
+| `test_engine.py` | None — engine unchanged | No risk |
+| `test_store.py` | New `_init_schema()` tables | `CREATE IF NOT EXISTS` — safe |
+| `test_runner.py` | `build_matrix` unchanged | No risk |
+| `test_web.py` | New endpoints added | Existing endpoint paths unchanged |
+| `test_cli.py` | New commands added | Existing commands unchanged |
+| `test_judge.py` | Judge unchanged | No risk |
+| `test_config.py` | New optional config sections | Defaults cover missing YAML keys |
+| `test_playbook.py` | Playbook uses `compare_strategies` | Strategy rankings unchanged |
+| `test_cursor_sdk_backend.py` | Backend unchanged | No risk |
+| `test_model_evaluation.py` | Model eval unchanged | No risk |
+| `test_env.py` | Env loading unchanged | No risk |
+
+#### UI Regression Checklist
+
+| Area | Risk | Mitigation |
+|------|------|------------|
+| Sidebar nav | New buttons push existing items down | Verify mobile scroll handles 12+ nav items |
+| `renderPage` switch | New cases must have matching functions | Add functions before adding cases |
+| Dashboard | Must still work with 0 tournaments | Leaderboard widget shows "No tournaments yet" |
+| Runs list | Unchanged — tournament sims appear as regular runs | Tournament runs have same schema as matrix runs |
+| Playbook | Uses existing strategy rankings | Evolved strategies appear in rankings only if they have completed runs |
+| Compliance | Uses `config.strategies` loop | Must merge evolved strategies into the loop or compliance misses them |
+| Benchmarks | Unchanged | No risk |
+| Manual sessions | Unchanged | Evolved strategies must be selectable in the dropdown — add to `run-options` endpoint |
+
+#### Cost Guardrails
+
+- Tournament simulations use the same models as matrix runs — no additional per-simulation cost.
+- Evolution LLM calls (Phase 2) use a configurable model — can use a cheap model (scripted for testing, small model for production).
+- Hardening LLM calls (Phase 3) same approach.
+- Calibration optimization (Phase 4) is bounded by `--iterations` flag.
+- All phases log estimated cost via existing `estimated_cost_usd` tracking.
+
+#### Observability
+
+- All tournament rounds are persisted with timestamps — enables post-hoc analysis of Elo convergence.
+- Evolution lineage is fully tracked — can reconstruct the genealogy of any evolved strategy.
+- Calibration results are stored with prompt variants — can compare Judge accuracy over time.
