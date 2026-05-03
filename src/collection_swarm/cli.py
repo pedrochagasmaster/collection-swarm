@@ -377,6 +377,7 @@ def model_report(
                 roles=selected_roles,  # type: ignore[arg-type]
                 scenario=scenario,
                 concurrency=concurrency,
+                api_keys=CredentialStore(ctx.obj["db_path"]),
             )
         )
     report = build_model_role_report(config, probes=probes, scenario=scenario)

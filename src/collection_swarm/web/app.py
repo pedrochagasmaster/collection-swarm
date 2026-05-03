@@ -711,7 +711,16 @@ def create_app(
         )
         app.state.jobs[job.id] = job
         app.state.tasks[job.id] = asyncio.create_task(
-            _run_single_job(job, config, _store(), payload.profile_id, payload.strategy_id, conversation_model, judge_model)
+            _run_single_job(
+                job,
+                config,
+                _store(),
+                payload.profile_id,
+                payload.strategy_id,
+                conversation_model,
+                judge_model,
+                _credential_store(),
+            )
         )
         return job.snapshot()
 
@@ -752,7 +761,9 @@ def create_app(
             message=f"Queued {len(cells)} matrix simulations.",
         )
         app.state.jobs[job.id] = job
-        app.state.tasks[job.id] = asyncio.create_task(_run_matrix_job(job, config, _store(), cells, payload.concurrency))
+        app.state.tasks[job.id] = asyncio.create_task(
+            _run_matrix_job(job, config, _store(), cells, payload.concurrency, _credential_store())
+        )
         return job.snapshot()
 
     @app.post("/api/jobs/tournaments")
@@ -813,6 +824,7 @@ def create_app(
                 conversation_model,
                 judge_model,
                 payload.concurrency,
+                _credential_store(),
             )
         )
         return job.snapshot()
@@ -1037,11 +1049,12 @@ async def _run_single_job(
     strategy_id: str,
     conversation_model: str,
     judge_model: str,
+    api_keys: CredentialStore,
 ) -> None:
     try:
         job.status = "running"
         job.message = "Simulation running."
-        engine = _make_engine(config, conversation_model, judge_model)
+        engine = _make_engine(config, conversation_model, judge_model, api_keys=api_keys)
 
         async def on_progress(result: SimulationResult) -> None:
             result.turn_count = len(result.transcript)
@@ -1069,6 +1082,7 @@ async def _run_matrix_job(
     store: SimulationStore,
     cells: list[MatrixCell],
     concurrency: int,
+    api_keys: CredentialStore,
 ) -> None:
     try:
         job.status = "running"
@@ -1079,7 +1093,7 @@ async def _run_matrix_job(
         async def run_cell(cell: MatrixCell) -> None:
             async with semaphore:
                 try:
-                    engine = _make_engine(config, cell.conversation_model, cell.judge_model)
+                    engine = _make_engine(config, cell.conversation_model, cell.judge_model, api_keys=api_keys)
 
                     async def on_progress(result: SimulationResult) -> None:
                         result.turn_count = len(result.transcript)
@@ -1128,6 +1142,7 @@ async def _run_tournament_job(
     conversation_model: str,
     judge_model: str,
     concurrency: int,
+    api_keys: CredentialStore,
 ) -> None:
     try:
         job.status = "running"
@@ -1142,7 +1157,7 @@ async def _run_tournament_job(
 
         async def run_cell(cell: MatrixCell) -> SimulationResult:
             async with semaphore:
-                engine = _make_engine(config, cell.conversation_model, cell.judge_model)
+                engine = _make_engine(config, cell.conversation_model, cell.judge_model, api_keys=api_keys)
 
                 async def on_progress(partial: SimulationResult) -> None:
                     partial.turn_count = len(partial.transcript)

@@ -233,6 +233,7 @@ async def run_evolution_cycle(
             conversation_model=conversation_model,
             judge_model=judge_model,
             concurrency=concurrency,
+            api_keys=api_keys,
         )
         results.append(tournament)
         ratings = store.get_elo_ratings("strategy", conversation_model or config.default_conversation_model, judge_model or config.default_judge_model)

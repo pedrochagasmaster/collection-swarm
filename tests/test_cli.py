@@ -48,6 +48,28 @@ def test_model_report_cli_writes_markdown(tmp_path) -> None:
     assert "Cursor Model Role Evaluation" in output_path.read_text(encoding="utf-8")
 
 
+def test_model_report_live_probes_uses_cli_key_store(tmp_path, monkeypatch) -> None:
+    captured = {}
+
+    async def fake_run_live_role_probes(*args, **kwargs):
+        captured["api_keys"] = kwargs["api_keys"]
+        return ()
+
+    monkeypatch.setattr("collection_swarm.cli.run_live_role_probes", fake_run_live_role_probes)
+    db_path = tmp_path / "keys.sqlite"
+    output_path = tmp_path / "live-report.md"
+    runner = CliRunner()
+    runner.invoke(cli, ["--db", str(db_path), "api-keys", "set", "cursor", "--key", "sk-live-probe-123456"])
+
+    result = runner.invoke(
+        cli,
+        ["--db", str(db_path), "model-report", "--live-probes", "--roles", "collector", "--output", str(output_path)],
+    )
+
+    assert result.exit_code == 0
+    assert captured["api_keys"].get_api_key("cursor") == "sk-live-probe-123456"
+
+
 def test_api_keys_cli_sets_lists_and_clears_dashboard_keys(tmp_path) -> None:
     db_path = tmp_path / "keys.sqlite"
     runner = CliRunner()

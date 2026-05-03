@@ -9,6 +9,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from collection_swarm.model_evaluation import RoleProbe
+from collection_swarm.models import LLMMessage, ModelConfig
+from collection_swarm.models import LLMMessage, ModelConfig
 from collection_swarm.web.app import create_app
 from collection_swarm.web.seed import generate_seed_data
 
@@ -300,6 +302,70 @@ class TestRunJobs:
         )
         assert resp.status_code == 200
         assert resp.json()["total"] == 4
+
+    def test_dashboard_job_uses_stored_credentials(self, empty_client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+        captured_keys: list[str | None] = []
+
+        class CapturingBackend:
+            def __init__(self, api_keys=None) -> None:
+                self.api_keys = api_keys
+
+            async def complete(self, model: ModelConfig, messages: list[LLMMessage]):
+                from collection_swarm.backends.scripted import ScriptedBackend
+
+                captured_keys.append(self.api_keys.get_api_key("nvidia_nim") if self.api_keys else None)
+                return await ScriptedBackend().complete(
+                    model.model_copy(update={"backend": "scripted"}),
+                    messages,
+                )
+
+        monkeypatch.setattr("collection_swarm.backends.nim.NimBackend", CapturingBackend)
+        empty_client.put("/api/config/api-keys/nvidia_nim", json={"api_key": "nim-dashboard-key"})
+
+        resp = empty_client.post(
+            "/api/jobs/simulations",
+            json={
+                "profile_id": "cooperative_hardship",
+                "strategy_id": "empathetic_payment_plan",
+                "conversation_model": "nim-mistral-large-3-675b",
+                "judge_model": "local-judge",
+            },
+        )
+
+        assert resp.status_code == 200
+        job = _wait_for_job(empty_client, resp.json()["id"])
+        assert job["status"] == "completed"
+        assert "nim-dashboard-key" in captured_keys
+
+        resp = empty_client.post(
+            "/api/jobs/matrix",
+            json={
+                "profile_ids": ["cooperative_hardship"],
+                "strategy_ids": ["empathetic_payment_plan"],
+                "conversation_models": ["nim-mistral-large-3-675b"],
+                "judge_models": ["local-judge"],
+                "reps": 1,
+                "concurrency": 1,
+            },
+        )
+        assert resp.status_code == 200
+        assert _wait_for_job(empty_client, resp.json()["id"])["status"] == "completed"
+
+        resp = empty_client.post(
+            "/api/jobs/tournaments",
+            json={
+                "format": "round_robin",
+                "rounds": 1,
+                "profile_ids": ["cooperative_hardship"],
+                "strategy_ids": ["empathetic_payment_plan"],
+                "conversation_model": "nim-mistral-large-3-675b",
+                "judge_model": "local-judge",
+                "concurrency": 1,
+            },
+        )
+        assert resp.status_code == 200
+        assert _wait_for_job(empty_client, resp.json()["id"])["status"] == "completed"
+        assert captured_keys.count("nim-dashboard-key") >= 3
 
     def test_matrix_requires_explicit_profile_and_strategy_selection(self, empty_client: TestClient) -> None:
         resp = empty_client.post(
