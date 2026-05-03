@@ -1,0 +1,343 @@
+/* Collection Swarm — documentation theme overrides
+ *
+ * Design intent: editorial, slightly mechanical, Brazilian-fintech-after-hours.
+ * Tinted neutrals, deep purple as the committed brand color, a single warm
+ * amber accent for "watch out" callouts, and a tight typography rhythm.
+ */
+
+:root {
+  --md-text-font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --md-code-font: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --cs-purple-50:  oklch(97% 0.01 290);
+  --cs-purple-200: oklch(86% 0.05 290);
+  --cs-purple-500: oklch(60% 0.17 290);
+  --cs-purple-700: oklch(40% 0.18 290);
+  --cs-amber-500:  oklch(78% 0.16 78);
+  --cs-amber-200:  oklch(92% 0.08 78);
+
+  --cs-ink-900:    oklch(22% 0.02 285);
+  --cs-ink-700:    oklch(34% 0.015 285);
+  --cs-ink-500:    oklch(55% 0.012 285);
+  --cs-ink-300:    oklch(78% 0.008 285);
+  --cs-ink-100:    oklch(96% 0.004 285);
+}
+
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color:        oklch(40% 0.18 290);
+  --md-primary-fg-color--light:  oklch(60% 0.17 290);
+  --md-primary-fg-color--dark:   oklch(28% 0.16 290);
+  --md-accent-fg-color:          oklch(58% 0.18 270);
+
+  --md-default-bg-color:         oklch(99% 0.005 285);
+  --md-default-fg-color:         var(--cs-ink-900);
+  --md-default-fg-color--light:  var(--cs-ink-500);
+  --md-default-fg-color--lighter: var(--cs-ink-300);
+  --md-typeset-a-color:          oklch(45% 0.16 290);
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color:        oklch(28% 0.10 285);
+  --md-primary-fg-color--light: oklch(64% 0.16 285);
+  --md-primary-fg-color--dark:  oklch(20% 0.08 285);
+  --md-accent-fg-color:         oklch(72% 0.16 270);
+
+  --md-default-bg-color:         oklch(15% 0.02 285);
+  --md-default-bg-color--light:  oklch(18% 0.02 285);
+  --md-default-fg-color:         oklch(94% 0.005 285);
+  --md-default-fg-color--light:  oklch(75% 0.005 285);
+  --md-default-fg-color--lighter: oklch(60% 0.005 285);
+
+  --md-code-bg-color:            oklch(20% 0.02 285);
+  --md-code-fg-color:            oklch(94% 0.005 285);
+
+  --md-typeset-a-color:          oklch(78% 0.13 290);
+}
+
+/* Typography rhythm */
+.md-typeset {
+  font-feature-settings: "ss01", "cv02", "cv11";
+  --md-typeset-table-color--light: var(--cs-ink-300);
+}
+
+.md-typeset h1 {
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  font-size: clamp(1.95rem, 1.4rem + 1.6vw, 2.6rem);
+  line-height: 1.05;
+  margin-bottom: 0.6em;
+}
+
+.md-typeset h2 {
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  font-size: 1.55rem;
+  margin-top: 2.2em;
+  padding-top: 0.4em;
+  border-top: 1px solid color-mix(in oklch, var(--md-default-fg-color) 8%, transparent);
+}
+
+.md-typeset h2:first-child,
+.md-typeset h2.no-rule {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 0;
+}
+
+.md-typeset h3 {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  font-size: 1.2rem;
+  margin-top: 1.8em;
+}
+
+.md-typeset h4 {
+  font-weight: 600;
+  font-size: 1rem;
+  text-transform: none;
+  margin-top: 1.6em;
+}
+
+.md-typeset code {
+  font-size: 0.86em;
+  padding: 0.13em 0.36em;
+  border-radius: 4px;
+  background: color-mix(in oklch, var(--md-primary-fg-color) 8%, transparent);
+  border: 1px solid color-mix(in oklch, var(--md-primary-fg-color) 14%, transparent);
+}
+
+[data-md-color-scheme="slate"] .md-typeset code {
+  background: oklch(24% 0.04 285);
+  border-color: oklch(33% 0.05 285);
+}
+
+.md-typeset pre code {
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+/* Tighten table density and align numeric columns */
+.md-typeset table:not([class]) {
+  font-size: 0.84rem;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 0 color-mix(in oklch, var(--md-default-fg-color) 8%, transparent);
+}
+
+.md-typeset table:not([class]) th {
+  background: color-mix(in oklch, var(--md-primary-fg-color) 14%, var(--md-default-bg-color));
+  color: var(--md-default-fg-color);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.md-typeset table:not([class]) td,
+.md-typeset table:not([class]) th {
+  padding: 0.6em 0.9em;
+}
+
+/* Hero on the homepage */
+.cs-hero {
+  position: relative;
+  margin: 0 0 3rem;
+  padding: 3.2rem 2.4rem 3.4rem;
+  border-radius: 18px;
+  color: oklch(98% 0.005 285);
+  background:
+    radial-gradient(120% 200% at 0% 0%, oklch(45% 0.18 290) 0%, transparent 55%),
+    radial-gradient(120% 180% at 100% 100%, oklch(35% 0.16 320) 0%, transparent 60%),
+    oklch(20% 0.04 285);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.cs-hero::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  background-image:
+    linear-gradient(to right, color-mix(in oklch, white 7%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in oklch, white 7%, transparent) 1px, transparent 1px);
+  background-size: 36px 36px;
+  mask-image: radial-gradient(circle at 80% 20%, black 0%, transparent 70%);
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0.55;
+}
+
+.cs-hero__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  font-family: var(--md-code-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  padding: 0.35em 0.8em;
+  border-radius: 999px;
+  background: color-mix(in oklch, white 10%, transparent);
+  border: 1px solid color-mix(in oklch, white 18%, transparent);
+}
+
+.cs-hero h1 {
+  margin: 1rem 0 0.6rem;
+  font-size: clamp(2.1rem, 1.4rem + 2.4vw, 3.3rem);
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  color: oklch(99% 0.005 285);
+  border: none;
+  padding: 0;
+}
+
+.cs-hero p.cs-hero__lead {
+  margin: 0 0 1.6rem;
+  max-width: 60ch;
+  font-size: 1.08rem;
+  line-height: 1.55;
+  color: color-mix(in oklch, white 86%, transparent);
+}
+
+.cs-hero__cta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.cs-hero__cta .md-button {
+  border: 1px solid color-mix(in oklch, white 24%, transparent);
+}
+
+.cs-hero__cta .md-button--primary {
+  background: oklch(75% 0.16 290);
+  color: oklch(18% 0.05 285);
+  border-color: transparent;
+}
+
+.cs-hero__cta .md-button--primary:hover {
+  background: oklch(82% 0.14 290);
+}
+
+/* Feature grid on the home page */
+.cs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+  margin: 1rem 0 2rem;
+}
+
+.cs-card {
+  position: relative;
+  padding: 1.2rem 1.2rem 1.1rem;
+  border-radius: 12px;
+  background: color-mix(in oklch, var(--md-primary-fg-color) 4%, var(--md-default-bg-color));
+  border: 1px solid color-mix(in oklch, var(--md-default-fg-color) 9%, transparent);
+  transition: border-color 120ms ease-out, transform 120ms ease-out;
+}
+
+.cs-card:hover {
+  border-color: color-mix(in oklch, var(--md-primary-fg-color) 35%, transparent);
+  transform: translateY(-1px);
+}
+
+.cs-card h3 {
+  margin: 0 0 0.4em;
+  font-size: 1rem;
+  letter-spacing: -0.005em;
+}
+
+.cs-card p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--md-default-fg-color--light);
+  line-height: 1.5;
+}
+
+.cs-card a:not(.md-button) {
+  color: inherit;
+  text-decoration: none;
+}
+
+.cs-card a:not(.md-button)::after {
+  content: " →";
+  color: var(--md-primary-fg-color--light);
+}
+
+/* Decorative kicker used at the top of module pages */
+.cs-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  font-family: var(--md-code-font);
+  font-size: 0.74rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--md-primary-fg-color--light);
+  margin-bottom: 0.4rem;
+}
+
+.cs-kicker::before {
+  content: "";
+  width: 18px;
+  height: 1px;
+  background: currentColor;
+}
+
+/* Slim "key responsibilities" box used on module pages */
+.cs-summary {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.4rem 1.4rem;
+  margin: 0.5rem 0 1.4rem;
+  padding: 0.9rem 1.1rem;
+  border-radius: 10px;
+  background: color-mix(in oklch, var(--md-primary-fg-color) 5%, var(--md-default-bg-color));
+  border: 1px solid color-mix(in oklch, var(--md-default-fg-color) 8%, transparent);
+  font-size: 0.9rem;
+}
+
+.cs-summary dt {
+  font-family: var(--md-code-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--md-default-fg-color--light);
+  align-self: center;
+}
+
+.cs-summary dd {
+  margin: 0;
+  align-self: center;
+}
+
+/* Section dividers between modules */
+.cs-divider {
+  margin: 2.4rem 0;
+  height: 1px;
+  background: color-mix(in oklch, var(--md-default-fg-color) 9%, transparent);
+}
+
+/* Mermaid diagrams: tighter container */
+.md-typeset .mermaid {
+  display: flex;
+  justify-content: center;
+  background: color-mix(in oklch, var(--md-primary-fg-color) 4%, var(--md-default-bg-color));
+  border: 1px solid color-mix(in oklch, var(--md-default-fg-color) 8%, transparent);
+  border-radius: 10px;
+  padding: 1rem 0.6rem;
+  margin: 1.4rem 0;
+}
+
+/* Footnotes & permalinks: subtle */
+.md-typeset .headerlink {
+  color: color-mix(in oklch, var(--md-primary-fg-color) 35%, transparent);
+}
+
+/* Footer */
+.md-footer {
+  background: oklch(18% 0.03 285);
+}
+
+[data-md-color-scheme="default"] .md-footer-meta {
+  background: oklch(15% 0.04 285);
+}

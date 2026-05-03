@@ -1,0 +1,218 @@
+site_name: Collection Swarm
+site_url: https://pedrochagasmaster.github.io/collection-swarm/
+site_description: >-
+  Functional and conceptual reference for Collection Swarm — an AI-driven
+  simulator that pits Collector, Debtor, and Judge agents against one another
+  to discover the negotiation strategies that work.
+site_author: Collection Swarm contributors
+repo_name: pedrochagasmaster/collection-swarm
+repo_url: https://github.com/pedrochagasmaster/collection-swarm
+edit_uri: edit/main/documentation/
+copyright: Synthetic data only. Not legal advice.
+docs_dir: documentation
+site_dir: site
+
+theme:
+  name: material
+  language: en
+  logo: assets/logo.svg
+  favicon: assets/logo.svg
+  custom_dir: documentation/overrides
+  features:
+    - announce.dismiss
+    - content.action.edit
+    - content.action.view
+    - content.code.annotate
+    - content.code.copy
+    - content.tabs.link
+    - content.tooltips
+    - navigation.expand
+    - navigation.footer
+    - navigation.indexes
+    - navigation.instant
+    - navigation.instant.progress
+    - navigation.path
+    - navigation.sections
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.top
+    - navigation.tracking
+    - search.highlight
+    - search.share
+    - search.suggest
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Match system
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep purple
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to light
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep purple
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to dark
+  font:
+    text: Inter
+    code: JetBrains Mono
+  icon:
+    repo: fontawesome/brands/github
+    edit: material/pencil-outline
+    view: material/eye-outline
+    admonition:
+      note: material/lightbulb-on-outline
+      abstract: material/book-open-page-variant
+      info: material/information-outline
+      tip: material/thumb-up-outline
+      success: material/check-circle-outline
+      question: material/help-circle-outline
+      warning: material/alert-outline
+      failure: material/close-circle-outline
+      danger: material/lightning-bolt
+      bug: material/spider
+      example: material/test-tube
+      quote: material/format-quote-close
+
+extra_css:
+  - stylesheets/extra.css
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/pedrochagasmaster/collection-swarm
+      name: Source on GitHub
+  generator: false
+  status:
+    new: Recently added
+    deprecated: Deprecated
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      permalink_title: Anchor link to this section
+      toc_depth: 4
+  - pymdownx.betterem
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.magiclink
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.snippets:
+      check_paths: true
+      base_path:
+        - documentation
+        - .
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+plugins:
+  - search:
+      separator: '[\s\-,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
+  - glightbox:
+      touchNavigation: true
+      loop: false
+      effect: zoom
+      slide_effect: slide
+      width: 100%
+      height: auto
+      zoomable: true
+      draggable: true
+  - minify:
+      minify_html: true
+      minify_js: true
+      minify_css: true
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - getting-started/index.md
+      - Install & first simulation: getting-started/install.md
+      - Live model setup: getting-started/live-models.md
+      - The web dashboard: getting-started/dashboard.md
+      - Troubleshooting: getting-started/troubleshooting.md
+  - Concepts:
+      - concepts/index.md
+      - Vocabulary: concepts/vocabulary.md
+      - Domain model: concepts/domain-model.md
+      - Conversation lifecycle: concepts/conversation-lifecycle.md
+      - Compliance & guardrails: concepts/compliance.md
+      - Arena & evolution: concepts/arena-and-evolution.md
+      - Judge calibration: concepts/judge-calibration.md
+  - Modules:
+      - modules/index.md
+      - models.py — domain types: modules/models.md
+      - config.py — YAML loading: modules/config.md
+      - env.py — dotenv loader: modules/env.md
+      - engine.py — simulation engine: modules/engine.md
+      - Agents:
+          - modules/agents/index.md
+          - collector.py: modules/agents/collector.md
+          - debtor.py: modules/agents/debtor.md
+          - judge.py: modules/agents/judge.md
+      - Backends:
+          - modules/backends/index.md
+          - base.py & router.py: modules/backends/base-and-router.md
+          - scripted.py: modules/backends/scripted.md
+          - nim.py: modules/backends/nim.md
+          - cursor_sdk.py & bridge: modules/backends/cursor-sdk.md
+      - store.py — SQLite store: modules/store.md
+      - runner.py — Run orchestration: modules/runner.md
+      - arena.py — Elo arena: modules/arena.md
+      - evolution.py — strategy evolution: modules/evolution.md
+      - adversarial.py — profile hardening: modules/adversarial.md
+      - calibration.py — judge calibration: modules/calibration.md
+      - model_evaluation.py — role probes: modules/model-evaluation.md
+      - Analysis:
+          - modules/analysis/index.md
+          - statistics.py: modules/analysis/statistics.md
+          - compliance.py: modules/analysis/compliance.md
+          - objections.py: modules/analysis/objections.md
+          - playbook.py: modules/analysis/playbook.md
+      - Web:
+          - modules/web/index.md
+          - app.py — FastAPI surface: modules/web/app.md
+          - seed.py — demo data: modules/web/seed.md
+          - Static SPA: modules/web/static.md
+      - cli.py — Click CLI: modules/cli.md
+  - Reference:
+      - reference/index.md
+      - CLI reference: reference/cli.md
+      - HTTP API reference: reference/api.md
+      - Configuration files: reference/configuration.md
+      - Database schema: reference/database.md
+      - Glossary: reference/glossary.md
