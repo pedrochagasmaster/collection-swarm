@@ -13,6 +13,7 @@ EXPECTED_MODULES = [
     "config.py",
     "models.py",
     "engine.py",
+    "cli.py",
     "runner.py",
     "store.py",
     "arena.py",
@@ -70,7 +71,7 @@ def main() -> int:
     missing_concepts = [concept for concept in REQUIRED_CONCEPTS if concept not in html]
     missing_workflow = [
         marker
-        for marker in ["actions/upload-pages-artifact", "actions/deploy-pages", "path: site"]
+        for marker in ["python3 scripts/validate_docs_site.py", "actions/upload-pages-artifact", "actions/deploy-pages", "path: site"]
         if marker not in workflow
     ]
 

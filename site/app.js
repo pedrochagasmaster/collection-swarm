@@ -1,4 +1,4 @@
-const navLinks = Array.from(document.querySelectorAll(".nav-link"));
+const navLinks = Array.from(document.querySelectorAll(".toc a, .topbar-links a"));
 const sections = navLinks
   .map((link) => document.querySelector(link.getAttribute("href")))
   .filter(Boolean);
@@ -14,7 +14,7 @@ const observer = new IntersectionObserver(
     }
 
     navLinks.forEach((link) => {
-      link.classList.toggle("active", link.getAttribute("href") === `#${visible.target.id}`);
+      link.classList.toggle("is-active", link.getAttribute("href") === `#${visible.target.id}`);
     });
   },
   {
@@ -25,26 +25,24 @@ const observer = new IntersectionObserver(
 
 sections.forEach((section) => observer.observe(section));
 
-const moduleSearch = document.querySelector("#module-search");
-const moduleCards = Array.from(document.querySelectorAll("[data-module-card]"));
-const emptyState = document.querySelector("#module-empty");
+const moduleSearch = document.querySelector("#doc-search");
+const searchableSections = Array.from(document.querySelectorAll(".searchable"));
+const emptyState = document.querySelector("#search-empty");
 
 moduleSearch?.addEventListener("input", (event) => {
   const query = event.target.value.trim().toLowerCase();
   let visibleCount = 0;
 
-  moduleCards.forEach((card) => {
-    const haystack = card.textContent.toLowerCase();
+  searchableSections.forEach((section) => {
+    const haystack = section.textContent.toLowerCase();
     const visible = haystack.includes(query);
-    card.hidden = !visible;
+    section.hidden = !visible;
     if (visible) {
       visibleCount += 1;
     }
   });
 
-  if (emptyState) {
-    emptyState.hidden = visibleCount !== 0;
-  }
+  emptyState.hidden = visibleCount !== 0;
 });
 
 document.querySelectorAll("a[href^='#']").forEach((anchor) => {
@@ -54,7 +52,8 @@ document.querySelectorAll("a[href^='#']").forEach((anchor) => {
       return;
     }
     event.preventDefault();
-    target.scrollIntoView({ behavior: "smooth", block: "start" });
+    const motionPreference = window.matchMedia("(prefers-reduced-motion: reduce)");
+    target.scrollIntoView({ behavior: motionPreference.matches ? "auto" : "smooth", block: "start" });
     history.pushState(null, "", anchor.getAttribute("href"));
   });
 });

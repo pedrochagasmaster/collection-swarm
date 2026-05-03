@@ -10,6 +10,7 @@ PAGES_WORKFLOW = Path(".github/workflows/pages.yml")
 EXPECTED_MODULES = [
     "config.py",
     "models.py",
+    "cli.py",
     "engine.py",
     "runner.py",
     "store.py",
