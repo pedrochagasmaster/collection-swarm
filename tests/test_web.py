@@ -630,6 +630,19 @@ class TestSPA:
         assert ".sidebar-footer" in css and "position: sticky" in css
         assert "min-width: 44px" in css
 
+    def test_static_assets_include_browser_audit_fixes(self, empty_client: TestClient) -> None:
+        """Regression guard for browser-audit UX fixes."""
+        css = empty_client.get("/static/styles.css").text
+        js = empty_client.get("/static/app.js").text
+
+        assert "Select a profile" in js
+        assert "Select a strategy" in js
+        assert "required aria-required" in js
+        assert "No simulations yet" in js
+        assert "Start your first run" in js
+        assert "setButtonLoading" in js
+        assert "empty-table-cell" in css
+
 
 class TestSeedData:
     def test_seed_creates_expected_count(self, tmp_path: Path) -> None:

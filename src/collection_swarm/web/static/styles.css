@@ -721,6 +721,12 @@ body {
   overflow: visible;
 }
 
+.data-table tbody td.empty-table-cell {
+  max-width: none;
+  padding: 0;
+  white-space: normal;
+}
+
 .data-table tbody tr:last-child td {
   border-bottom: none;
 }
