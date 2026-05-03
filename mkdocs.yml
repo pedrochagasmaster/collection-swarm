@@ -18,6 +18,8 @@ theme:
   name: material
   language: en
   custom_dir: docs-site/overrides
+  logo: assets/logo.svg
+  favicon: assets/logo.svg
   features:
     - announce.dismiss
     - content.action.edit

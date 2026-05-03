@@ -72,6 +72,37 @@ REQUIRED_PAGES = [
 
 REQUIRED_THEME_ASSETS = [
     "stylesheets/theme.css",
+    "assets/logo.svg",
+]
+
+EXPECTED_MODULE_FILES = [
+    "config.py",
+    "models.py",
+    "engine.py",
+    "cli.py",
+    "runner.py",
+    "store.py",
+    "arena.py",
+    "evolution.py",
+    "adversarial.py",
+    "calibration.py",
+    "model_evaluation.py",
+    "env.py",
+    "agents/collector.py",
+    "agents/debtor.py",
+    "agents/judge.py",
+    "backends/base.py",
+    "backends/router.py",
+    "backends/scripted.py",
+    "backends/nim.py",
+    "backends/cursor_sdk.py",
+    "analysis/statistics.py",
+    "analysis/compliance.py",
+    "analysis/objections.py",
+    "analysis/playbook.py",
+    "web/app.py",
+    "web/seed.py",
+    "cursor_sdk_bridge/run.mjs",
 ]
 
 
@@ -111,3 +142,21 @@ def test_home_page_links_to_core_sections() -> None:
         "reference/index.md",
     ]:
         assert required_link in home, f"Home page missing link to {required_link}"
+
+
+def test_every_codebase_module_is_referenced_in_docs() -> None:
+    """Every Python source file in the package must be named somewhere in the docs.
+
+    Inspired by ``scripts/validate_docs_site.py`` from PR #33: the docs are a
+    contract against the codebase, so every shipped module needs at least one
+    reference. This catches the common drift where new modules are added but
+    nobody updates the docs.
+    """
+    all_text = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in DOCS_ROOT.rglob("*.md")
+    )
+    missing = [m for m in EXPECTED_MODULE_FILES if m not in all_text]
+    assert not missing, (
+        f"These codebase modules are not referenced anywhere in the docs: {missing}"
+    )
