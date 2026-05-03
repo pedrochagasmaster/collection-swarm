@@ -152,6 +152,24 @@ The seed combos cover the full breadth of the catalog:
 | `willbank_fgc_waiting_high_balance` | `reimbursement_milestone_callback` |
 | `willbank_low_digital_access` | `low_digital_access_guidance` |
 
+## API Key Management
+
+The dashboard includes an **API Keys** page (under Configuration) where
+users can input, save, and test backend credentials directly in the
+browser. Stored keys are encrypted at rest in the SQLite database and
+take priority over environment variables.
+
+The settings API endpoints are:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/settings` | `GET` | Read all stored settings (secrets masked) |
+| `/api/settings` | `PUT` | Create or update settings (empty string deletes) |
+| `/api/settings/test` | `POST` | Check which keys are configured and their source |
+
+See the [Settings API reference](../../reference/api.md#settings) for
+full request/response details.
+
 ## Environment Variables
 
 The dashboard respects the following environment variables when using the `create_app_from_env()` factory (used by uvicorn reload mode):

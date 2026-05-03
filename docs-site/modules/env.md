@@ -51,11 +51,21 @@ guard ensures `.env` is *additive*, never *overriding*.
 | Comments (`# ...`)         | Yes      |
 | `export KEY=VALUE` syntax  | No (the `export ` prefix would become part of the key name) |
 
-If you need any of the missing features, switch to `python-dotenv`. The
-backends both call this loader the same way:
+If you need any of the missing features, switch to `python-dotenv`.
+
+!!! note "Settings store takes priority"
+    Since the addition of the [settings store](../reference/api.md#settings),
+    backends now resolve credentials via `settings.resolve()` which checks
+    the stored database value first (set via the dashboard **API Keys** page
+    or `collection-swarm config-set`), then falls back to the environment
+    variable loaded by this module. The `.env` loader still runs first so
+    the env var is available as a fallback.
+
+The backends call the loader and then resolve through the settings store:
 
 ```python
 from collection_swarm.env import load_dotenv_if_present
+from collection_swarm.settings import get_settings_store
 load_dotenv_if_present()
-api_key = os.getenv("CURSOR_API_KEY")
+api_key = get_settings_store().resolve("cursor_api_key", "CURSOR_API_KEY")
 ```

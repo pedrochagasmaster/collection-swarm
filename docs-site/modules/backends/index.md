@@ -77,8 +77,8 @@ class LLMResponse:
 | Backend | Class | Module | API Keys Required | Use Case |
 |---|---|---|---|---|
 | **Scripted** | `ScriptedBackend` | `backends/scripted.py` | None | Offline development, testing, CI — deterministic heuristic responses |
-| **NIM** | `NimBackend` | `backends/nim.py` | `NVIDIA_NIM_API_KEY` | Production-grade LLM inference via NVIDIA NIM |
-| **Cursor SDK** | `CursorSdkBackend` | `backends/cursor_sdk.py` | `CURSOR_API_KEY` | Cursor coding agent API via Node.js bridge |
+| **NIM** | `NimBackend` | `backends/nim.py` | `NVIDIA_NIM_API_KEY` (dashboard, CLI, or env var) | Production-grade LLM inference via NVIDIA NIM |
+| **Cursor SDK** | `CursorSdkBackend` | `backends/cursor_sdk.py` | `CURSOR_API_KEY` (dashboard, CLI, or env var) | Cursor coding agent API via Node.js bridge |
 
 ### Backend Selection
 

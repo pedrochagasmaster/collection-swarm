@@ -236,7 +236,7 @@ A deterministic, rule-based backend that makes the entire system usable without 
 |---|---|
 | **Module** | `collection_swarm.backends.nim` |
 | **Cost** | Per-token via NVIDIA NIM pricing |
-| **Requires** | `NVIDIA_NIM_API_KEY` environment variable |
+| **Requires** | `NVIDIA_NIM_API_KEY` (via dashboard, CLI, or environment variable) |
 
 Routes completions through the [NVIDIA NIM](https://build.nvidia.com/) inference API using [LiteLLM](https://docs.litellm.ai/) as the HTTP client. Supports any model hosted on the NIM platform.
 
@@ -246,7 +246,7 @@ Routes completions through the [NVIDIA NIM](https://build.nvidia.com/) inference
 |---|---|
 | **Module** | `collection_swarm.backends.cursor_sdk` |
 | **Cost** | Per-token via Cursor pricing |
-| **Requires** | `CURSOR_API_KEY` environment variable, Node.js 22+, `cursor_sdk_bridge/` |
+| **Requires** | `CURSOR_API_KEY` (via dashboard, CLI, or environment variable), Node.js 22+, `cursor_sdk_bridge/` |
 
 Bridges to the [Cursor Agent SDK](https://github.com/cursor/cookbook) via a Node.js subprocess (`cursor_sdk_bridge/run.mjs`). Messages and configuration are passed as JSON over stdin/stdout.
 
