@@ -1,7 +1,9 @@
 """Cursor coding agent via the official TypeScript SDK (subprocess bridge).
 
-See https://github.com/cursor/cookbook — set CURSOR_API_KEY and install bridge deps
-(`npm install` in `cursor_sdk_bridge/`). Requires Node.js 22+ on PATH.
+See https://github.com/cursor/cookbook — provide a Cursor API key (via the
+dashboard Settings page, ``collection-swarm creds set cursor``, or the
+``CURSOR_API_KEY`` env var) and install bridge deps (``npm install`` in
+``cursor_sdk_bridge/``). Requires Node.js 22+ on PATH.
 """
 
 from __future__ import annotations
@@ -13,6 +15,7 @@ import shutil
 from pathlib import Path
 
 from collection_swarm.backends.base import LLMBackend, LLMResponse
+from collection_swarm.credentials import CredentialResolver
 from collection_swarm.env import load_dotenv_if_present
 from collection_swarm.models import CursorSdkPromptConfig, LLMMessage, ModelConfig
 
@@ -26,17 +29,25 @@ def _bridge_script() -> Path:
 
 
 class CursorSdkBackend(LLMBackend):
-    def __init__(self, prompts: CursorSdkPromptConfig) -> None:
+    def __init__(
+        self,
+        prompts: CursorSdkPromptConfig,
+        credentials: CredentialResolver | None = None,
+    ) -> None:
         self.prompts = prompts
+        self._credentials = credentials or CredentialResolver(store=None)
 
     async def complete(self, model: ModelConfig, messages: list[LLMMessage]) -> LLMResponse:
         load_dotenv_if_present()
-        api_key = os.getenv("CURSOR_API_KEY")
-        if not api_key:
-            raise RuntimeError(
+        api_key = self._credentials.require(
+            "cursor",
+            error_message=(
                 "CURSOR_API_KEY is required for Cursor SDK models. "
+                "Add it from the dashboard Settings page, run "
+                "`collection-swarm creds set cursor`, or export the env var. "
                 "Create a key in the Cursor integrations dashboard."
-            )
+            ),
+        )
 
         script = _bridge_script()
         if not script.is_file():
@@ -61,13 +72,20 @@ class CursorSdkBackend(LLMBackend):
             ensure_ascii=False,
         )
 
+        # Inject dashboard-stored credentials for the subprocess so the bridge
+        # picks them up via process.env.CURSOR_API_KEY without touching the
+        # parent process environment.
+        bridge_env = os.environ.copy()
+        bridge_env["CURSOR_API_KEY"] = api_key
+        bridge_env.update(self._credentials.env_overlay())
+
         proc = await asyncio.create_subprocess_exec(
             node,
             str(script),
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            env=os.environ.copy(),
+            env=bridge_env,
         )
         stdout_b, stderr_b = await proc.communicate(payload.encode("utf-8"))
         stderr = stderr_b.decode("utf-8", errors="replace").strip()

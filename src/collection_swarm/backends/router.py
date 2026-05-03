@@ -4,13 +4,20 @@ from __future__ import annotations
 
 from collection_swarm.backends.base import LLMBackend, LLMResponse
 from collection_swarm.backends.scripted import ScriptedBackend
+from collection_swarm.credentials import CredentialResolver
 from collection_swarm.models import CursorSdkPromptConfig, LLMMessage, ModelConfig
 
 
 class _BackendRegistry(dict[str, LLMBackend]):
-    def __init__(self, *args: object, cursor_sdk_prompts: CursorSdkPromptConfig | None = None) -> None:
+    def __init__(
+        self,
+        *args: object,
+        cursor_sdk_prompts: CursorSdkPromptConfig | None = None,
+        credentials: CredentialResolver | None = None,
+    ) -> None:
         super().__init__(*args)
         self.cursor_sdk_prompts = cursor_sdk_prompts
+        self.credentials = credentials
 
     def __missing__(self, backend_name: str) -> LLMBackend:
         if backend_name in {"cursor_sdk", "acp"}:
@@ -18,14 +25,14 @@ class _BackendRegistry(dict[str, LLMBackend]):
 
             if self.cursor_sdk_prompts is None:
                 raise KeyError(backend_name)
-            backend = CursorSdkBackend(self.cursor_sdk_prompts)
+            backend = CursorSdkBackend(self.cursor_sdk_prompts, credentials=self.credentials)
             self["cursor_sdk"] = backend
             self["acp"] = backend
             return backend
         if backend_name == "nim":
             from collection_swarm.backends.nim import NimBackend
 
-            backend = NimBackend()
+            backend = NimBackend(credentials=self.credentials)
             self[backend_name] = backend
             return backend
         raise KeyError(backend_name)
@@ -39,14 +46,17 @@ class LLMRouter:
         models: dict[str, ModelConfig],
         backends: dict[str, LLMBackend] | None = None,
         cursor_sdk_prompts: CursorSdkPromptConfig | None = None,
+        credentials: CredentialResolver | None = None,
     ) -> None:
         self.models = models
+        self.credentials = credentials
         self.backends = backends or _BackendRegistry(
             {
                 "scripted": ScriptedBackend(),
                 "heuristic": ScriptedBackend(),
             },
             cursor_sdk_prompts=cursor_sdk_prompts,
+            credentials=credentials,
         )
 
     async def complete(self, model_id: str, messages: list[LLMMessage]) -> LLMResponse:

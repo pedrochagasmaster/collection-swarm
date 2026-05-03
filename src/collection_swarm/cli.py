@@ -18,6 +18,12 @@ from collection_swarm.analysis.statistics import compare_strategies
 from collection_swarm.backends.router import LLMRouter
 from collection_swarm.calibration import evaluate_judge, load_calibration_labels
 from collection_swarm.config import load_app_config
+from collection_swarm.credentials import (
+    CredentialResolver,
+    CredentialStore,
+    get_provider,
+    list_providers,
+)
 from collection_swarm.engine import SimulationEngine
 from collection_swarm.model_evaluation import (
     DEFAULT_CURSOR_PROBE_MODELS,
@@ -48,6 +54,16 @@ def cli(ctx: click.Context, config_dir: Path, db_path: Path) -> None:
     ctx.ensure_object(dict)
     ctx.obj["config_dir"] = config_dir
     ctx.obj["db_path"] = db_path
+
+
+def _credential_resolver(ctx: click.Context) -> CredentialResolver:
+    """Build a credential resolver backed by the active simulation database.
+
+    Sharing one SQLite file for simulations and credentials keeps deployments
+    simple — operators only configure ``--db`` once.
+    """
+    db_path: Path = ctx.obj["db_path"]
+    return CredentialResolver(store=CredentialStore(db_path))
 
 
 @cli.command("list-profiles")
@@ -108,7 +124,11 @@ def simulate(
     config = load_app_config(ctx.obj["config_dir"])
     conversation_model = conversation_model or config.default_conversation_model
     judge_model = judge_model or config.default_judge_model
-    router = LLMRouter(config.models, cursor_sdk_prompts=config.prompts.cursor_sdk)
+    router = LLMRouter(
+        config.models,
+        cursor_sdk_prompts=config.prompts.cursor_sdk,
+        credentials=_credential_resolver(ctx),
+    )
     settings = config.simulation.conversation
     engine = SimulationEngine(
         CollectorAgent(router, conversation_model, config.prompts.collector),
@@ -152,7 +172,15 @@ def run_command(
         judge_models=_split_csv(judge_models),
         reps=reps or config.simulation.default_repetitions,
     )
-    summary = asyncio.run(run_matrix(config, SimulationStore(ctx.obj["db_path"]), cells, concurrency=concurrency))
+    summary = asyncio.run(
+        run_matrix(
+            config,
+            SimulationStore(ctx.obj["db_path"]),
+            cells,
+            concurrency=concurrency,
+            credentials=_credential_resolver(ctx),
+        )
+    )
     console.print(f"Completed {summary.completed}/{summary.total} simulations; failed {summary.failed}.")
 
 
@@ -195,6 +223,7 @@ def tournament(
             conversation_model=conversation_model,
             judge_model=judge_model,
             concurrency=concurrency,
+            credentials=_credential_resolver(ctx),
         )
     )
     console.print(f"Tournament {result.id} completed: {result.total_games} games across {result.rounds_completed} rounds.")
@@ -267,6 +296,7 @@ def evolve(
             profile_ids=_split_csv(profiles),
             strategy_ids=_split_csv(strategies),
             concurrency=concurrency,
+            credentials=_credential_resolver(ctx),
         )
     )
     console.print(f"Evolution completed: {len(results)} generation{'s' if len(results) != 1 else ''}.")
@@ -362,6 +392,7 @@ def model_report(
                 roles=selected_roles,  # type: ignore[arg-type]
                 scenario=scenario,
                 concurrency=concurrency,
+                credentials=_credential_resolver(ctx),
             )
         )
     report = build_model_role_report(config, probes=probes, scenario=scenario)
@@ -379,7 +410,11 @@ def test_connection(ctx: click.Context) -> None:
         console.print(f"Configured default backend is '{model.backend}'. Run a simulation to test live credentials.")
         return
     result = asyncio.run(
-        LLMRouter(config.models, cursor_sdk_prompts=config.prompts.cursor_sdk).complete(
+        LLMRouter(
+            config.models,
+            cursor_sdk_prompts=config.prompts.cursor_sdk,
+            credentials=_credential_resolver(ctx),
+        ).complete(
             config.default_conversation_model,
             [],
         )
@@ -403,6 +438,103 @@ def serve(ctx: click.Context, host: str, port: int, auto_reload: bool) -> None:
     app = create_app(config_dir=ctx.obj["config_dir"], db_path=ctx.obj["db_path"])
     console.print(f"Starting dashboard at http://{host}:{port}")
     uvicorn.run(app, host=host, port=port)
+
+
+@cli.group("creds")
+def creds_group() -> None:
+    """Manage API credentials stored in the dashboard database.
+
+    Stored credentials take precedence over environment variables, so all
+    backends — CLI, web, runner — can pick them up without touching the shell.
+    """
+
+
+@creds_group.command("list")
+@click.pass_context
+def creds_list(ctx: click.Context) -> None:
+    """Show the current credential status for every supported provider."""
+    resolver = _credential_resolver(ctx)
+    table = Table(title="Dashboard Credentials")
+    table.add_column("Provider", overflow="fold")
+    table.add_column("Env Var", overflow="fold")
+    table.add_column("Source")
+    table.add_column("Preview")
+    table.add_column("Updated")
+    for status in resolver.statuses():
+        if status["source"] == "store":
+            source = "[green]dashboard[/green]"
+        elif status["source"] == "env":
+            source = "[cyan]env[/cyan]"
+        else:
+            source = "[red]missing[/red]"
+        table.add_row(
+            f"{status['label']} ({status['id']})",
+            str(status["env_var"]),
+            source,
+            str(status["preview"] or "—"),
+            str(status["updated_at"] or "—"),
+        )
+    console.print(table)
+
+
+@creds_group.command("set")
+@click.argument("provider_id")
+@click.option(
+    "--value",
+    default=None,
+    help="Credential value. Omit to be prompted (recommended for interactive use).",
+)
+@click.pass_context
+def creds_set(ctx: click.Context, provider_id: str, value: str | None) -> None:
+    """Store a credential value for PROVIDER_ID (e.g. cursor, nvidia_nim)."""
+    try:
+        provider = get_provider(provider_id)
+    except KeyError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if value is None:
+        value = click.prompt(f"Enter value for {provider.label} ({provider.env_var})", hide_input=True)
+    resolver = _credential_resolver(ctx)
+    if resolver.store is None:
+        raise click.ClickException("credential store is unavailable for this configuration")
+    try:
+        stored = resolver.store.set(provider.id, value)
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
+    console.print(
+        f"Saved {provider.label} credential (preview {stored.value[:4]}…) to {ctx.obj['db_path']}."
+    )
+
+
+@creds_group.command("clear")
+@click.argument("provider_id")
+@click.pass_context
+def creds_clear(ctx: click.Context, provider_id: str) -> None:
+    """Remove a stored credential. Falls back to the env var if one is set."""
+    try:
+        provider = get_provider(provider_id)
+    except KeyError as exc:
+        raise click.ClickException(str(exc)) from exc
+    resolver = _credential_resolver(ctx)
+    if resolver.store is None:
+        raise click.ClickException("credential store is unavailable for this configuration")
+    deleted = resolver.store.delete(provider.id)
+    if deleted:
+        console.print(f"Cleared {provider.label} credential from the dashboard store.")
+    else:
+        console.print(f"No stored {provider.label} credential to clear.")
+
+
+@creds_group.command("providers")
+def creds_providers() -> None:
+    """List the credential providers Collection Swarm understands."""
+    table = Table(title="Credential Providers")
+    table.add_column("ID")
+    table.add_column("Label", overflow="fold")
+    table.add_column("Env Var")
+    table.add_column("Description", overflow="fold")
+    for provider in list_providers():
+        table.add_row(provider.id, provider.label, provider.env_var, provider.description)
+    console.print(table)
 
 
 @cli.command("seed")

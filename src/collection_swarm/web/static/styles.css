@@ -1653,6 +1653,58 @@ body {
   font-weight: 600;
 }
 
+/* ── Settings page ──────────────────────────────────────────── */
+
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.settings-form .settings-label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-tertiary);
+}
+
+.settings-row {
+  display: flex;
+  gap: var(--space-2);
+  align-items: stretch;
+}
+
+.settings-row .form-input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono, monospace);
+}
+
+.settings-actions {
+  margin-top: var(--space-1);
+}
+
+.settings-callout {
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-2, var(--surface));
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--primary, oklch(65% 0.2 275));
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-4);
+}
+
+.settings-callout code {
+  background: var(--code-bg, var(--surface));
+  padding: 0 4px;
+  border-radius: var(--radius-sm, 4px);
+}
+
 .status-card {
   display: flex;
   flex-direction: column;

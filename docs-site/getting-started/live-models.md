@@ -14,10 +14,34 @@ field in `config/models.yaml`.
 
 ## Configure your secrets
 
-Create a `.env` file in the repo root. All backends call
-[`env.load_dotenv_if_present`](../modules/env.md), which loads
-simple `KEY=VALUE` lines without overriding variables already exported in
-your shell.
+Collection Swarm resolves API credentials in this order:
+
+1. **Dashboard-managed credentials** stored in the SQLite database. Manage
+   them from the **Settings** page in the web dashboard or via the CLI.
+2. **Environment variables** (including anything loaded from `.env` by
+   [`env.load_dotenv_if_present`](../modules/env.md)).
+3. Otherwise, the backend raises a friendly error pointing back at one of
+   the above options.
+
+### From the dashboard
+
+Run `collection-swarm serve`, open the dashboard, and click **Settings** in the
+sidebar. Each provider card shows the current source (dashboard, env, or
+not configured), accepts a new value with a hidden input, and exposes a
+"Clear stored value" button. Saved keys live in the same SQLite file as your
+simulations (`output/collection_swarm.sqlite` by default).
+
+### From the CLI
+
+```bash
+collection-swarm creds list                        # show current status
+collection-swarm creds set cursor                  # interactive prompt
+collection-swarm creds set nvidia_nim --value $K   # one-liner
+collection-swarm creds clear cursor                # remove stored value
+collection-swarm creds providers                   # list known providers
+```
+
+### From a `.env` file (legacy)
 
 ```bash title=".env"
 NVIDIA_NIM_API_KEY=...
@@ -29,7 +53,8 @@ CURSOR_SDK_WORKSPACE=/absolute/path/to/your/workspace
 !!! tip "Secrets on Cursor Cloud"
     If you're running this from a Cursor Cloud Agent, add the same keys
     in **Cursor Dashboard → Cloud Agents → Secrets** so they're injected
-    automatically into every new VM.
+    automatically into every new VM, or store them via the in-app Settings
+    page once the dashboard is up.
 
 ## NVIDIA NIM
 

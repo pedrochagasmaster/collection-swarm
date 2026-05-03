@@ -440,6 +440,46 @@ collection-swarm --db demo.sqlite seed --count 50
 
 ---
 
+### `creds`
+
+Manage API credentials stored in the dashboard database. Stored values
+override matching environment variables for every backend (CLI, web,
+runner, model probes), so dashboard users no longer have to manage `.env`
+files manually.
+
+```bash
+collection-swarm creds list                        # show provider statuses
+collection-swarm creds providers                   # describe known providers
+collection-swarm creds set <provider> [--value V]  # store a credential
+collection-swarm creds clear <provider>            # delete a stored credential
+```
+
+Supported providers (run `collection-swarm creds providers` for the live
+list):
+
+| Provider ID  | Env Var                | Used by              |
+|--------------|------------------------|----------------------|
+| `cursor`     | `CURSOR_API_KEY`       | Cursor SDK backend   |
+| `nvidia_nim` | `NVIDIA_NIM_API_KEY`   | NVIDIA NIM backend   |
+
+#### Examples
+
+```bash
+# Interactive — prompts with hidden input
+collection-swarm creds set cursor
+
+# Non-interactive (CI / scripted setup)
+collection-swarm creds set nvidia_nim --value "$NVIDIA_NIM_API_KEY"
+
+# Show current state
+collection-swarm creds list
+
+# Remove a stored value (env vars still apply if set)
+collection-swarm creds clear cursor
+```
+
+---
+
 ## Command Quick Reference
 
 | Command | Purpose |
@@ -458,3 +498,4 @@ collection-swarm --db demo.sqlite seed --count 50
 | `test-connection` | Verify backend connectivity |
 | `serve` | Launch the web dashboard |
 | `seed` | Generate demo data |
+| `creds` | Manage dashboard-stored API credentials |
