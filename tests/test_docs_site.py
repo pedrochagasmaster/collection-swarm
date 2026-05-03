@@ -128,12 +128,12 @@ def test_mkdocs_config_and_workflow_are_wired_correctly() -> None:
 
     workflow = PAGES_WORKFLOW.read_text(encoding="utf-8")
     assert "mkdocs build --strict" in workflow
-    assert "actions/upload-pages-artifact" in workflow
-    assert "actions/deploy-pages" in workflow
-    # configure-pages with enablement:true bootstraps Pages on fresh
-    # repos so the first deploy doesn't 404 on "Pages not enabled".
-    assert "actions/configure-pages" in workflow
-    assert "enablement: true" in workflow
+    # We deploy to the existing gh-pages branch via `mkdocs gh-deploy`,
+    # not the GitHub-Actions Pages source. That keeps the deploy on the
+    # contents:write scope only — no Pages-API admin permissions needed,
+    # no first-run "Pages not enabled" 404s.
+    assert "mkdocs gh-deploy" in workflow
+    assert "contents: write" in workflow
 
 
 def test_home_page_links_to_core_sections() -> None:
