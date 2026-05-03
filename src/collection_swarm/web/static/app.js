@@ -401,8 +401,44 @@ function progressHTML(completed, failed, total) {
     <div class="progress-meta">${done} of ${total} finished \u00b7 ${completed} completed \u00b7 ${failed} failed</div>`;
 }
 
-function runSelectOptions(items, selectedId) {
-  return items.map(item => `<option value="${escapeAttr(item.id)}" ${item.id === selectedId ? 'selected' : ''}>${escapeHTML(fmtId(item.id))}</option>`).join('');
+function runSelectOptions(items, selectedId, placeholder = '') {
+  const placeholderOption = placeholder
+    ? `<option value="" ${selectedId ? '' : 'selected'}>${escapeHTML(placeholder)}</option>`
+    : '';
+  return placeholderOption + items.map(item => `<option value="${escapeAttr(item.id)}" ${item.id === selectedId ? 'selected' : ''}>${escapeHTML(fmtId(item.id))}</option>`).join('');
+}
+
+function launchFormReady(prefix) {
+  return !!($(`#${prefix}-profile`) || {}).value && !!($(`#${prefix}-strategy`) || {}).value;
+}
+
+function validateLaunchForm() {
+  if (launchFormReady('launch')) return true;
+  appendFormError($('#single-job-panel'), 'Select a profile and strategy before starting a simulation.');
+  return false;
+}
+
+window.updateLaunchFormState = function() {
+  updateLaunchDescriptions();
+  const btn = $('#launch-btn');
+  if (btn) btn.disabled = !launchFormReady('launch');
+};
+
+function setButtonLoading(button, isLoading, loadingLabel = 'Working...') {
+  if (!button) return;
+  if (isLoading) {
+    button.dataset.defaultLabel = button.textContent;
+    button.textContent = loadingLabel;
+    button.classList.add('btn-loading');
+    button.disabled = true;
+    return;
+  }
+  button.classList.remove('btn-loading');
+  button.disabled = false;
+  if (button.dataset.defaultLabel) {
+    button.textContent = button.dataset.defaultLabel;
+    delete button.dataset.defaultLabel;
+  }
 }
 
 function modelSelectOptions(items, selectedId) {
@@ -895,7 +931,19 @@ window.filterRuns = function() {
   if (!tbody) return;
 
   if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="13">${emptyState('No Runs', 'No simulations match the current filters.')}</td></tr>`;
+    const noRuns = !(window._allRuns || []).length && !hasFilters;
+    tbody.innerHTML = `<tr><td colspan="13" class="empty-table-cell">
+      ${noRuns ? `
+        <div class="empty-state" role="status">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/><line x1="19" y1="12" x2="22" y2="12"/></svg>
+          <h3>No simulations yet</h3>
+          <p>Start your first run to create a judged transcript and unlock dashboard analysis.</p>
+          <div class="btn-row" style="margin-top:var(--space-4);justify-content:center">
+            <button class="btn btn-primary" type="button" onclick="navigateTo('launch', { demo: true })">Start your first run</button>
+          </div>
+        </div>`
+        : emptyState('No Runs', 'No simulations match the current filters.')}
+    </td></tr>`;
     return;
   }
 
@@ -1094,8 +1142,8 @@ async function renderLaunch(params = {}) {
   const options = await api('/config/run-options');
   const selectedProfile = params.profile || (params.demo ? 'cooperative_hardship' : '');
   const selectedStrategy = params.strategy || (params.demo ? 'empathetic_payment_plan' : '');
-  const profileOpts = runSelectOptions(options.profiles, selectedProfile);
-  const strategyOpts = runSelectOptions(options.strategies, selectedStrategy);
+  const profileOpts = runSelectOptions(options.profiles, selectedProfile, 'Select a profile');
+  const strategyOpts = runSelectOptions(options.strategies, selectedStrategy, 'Select a strategy');
   const conversationOpts = modelSelectOptions(options.conversation_models, options.defaults.conversation_model);
   const judgeOpts = modelSelectOptions(options.judge_models, options.defaults.judge_model);
 
@@ -1110,12 +1158,12 @@ async function renderLaunch(params = {}) {
         <div class="card-header"><h2>Configuration</h2></div>
         <div class="card-body">
           <form class="control-form" onsubmit="startSingleRun(event)">
-            ${selectField('launch-profile', 'Profile', profileOpts, "updateLaunchDescriptions()")}
+            ${selectField('launch-profile', 'Profile', profileOpts, "updateLaunchFormState()", true)}
             <p class="field-summary" id="launch-profile-summary"></p>
-            ${selectField('launch-strategy', 'Strategy', strategyOpts, "updateLaunchDescriptions()")}
+            ${selectField('launch-strategy', 'Strategy', strategyOpts, "updateLaunchFormState()", true)}
             <p class="field-summary" id="launch-strategy-summary"></p>
             ${advancedModelSettings('launch', conversationOpts, judgeOpts)}
-            <button class="btn btn-primary" type="submit" id="launch-btn">Start simulation</button>
+            <button class="btn btn-primary" type="submit" id="launch-btn" disabled>Start simulation</button>
           </form>
         </div>
       </div>
@@ -1126,17 +1174,18 @@ async function renderLaunch(params = {}) {
         </div>
       </div>
     </div>`;
-  updateLaunchDescriptions();
+  updateLaunchFormState();
 }
 
 window.startSingleRun = async function(event) {
   event.preventDefault();
+  if (!validateLaunchForm()) return;
   clearPoll('single');
   const panel = $('#single-job-panel');
   const status = $('#single-job-status');
   const btn = $('#launch-btn');
   panel.innerHTML = skeleton();
-  if (btn) { btn.classList.add('btn-loading'); btn.disabled = true; }
+  setButtonLoading(btn, true, 'Launching...');
   try {
     const job = await apiPost('/jobs/simulations', {
       profile_id: $('#launch-profile').value,
@@ -1152,7 +1201,8 @@ window.startSingleRun = async function(event) {
     panel.innerHTML = emptyState('Launch failed', err.message);
     showToast(err.message, 'error');
   } finally {
-    if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; }
+    setButtonLoading(btn, false);
+    updateLaunchFormState();
   }
 };
 
@@ -1418,12 +1468,13 @@ function renderManualSession(session) {
 
 window._pollers = {};
 
-function selectField(id, label, optionsHTML, onchange = '') {
+function selectField(id, label, optionsHTML, onchange = '', required = false) {
   const changeAttr = onchange ? ` onchange="${escapeAttr(onchange)}"` : '';
+  const requiredAttr = required ? ' required aria-required="true"' : '';
   return `
     <div class="form-field">
       <label for="${escapeAttr(id)}">${escapeHTML(label)}</label>
-      <select class="filter-select" id="${escapeAttr(id)}"${changeAttr}>${optionsHTML}</select>
+      <select class="filter-select" id="${escapeAttr(id)}"${changeAttr}${requiredAttr}>${optionsHTML}</select>
     </div>`;
 }
 
