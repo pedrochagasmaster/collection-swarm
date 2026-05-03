@@ -165,6 +165,7 @@ nav:
       - models.py — domain types: modules/models.md
       - config.py — YAML loading: modules/config.md
       - env.py — dotenv loader: modules/env.md
+      - credentials.py — dashboard credentials: modules/credentials.md
       - engine.py — simulation engine: modules/engine.md
       - Agents:
           - modules/agents/index.md

@@ -137,6 +137,23 @@ the same metric without one overwriting the other.
 | `calibration_score`   | REAL    | The `overall_score` from the calibration that snapshotted it.     |
 | `created_at`          | TEXT    | ISO 8601 (UTC).                                                   |
 
+## `dashboard_credentials`
+
+Backing store for the [`credentials`](../modules/credentials.md) module —
+the dashboard Settings page and `collection-swarm creds` CLI both read
+and write here. Stored values take precedence over matching environment
+variables for every backend (CLI, web, runner, model probes).
+
+| Column        | Type    | Notes                                                              |
+| ------------- | ------- | ------------------------------------------------------------------- |
+| `provider_id` | TEXT PK | Stable provider id (e.g. `cursor`, `nvidia_nim`).                   |
+| `value`       | TEXT    | Raw API key. Stored as plain text — treat the SQLite file like `.env`. |
+| `updated_at`  | TEXT    | ISO 8601 (UTC).                                                     |
+
+The table is initialized lazily by `CredentialStore` on first access.
+Rows for unknown provider ids are silently ignored at read time, so
+renaming a provider does not crash existing deployments.
+
 ## Schema migrations
 
 The store does not use Alembic. Two patterns instead:

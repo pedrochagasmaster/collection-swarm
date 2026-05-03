@@ -62,7 +62,18 @@ You should see a full collector/debtor transcript followed by a judgment table i
 
 ### 3. Run with Live Models
 
-Create a `.env` file in the repo root:
+You can supply API keys in three interchangeable ways. The first match wins:
+
+1. **Dashboard Settings page** — open the dashboard (`collection-swarm serve`), click
+   **Settings** in the sidebar, paste a key, and save. Stored values live in the
+   same SQLite database as your simulations and override matching env vars for
+   every backend (CLI, web, runner, model probes).
+2. **CLI** — `collection-swarm creds set cursor` (prompted) or
+   `collection-swarm creds set nvidia_nim --value $NVIDIA_NIM_API_KEY` from a
+   shell script. Use `collection-swarm creds list` to inspect current state and
+   `collection-swarm creds clear <provider>` to remove a stored value.
+3. **Environment variables / `.env` file** — same as before, useful for CI and
+   transient sessions:
 
 ```bash
 NVIDIA_NIM_API_KEY=your_nvidia_key
@@ -276,6 +287,13 @@ Uses LiteLLM against `https://integrate.api.nvidia.com/v1`.
 NVIDIA_NIM_API_KEY=...
 ```
 
+Or store the key in the dashboard:
+
+```bash
+collection-swarm creds set nvidia_nim
+# or set it from Settings → NVIDIA NIM in the web dashboard
+```
+
 NIM model names in `config/models.yaml` use LiteLLM's OpenAI-compatible prefix:
 
 ```yaml
@@ -290,6 +308,14 @@ Uses the official [`@cursor/sdk`](https://github.com/cursor/cookbook) through th
 CURSOR_API_KEY=...
 CURSOR_SDK_WORKSPACE=C:\path\to\workspace  # optional; defaults to cwd
 ```
+
+You can also store the key from the dashboard Settings page or the CLI:
+
+```bash
+collection-swarm creds set cursor
+```
+
+Stored credentials take precedence over the environment variable.
 
 Requirements: Node.js 22+ and `npm install` inside `cursor_sdk_bridge/`.
 

@@ -2,16 +2,23 @@
 
 ## `CURSOR_API_KEY is required`
 
-Add `CURSOR_API_KEY` to a `.env` file in the repo root or export it in
-your shell. The Cursor SDK backend calls
-[`env.load_dotenv_if_present`](../modules/env.md) before reading the
-environment, but it does **not** override variables already set in your
-shell.
+You have three equivalent fixes:
+
+1. Open the dashboard, go to **Settings → Cursor SDK**, and save the key
+   there. The value is persisted in the SQLite database and overrides any
+   matching env var.
+2. Run `collection-swarm creds set cursor` to store the key from the CLI.
+3. Add `CURSOR_API_KEY` to a `.env` file in the repo root or export it in
+   your shell. The Cursor SDK backend calls
+   [`env.load_dotenv_if_present`](../modules/env.md) before reading the
+   environment, but it does **not** override variables already set in your
+   shell.
 
 ## `NVIDIA_NIM_API_KEY is required for NIM models`
 
-Same fix: add the key to `.env` or export it. The error originates in
-[`backends/nim.py`](../modules/backends/nim.md).
+Same options apply: store via the dashboard Settings page, run
+`collection-swarm creds set nvidia_nim`, or export the env var. The error
+originates in [`backends/nim.py`](../modules/backends/nim.md).
 
 ## `Cursor SDK bridge not found at .../cursor_sdk_bridge/run.mjs`
 

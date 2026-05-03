@@ -1073,6 +1073,70 @@ Force-finish a session and trigger judgment.
 
 ---
 
+## Credentials
+
+Manage API credentials stored in the dashboard SQLite database. Stored
+values override matching environment variables for every backend.
+
+### `GET /api/credentials`
+
+Return the status of every supported credential provider.
+
+**Response:**
+
+```json
+{
+  "storage_path": "output/collection_swarm.sqlite",
+  "providers": [
+    {
+      "id": "cursor",
+      "label": "Cursor SDK",
+      "env_var": "CURSOR_API_KEY",
+      "description": "Powers the Cursor coding-agent backend used by collector, debtor, and judge LLM roles.",
+      "docs_url": "https://cursor.com/dashboard?tab=integrations",
+      "configured": true,
+      "source": "store",
+      "stored": true,
+      "env_set": false,
+      "preview": "key_...1234",
+      "updated_at": "2026-05-03T17:00:00+00:00"
+    }
+  ]
+}
+```
+
+`source` is one of `store`, `env`, or `null` (not configured). `preview`
+shows the first/last four characters of the stored value for visual
+confirmation; the raw value is never returned.
+
+### `PUT /api/credentials/{provider_id}`
+
+Persist or replace a credential value for the given provider.
+
+**Body:**
+
+```json
+{ "value": "key_topsecret_1234" }
+```
+
+**Response:** Same shape as one provider entry from `GET /api/credentials`.
+
+**Errors:**
+
+| Code | Reason |
+|------|--------|
+| `404` | Unknown provider |
+| `422` | Empty/invalid value |
+
+### `DELETE /api/credentials/{provider_id}`
+
+Remove the stored value for the given provider. Backends fall back to the
+matching environment variable, if any.
+
+**Response:** Refreshed status entry.
+
+---
+
 ## Static
 
 ### `GET /`

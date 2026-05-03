@@ -14,7 +14,7 @@ const mainEl = $('#main-content');
 const KNOWN_PAGES = [
   'dashboard', 'runs', 'launch', 'matrix', 'manual',
   'playbook', 'compliance', 'arena', 'evolution',
-  'calibration', 'benchmarks', 'profiles', 'strategies',
+  'calibration', 'benchmarks', 'settings', 'profiles', 'strategies',
 ];
 const _KNOWN_PAGES_SET = new Set(KNOWN_PAGES);
 
@@ -35,6 +35,7 @@ const PAGE_TITLES = {
   evolution: 'Evolution',
   calibration: 'Calibration',
   benchmarks: 'Model Benchmarks',
+  settings: 'Settings',
   profiles: 'Profiles',
   strategies: 'Strategies',
 };
@@ -247,6 +248,30 @@ async function apiPost(path, body = {}) {
     throw new Error(detail);
   }
   return res.json();
+}
+
+async function apiSend(path, method, body) {
+  const init = {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+  };
+  if (body !== undefined) init.body = JSON.stringify(body);
+  const res = await fetch(`/api${path}`, init);
+  if (!res.ok) {
+    let detail = `API error: ${res.status}`;
+    try {
+      const data = await res.json();
+      if (Array.isArray(data.detail)) {
+        detail = data.detail.map(d => d.msg || d).join('; ');
+      } else if (data.detail) {
+        detail = data.detail;
+      }
+    } catch (_) {}
+    throw new Error(detail);
+  }
+  if (res.status === 204) return null;
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
 }
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -573,6 +598,7 @@ async function renderPage(page, params = {}) {
       case 'evolution': await renderEvolution(); break;
       case 'calibration': await renderCalibration(); break;
       case 'benchmarks': await renderBenchmarks(); break;
+      case 'settings': await renderSettings(); break;
       case 'profiles': await renderProfiles(); break;
       case 'strategies': await renderStrategies(); break;
     }
@@ -2896,6 +2922,117 @@ window.uploadCalibrationLabels = async function(event) {
     showToast(err.message, 'error');
   } finally {
     if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; }
+  }
+};
+
+// ── Settings (API credentials) ─────────────────────────────────
+
+async function renderSettings() {
+  const data = await api('/credentials');
+  const providers = data.providers || [];
+
+  const cards = providers.map(p => {
+    const status = p.source === 'store'
+      ? `<span class="badge badge-success">Stored in dashboard</span>`
+      : p.source === 'env'
+        ? `<span class="badge badge-info">From environment</span>`
+        : `<span class="badge badge-warning">Not configured</span>`;
+    const previewLine = p.preview
+      ? `<div class="config-field"><span class="config-field-key">Preview</span><span class="config-field-value"><code>${escapeHTML(p.preview)}</code></span></div>`
+      : '';
+    const updatedLine = p.updated_at
+      ? `<div class="config-field"><span class="config-field-key">Updated</span><span class="config-field-value">${escapeHTML(relTime(p.updated_at))}</span></div>`
+      : '';
+    const envLine = p.env_set
+      ? `<div class="config-field"><span class="config-field-key">Env var</span><span class="config-field-value"><code>${escapeHTML(p.env_var)}</code> is also set</span></div>`
+      : `<div class="config-field"><span class="config-field-key">Env var</span><span class="config-field-value"><code>${escapeHTML(p.env_var)}</code></span></div>`;
+    const docs = p.docs_url
+      ? `<a class="config-field-value" href="${escapeAttr(p.docs_url)}" target="_blank" rel="noopener noreferrer">Provider docs ↗</a>`
+      : '';
+    return `
+      <div class="config-card" data-provider="${escapeAttr(p.id)}">
+        <div class="config-card-header">
+          <div class="config-card-icon" style="background:var(--chart-2);color:oklch(99% 0 0);font-weight:700;font-size:var(--text-sm)">${escapeHTML(String(p.label || p.id).charAt(0))}</div>
+          <h3>${escapeHTML(p.label)}</h3>
+        </div>
+        <div class="config-field"><span class="config-field-key">Status</span><span class="config-field-value">${status}</span></div>
+        ${envLine}
+        ${previewLine}
+        ${updatedLine}
+        <p class="config-backstory">${escapeHTML(p.description || '')}</p>
+        ${docs}
+        <form class="settings-form" onsubmit="return submitCredential(event, ${jsArg(p.id)})">
+          <label class="settings-label" for="cred-input-${escapeAttr(p.id)}">New value</label>
+          <div class="settings-row">
+            <input id="cred-input-${escapeAttr(p.id)}" class="form-input" type="password" name="value" autocomplete="off" placeholder="Paste API key…" required>
+            <button class="btn btn-primary" type="submit">${p.source === 'store' ? 'Replace' : 'Save'}</button>
+          </div>
+          <div class="btn-row settings-actions">
+            <button class="btn" type="button" onclick="toggleCredentialReveal(${jsArg(p.id)})" data-reveal-state="hidden">Show</button>
+            ${p.source === 'store' ? `<button class="btn btn-danger" type="button" onclick="deleteCredential(${jsArg(p.id)})">Clear stored value</button>` : ''}
+          </div>
+          <div class="form-error" id="cred-error-${escapeAttr(p.id)}" role="alert" hidden></div>
+        </form>
+      </div>`;
+  }).join('');
+
+  mainEl.innerHTML = `
+    <div class="page-header">
+      <h1>Settings</h1>
+      <p>Manage API credentials used by the Collection Swarm backends. Stored values take precedence over environment variables and are persisted in <code>${escapeHTML(data.storage_path || '')}</code>.</p>
+    </div>
+    <div class="settings-callout" role="note">
+      Credentials are stored as plain text in the dashboard SQLite database. Treat that file like a <code>.env</code> file —
+      restrict access to trusted operators. Stored values override matching <code>os.environ</code> entries for
+      every backend (CLI, web, runner, model probes).
+    </div>
+    <div class="grid-2">${cards || emptyState('No providers', 'No credential providers are registered.')}</div>
+  `;
+}
+
+window.toggleCredentialReveal = function(providerId) {
+  const input = document.getElementById(`cred-input-${providerId}`);
+  const btn = document.querySelector(`[data-provider="${providerId}"] [data-reveal-state]`);
+  if (!input || !btn) return;
+  const hidden = input.type === 'password';
+  input.type = hidden ? 'text' : 'password';
+  btn.dataset.revealState = hidden ? 'visible' : 'hidden';
+  btn.textContent = hidden ? 'Hide' : 'Show';
+};
+
+window.submitCredential = async function(event, providerId) {
+  event.preventDefault();
+  const form = event.target;
+  const input = form.querySelector('input[name="value"]');
+  const errorEl = document.getElementById(`cred-error-${providerId}`);
+  if (errorEl) { errorEl.hidden = true; errorEl.textContent = ''; }
+  const submitBtn = form.querySelector('button[type="submit"]');
+  setButtonLoading(submitBtn, true, 'Saving...');
+  try {
+    await apiSend(`/credentials/${encodeURIComponent(providerId)}`, 'PUT', { value: input.value });
+    input.value = '';
+    showToast('Credential saved.', 'success');
+    await renderSettings();
+  } catch (err) {
+    if (errorEl) {
+      errorEl.textContent = err.message;
+      errorEl.hidden = false;
+    }
+    showToast(err.message, 'error');
+  } finally {
+    setButtonLoading(submitBtn, false);
+  }
+  return false;
+};
+
+window.deleteCredential = async function(providerId) {
+  if (!confirm(`Clear the stored credential for "${providerId}"? Backends will fall back to the environment variable, if any.`)) return;
+  try {
+    await apiSend(`/credentials/${encodeURIComponent(providerId)}`, 'DELETE');
+    showToast('Credential cleared.', 'success');
+    await renderSettings();
+  } catch (err) {
+    showToast(err.message, 'error');
   }
 };
 
