@@ -62,12 +62,15 @@ You should see a full collector/debtor transcript followed by a judgment table i
 
 ### 3. Run with Live Models
 
-Create a `.env` file in the repo root:
+Store provider keys in the same SQLite database used by the dashboard:
 
 ```bash
-NVIDIA_NIM_API_KEY=your_nvidia_key
-CURSOR_API_KEY=your_cursor_key
+collection-swarm api-keys set nvidia_nim --key your_nvidia_key
+collection-swarm api-keys set cursor --key your_cursor_key
+collection-swarm api-keys list
 ```
+
+You can also open the dashboard, go to **Settings**, and paste keys there. The UI and CLI only display masked values. Environment variables (`NVIDIA_NIM_API_KEY`, `CURSOR_API_KEY`) and `.env` still work as fallbacks when no dashboard key is saved.
 
 Install the Cursor SDK bridge:
 
@@ -268,13 +271,18 @@ Models are defined in `config/models.yaml`. The user-facing `id` is what you pas
 
 ## Live Backend Setup
 
+Live backends read keys from the configured dashboard database first. Use the Settings page or:
+
+```bash
+collection-swarm api-keys set nvidia_nim --key ...
+collection-swarm api-keys set cursor --key ...
+```
+
+The CLI and dashboard share the `--db` path, so use the same database when you manage keys for a non-default dashboard. `.env` and exported variables remain supported as fallbacks.
+
 ### NVIDIA NIM
 
 Uses LiteLLM against `https://integrate.api.nvidia.com/v1`.
-
-```bash
-NVIDIA_NIM_API_KEY=...
-```
 
 NIM model names in `config/models.yaml` use LiteLLM's OpenAI-compatible prefix:
 
@@ -287,7 +295,6 @@ model_name: openai/mistralai/mistral-large-3-675b-instruct-2512
 Uses the official [`@cursor/sdk`](https://github.com/cursor/cookbook) through the Node bridge in `cursor_sdk_bridge/`.
 
 ```bash
-CURSOR_API_KEY=...
 CURSOR_SDK_WORKSPACE=C:\path\to\workspace  # optional; defaults to cwd
 ```
 
@@ -408,13 +415,13 @@ collection-swarm/
 <details>
 <summary><code>CURSOR_API_KEY is required</code></summary>
 
-Add `CURSOR_API_KEY` to a `.env` file in the repo root or export it in your shell. Backends automatically load `.env` without overriding already-exported variables.
+Save a Cursor key in **Dashboard → Settings** or run `collection-swarm api-keys set cursor --key ...`. `.env` / exported `CURSOR_API_KEY` works as a fallback.
 </details>
 
 <details>
 <summary><code>NVIDIA_NIM_API_KEY is required</code></summary>
 
-Add `NVIDIA_NIM_API_KEY` to `.env` or export it in your shell.
+Save a NIM key in **Dashboard → Settings** or run `collection-swarm api-keys set nvidia_nim --key ...`. `.env` / exported `NVIDIA_NIM_API_KEY` works as a fallback.
 </details>
 
 <details>
@@ -423,7 +430,7 @@ Add `NVIDIA_NIM_API_KEY` to `.env` or export it in your shell.
 Verify:
 - Node.js is version 22 or newer.
 - `npm install` has been run inside `cursor_sdk_bridge/`.
-- `CURSOR_API_KEY` is valid.
+- The Cursor key saved in Settings or `CURSOR_API_KEY` is valid.
 - The `model_name` exists in Cursor SDK's model list.
 </details>
 

@@ -7,8 +7,8 @@ OpenAI-compatible inference endpoint at
 `https://integrate.api.nvidia.com/v1`.
 
 <dl class="cs-summary">
-  <dt>Imports</dt><dd><code>litellm.acompletion</code>, <code>collection_swarm.env</code>, domain models</dd>
-  <dt>Network</dt><dd>Yes — needs <code>NVIDIA_NIM_API_KEY</code></dd>
+  <dt>Imports</dt><dd><code>litellm.acompletion</code>, <code>collection_swarm.credentials</code>, domain models</dd>
+  <dt>Network</dt><dd>Yes — needs a dashboard/CLI <code>nvidia_nim</code> key or <code>NVIDIA_NIM_API_KEY</code></dd>
   <dt>Cost accounting</dt><dd>Computed from <code>ModelConfig.input_cost_per_m</code> and <code>output_cost_per_m</code></dd>
 </dl>
 
@@ -17,7 +17,7 @@ OpenAI-compatible inference endpoint at
 ```python
 async def complete(self, model: ModelConfig, messages: list[LLMMessage]) -> LLMResponse:
     load_dotenv_if_present()
-    api_key = os.getenv("NVIDIA_NIM_API_KEY")
+    api_key = self.api_keys.get_api_key("nvidia_nim") if self.api_keys else os.getenv("NVIDIA_NIM_API_KEY")
     if not api_key:
         raise RuntimeError("NVIDIA_NIM_API_KEY is required for NIM models")
 
@@ -42,9 +42,9 @@ async def complete(self, model: ModelConfig, messages: list[LLMMessage]) -> LLMR
     )
 ```
 
-The function reads its own API key on every call rather than caching it
-in the constructor — that way `.env` edits are picked up without a
-process restart.
+The function reads its key on every call rather than caching it in the
+constructor. Dashboard/CLI keys are checked first; `.env` and exported
+environment variables remain fallback sources.
 
 ## `model.litellm_model`
 

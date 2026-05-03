@@ -31,12 +31,16 @@ collection-swarm list-strategies
 
 ### Set up live model backends (optional)
 
-Create a `.env` file in the repo root:
+Use the dashboard Settings page, or store keys for CLI runs:
 
 ```bash
-NVIDIA_NIM_API_KEY=your_nvidia_key
-CURSOR_API_KEY=your_cursor_key
+collection-swarm api-keys set nvidia_nim --key your_nvidia_key
+collection-swarm api-keys set cursor --key your_cursor_key
+collection-swarm api-keys list
 ```
+
+The keys live in the configured SQLite database. `.env` and exported
+`NVIDIA_NIM_API_KEY` / `CURSOR_API_KEY` values remain supported as fallbacks.
 
 For the Cursor SDK backend:
 

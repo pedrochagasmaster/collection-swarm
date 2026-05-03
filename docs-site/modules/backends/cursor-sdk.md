@@ -9,9 +9,9 @@ JSON envelope on stdin / stdout. The Python side lives at
 `cursor_sdk_bridge/run.mjs`.
 
 <dl class="cs-summary">
-  <dt>Python imports</dt><dd>standard library, <code>collection_swarm.env</code>, domain models</dd>
+  <dt>Python imports</dt><dd>standard library, <code>collection_swarm.credentials</code>, <code>collection_swarm.env</code>, domain models</dd>
   <dt>Node bridge</dt><dd><code>@cursor/sdk</code> (installed via <code>npm install</code> inside <code>cursor_sdk_bridge/</code>)</dd>
-  <dt>Network</dt><dd>Yes — needs <code>CURSOR_API_KEY</code></dd>
+  <dt>Network</dt><dd>Yes — needs a dashboard/CLI Cursor key or <code>CURSOR_API_KEY</code></dd>
   <dt>Process model</dt><dd>One subprocess per <code>complete()</code> call</dd>
 </dl>
 
@@ -20,7 +20,7 @@ JSON envelope on stdin / stdout. The Python side lives at
 ```python
 async def complete(self, model: ModelConfig, messages: list[LLMMessage]) -> LLMResponse:
     load_dotenv_if_present()
-    api_key = os.getenv("CURSOR_API_KEY")
+    api_key = self.credential_store.get_api_key("cursor") if self.credential_store else os.getenv("CURSOR_API_KEY")
     if not api_key:
         raise RuntimeError("CURSOR_API_KEY is required for Cursor SDK models. ...")
 
@@ -50,14 +50,18 @@ async def complete(self, model: ModelConfig, messages: list[LLMMessage]) -> LLMR
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
-        env=os.environ.copy(),
+        env={**os.environ.copy(), "CURSOR_API_KEY": api_key},
     )
     stdout_b, stderr_b = await proc.communicate(payload.encode("utf-8"))
 ```
 
-The function is intentionally explicit: it validates the key, the
-script, and Node availability *before* spawning anything, so the error
-messages are the diagnostic, not a "Node 1: command not found" leak.
+The backend reads the key from the configured `CredentialStore` first, then
+falls back to `CURSOR_API_KEY` / `.env`. It injects the resolved key into
+the Node subprocess environment, so dashboard and CLI-managed keys work
+without exporting global environment variables. The function is intentionally
+explicit: it validates the key, the script, and Node availability *before*
+spawning anything, so the error messages are the diagnostic, not a "Node 1:
+command not found" leak.
 
 After the subprocess exits, the backend:
 

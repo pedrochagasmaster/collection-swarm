@@ -40,9 +40,11 @@ collection-swarm model-report \
 
 Live probes require:
 
-- `CURSOR_API_KEY`
+- a Cursor key saved in dashboard Settings or with `collection-swarm api-keys set cursor --key ...`
 - Node.js 22+
 - `npm install` in `cursor_sdk_bridge/`
+
+`CURSOR_API_KEY` is still supported as an environment fallback when no dashboard key is saved.
 
 ## Python API
 

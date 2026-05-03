@@ -5,8 +5,8 @@ Collection Swarm ships with three backends:
 | Backend     | Module                                                | Needs                            |
 | ----------- | ----------------------------------------------------- | -------------------------------- |
 | Scripted    | [`backends/scripted.py`](../modules/backends/scripted.md) | Nothing — runs offline          |
-| NVIDIA NIM  | [`backends/nim.py`](../modules/backends/nim.md)           | `NVIDIA_NIM_API_KEY`            |
-| Cursor SDK  | [`backends/cursor_sdk.py`](../modules/backends/cursor-sdk.md) | `CURSOR_API_KEY`, Node.js 22+, the bridge under `cursor_sdk_bridge/` |
+| NVIDIA NIM  | [`backends/nim.py`](../modules/backends/nim.md)           | Dashboard or CLI key (`nvidia_nim`), or `NVIDIA_NIM_API_KEY` fallback |
+| Cursor SDK  | [`backends/cursor_sdk.py`](../modules/backends/cursor-sdk.md) | Dashboard or CLI key (`cursor`), or `CURSOR_API_KEY` fallback; Node.js 22+ and `cursor_sdk_bridge/` |
 
 The router in [`backends/router.py`](../modules/backends/base-and-router.md)
 dispatches each model ID to the correct backend based on its `backend`
@@ -14,16 +14,40 @@ field in `config/models.yaml`.
 
 ## Configure your secrets
 
-Create a `.env` file in the repo root. All backends call
-[`env.load_dotenv_if_present`](../modules/env.md), which loads
-simple `KEY=VALUE` lines without overriding variables already exported in
-your shell.
+The dashboard and CLI can store live model keys in the configured SQLite
+database. This is the preferred local workflow because dashboard jobs and
+CLI commands read the same key store.
+
+=== "Dashboard"
+
+    ```bash
+    collection-swarm serve
+    ```
+
+    Open **Settings → Live model API keys**, paste the Cursor and/or
+    NVIDIA NIM key, and save. The page only shows masked values after
+    saving.
+
+=== "CLI"
+
+    ```bash
+    collection-swarm api-keys set nvidia_nim --key ...
+    collection-swarm api-keys set cursor --key ...
+    collection-swarm api-keys list
+    ```
+
+    Use the same `--db` path as the dashboard when you run a non-default
+    database.
+
+Environment variables still work as fallbacks. Backends call
+[`env.load_dotenv_if_present`](../modules/env.md), which loads simple
+`KEY=VALUE` lines without overriding variables already exported in your
+shell.
 
 ```bash title=".env"
 NVIDIA_NIM_API_KEY=...
 CURSOR_API_KEY=...
-# Optional: tell Cursor SDK which workspace to operate in. Defaults to cwd.
-CURSOR_SDK_WORKSPACE=/absolute/path/to/your/workspace
+CURSOR_SDK_WORKSPACE=/absolute/path/to/your/workspace  # optional
 ```
 
 !!! tip "Secrets on Cursor Cloud"
