@@ -1,0 +1,132 @@
+docs_dir: docs-site
+
+site_name: Collection Swarm
+site_description: AI-driven simulator for testing debt-collection strategies before they ever touch a real customer.
+site_url: ""
+repo_url: https://github.com/pedrochagasmaster/collection-swarm
+repo_name: collection-swarm
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  font:
+    text: Inter
+    code: JetBrains Mono
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.indexes
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.tabs.link
+  icon:
+    repo: fontawesome/brands/github
+  logo: material/robot-happy-outline
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.mark
+  - pymdownx.critic
+  - pymdownx.keys
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - attr_list
+  - md_in_html
+  - tables
+  - footnotes
+  - def_list
+  - toc:
+      permalink: true
+      toc_depth: 3
+
+plugins:
+  - search
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/your-org/collection-swarm
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Quick Start: getting-started/quickstart.md
+      - Configuration: getting-started/configuration.md
+  - Architecture:
+      - Overview: architecture/overview.md
+      - Data Flow: architecture/data-flow.md
+      - Domain Model: architecture/domain-model.md
+  - Core Modules:
+      - Simulation Engine: modules/engine.md
+      - Runner & Matrix: modules/runner.md
+      - Store (Persistence): modules/store.md
+      - Configuration Loader: modules/config.md
+      - Domain Models: modules/models.md
+  - Agents:
+      - Overview: agents/overview.md
+      - Collector Agent: agents/collector.md
+      - Debtor Agent: agents/debtor.md
+      - Judge: agents/judge.md
+  - Backends:
+      - Overview: backends/overview.md
+      - LLM Router: backends/router.md
+      - Scripted Backend: backends/scripted.md
+      - NVIDIA NIM Backend: backends/nim.md
+      - Cursor SDK Backend: backends/cursor-sdk.md
+  - Analysis:
+      - Overview: analysis/overview.md
+      - Statistics & Rankings: analysis/statistics.md
+      - Compliance: analysis/compliance.md
+      - Objections: analysis/objections.md
+      - Playbook Generation: analysis/playbook.md
+  - Advanced Features:
+      - Arena & Elo System: advanced/arena.md
+      - Strategy Evolution: advanced/evolution.md
+      - Adversarial Hardening: advanced/adversarial.md
+      - Judge Calibration: advanced/calibration.md
+      - Model Evaluation: advanced/model-evaluation.md
+  - Web Dashboard:
+      - Overview: web/overview.md
+      - API Reference: web/api-reference.md
+      - Manual Sessions: web/manual-sessions.md
+  - CLI Reference: cli.md
+  - Profiles & Strategies:
+      - Debtor Profiles: catalog/profiles.md
+      - Collector Strategies: catalog/strategies.md
+  - Development:
+      - Contributing: development/contributing.md
+      - Testing: development/testing.md
