@@ -75,6 +75,8 @@ REQUIRED_THEME_ASSETS = [
     "assets/logo.svg",
 ]
 
+THEME_CSS = DOCS_ROOT / "stylesheets/theme.css"
+
 EXPECTED_MODULE_FILES = [
     "config.py",
     "models.py",
@@ -114,6 +116,22 @@ def test_every_required_doc_page_exists() -> None:
 def test_theme_assets_exist() -> None:
     missing = [a for a in REQUIRED_THEME_ASSETS if not (DOCS_ROOT / a).is_file()]
     assert not missing, f"Missing theme assets: {missing}"
+
+
+def test_theme_has_phone_responsive_rules_for_custom_docs_components() -> None:
+    css = THEME_CSS.read_text(encoding="utf-8")
+    phone_rules = css.split("@media screen and (max-width: 44.984em)", maxsplit=1)[1]
+
+    assert "@media screen and (max-width: 44.984em)" in css
+    assert ".cs-hero__cta > p" in phone_rules
+    assert "min-height: 2.75rem" in phone_rules
+    assert "grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr))" in css
+    assert ".cs-summary" in phone_rules
+    assert "grid-template-columns: minmax(0, 1fr)" in phone_rules
+    assert ".md-typeset__table" in css
+    assert "overflow-x: auto" in css
+    assert ".cs-kicker" in css
+    assert "overflow-wrap: anywhere" in css
 
 
 def test_mkdocs_config_and_workflow_are_wired_correctly() -> None:

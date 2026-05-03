@@ -143,6 +143,12 @@
   overflow: hidden;
 }
 
+.md-typeset__table {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .md-typeset table:not([class]) th {
   background: var(--cs-surface-sunk);
   font-weight: 600;
@@ -295,7 +301,7 @@
 /* ---------- Card grid (feature / nav cards) ---------- */
 .cs-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
   gap: 1rem;
   margin: 1.6rem 0;
 }
@@ -349,6 +355,7 @@
 /* ---------- Kickers / section labels ---------- */
 .cs-kicker {
   display: inline-block;
+  max-width: 100%;
   margin-bottom: 0.4rem;
   padding: 0.18rem 0.55rem;
   border-radius: 999px;
@@ -358,6 +365,7 @@
   font-family: var(--md-code-font);
   font-size: 0.72rem;
   letter-spacing: 0.04em;
+  overflow-wrap: anywhere;
 }
 
 /* ---------- Module-page summary <dl> ---------- */
@@ -464,4 +472,97 @@
   border: 1px solid var(--cs-border);
   border-radius: 0.75rem;
   padding: 0.6rem;
+}
+
+/* ---------- Phone layout ---------- */
+@media screen and (max-width: 44.984em) {
+  .md-typeset {
+    line-height: 1.6;
+  }
+
+  .md-typeset h1 {
+    font-size: clamp(1.75rem, 1.3rem + 6vw, 2.25rem);
+  }
+
+  .md-typeset h2 {
+    font-size: 1.28rem;
+    margin-top: 2rem;
+  }
+
+  .md-typeset__scrollwrap {
+    margin-inline: -0.8rem;
+    padding-inline: 0.8rem;
+  }
+
+  .md-typeset pre {
+    max-width: 100%;
+    border-radius: 0.55rem;
+  }
+
+  .cs-hero {
+    margin-bottom: 2rem;
+    padding: 1.15rem;
+    border-radius: 0.95rem;
+  }
+
+  .cs-hero h1 {
+    font-size: clamp(2rem, 1.2rem + 9vw, 2.75rem);
+  }
+
+  .cs-hero__lead {
+    font-size: 1rem;
+  }
+
+  .cs-hero__cta {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cs-hero__cta > p {
+    display: grid;
+    gap: 0.6rem;
+    margin: 0;
+  }
+
+  .cs-hero .md-button {
+    min-height: 2.75rem;
+    width: 100%;
+    align-content: center;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .cs-hero__loop {
+    margin-top: 1.4rem;
+    padding: 0.85rem;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cs-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.75rem;
+  }
+
+  .cs-card {
+    padding: 0.95rem;
+    border-radius: 0.75rem;
+  }
+
+  .cs-summary {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.15rem;
+    padding: 0.85rem;
+  }
+
+  .cs-summary dd + dt {
+    margin-top: 0.65rem;
+  }
+
+  .cs-flow {
+    align-items: stretch;
+  }
+
+  .cs-flow > span {
+    overflow-wrap: anywhere;
+  }
 }
