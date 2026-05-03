@@ -9,3 +9,6 @@ output/
 .env
 node_modules/
 cursor_sdk_bridge/node_modules/
+docs/pages/_site/
+docs/pages/.jekyll-cache/
+docs/pages/Gemfile.lock
