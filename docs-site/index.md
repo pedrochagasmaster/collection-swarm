@@ -113,8 +113,8 @@ substrate every downstream report builds on.
 ## Read it like a book { .no-rule }
 
 The docs are ordered the way a careful reader would explore the codebase —
-from the surface, down through the concepts, into each individual module,
-and back out to operator references.
+from the surface, down through the architecture and concepts, into each
+individual module, and back out to operator references.
 
 <div class="cs-grid" markdown>
 
@@ -125,25 +125,31 @@ provider, open the dashboard.
 </div>
 
 <div class="cs-card" markdown>
-### [2 · Concepts](concepts/index.md)
-Vocabulary, domain model, conversation lifecycle, the compliance guardrails,
-and how the arena and the judge think.
+### [2 · Architecture](architecture/overview.md)
+A system-level view: components, data flow through every workflow, and the
+full Pydantic domain model.
 </div>
 
 <div class="cs-card" markdown>
-### [3 · Modules](modules/index.md)
+### [3 · Concepts](concepts/index.md)
+Vocabulary, conversation lifecycle, compliance guardrails, and how the
+arena and the judge think.
+</div>
+
+<div class="cs-card" markdown>
+### [4 · Modules](modules/index.md)
 A file-by-file walkthrough of every module under `src/collection_swarm/`,
 with signatures, diagrams, and the gotchas worth knowing.
 </div>
 
 <div class="cs-card" markdown>
-### [4 · Catalog](catalog/profiles.md)
+### [5 · Catalog](catalog/profiles.md)
 The fourteen bundled debtor profiles and the collector strategies they
 negotiate against — archetypes, constraints, and demographics.
 </div>
 
 <div class="cs-card" markdown>
-### [5 · Reference](reference/index.md)
+### [6 · Reference](reference/index.md)
 Operator-level reference for the CLI, the HTTP API, the YAML configuration
 files, the SQLite schema, and the full glossary.
 </div>

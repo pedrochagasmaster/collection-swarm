@@ -18,7 +18,7 @@ Quick A–Z cross-reference. The full prose is in
 | **Matrix**                 | Combinatorial space of Simulations to execute (Profile × Strategy × repetitions).                       | [runner.py](../modules/runner.md)                                         |
 | **Model Combo**            | The (conversation_model, judge_model) pair recorded as Simulation metadata.                             | [Vocabulary](../concepts/vocabulary.md#experiment-design)                |
 | **Objection**              | A debtor's stated reason for not paying, classified against the taxonomy.                               | [analysis/objections.py](../modules/analysis/objections.md)               |
-| **Objection Taxonomy**     | The canonical set of objection categories defined in `simulation.yaml`.                                 | [Configuration](configuration.md#simulationyaml)                           |
+| **Objection Taxonomy**     | The canonical set of objection categories defined in `simulation.yaml`.                                 | [Configuration](configuration.md#simulation-settings)                           |
 | **Participant**            | An agent that takes turns: Collector or Debtor.                                                         | [Vocabulary](../concepts/vocabulary.md#the-atoms)                        |
 | **Payment Outcome**        | Categorical result ordered best-to-worst.                                                              | [Vocabulary](../concepts/vocabulary.md#payment-outcomes)                  |
 | **Persona**                | The Profile's behavioral content (backstory, constraints, emotional state).                             | [Vocabulary](../concepts/vocabulary.md#debtor-profiles)                  |
@@ -31,4 +31,4 @@ Quick A–Z cross-reference. The full prose is in
 | **Tags**                   | Categorical labels on a Profile used for grouping and analysis.                                          | [Vocabulary](../concepts/vocabulary.md#debtor-profiles)                  |
 | **Transcript**             | Ordered sequence of Turns in a Simulation.                                                              | [engine.py](../modules/engine.md)                                         |
 | **Turn**                   | A single message from one Participant.                                                                  | [Vocabulary](../concepts/vocabulary.md#conversation-lifecycle)           |
-| **Turn Limit**             | Hard ceiling on conversation length.                                                                    | [Configuration](configuration.md#simulationyaml)                          |
+| **Turn Limit**             | Hard ceiling on conversation length.                                                                    | [Configuration](configuration.md#simulation-settings)                          |
