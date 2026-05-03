@@ -9,3 +9,6 @@ output/
 .env
 node_modules/
 cursor_sdk_bridge/node_modules/
+
+# MkDocs build output
+/site/

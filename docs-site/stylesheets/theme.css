@@ -1,0 +1,467 @@
+/* Collection Swarm — documentation theme
+ *
+ * Design posture: editorial, slightly mechanical, after-hours fintech.
+ * Deep navy ink, warm gold for emphasis, mint for code, a single rose for
+ * warnings. Typography does the heavy lifting; we don't gradient everything.
+ */
+
+:root {
+  --md-text-font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --md-code-font: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Brand */
+  --cs-gold:      oklch(82% 0.14 80);
+  --cs-gold-soft: oklch(88% 0.08 80);
+  --cs-mint:      oklch(79% 0.095 164);
+  --cs-rose:      oklch(74% 0.11 22);
+  --cs-blue:      oklch(73% 0.1 232);
+
+  /* Dark surface tokens */
+  --cs-ink:       oklch(94% 0.018 255);
+  --cs-muted:     oklch(78% 0.022 255);
+  --cs-quiet:     oklch(64% 0.024 255);
+  --cs-paper:     oklch(16% 0.022 255);
+  --cs-paper-2:   oklch(20% 0.024 255);
+  --cs-paper-3:   oklch(26% 0.028 255);
+  --cs-line:      oklch(36% 0.032 255);
+}
+
+/* ---------- Light scheme ---------- */
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color:         oklch(22% 0.03 255);
+  --md-primary-fg-color--light:  oklch(36% 0.032 255);
+  --md-primary-fg-color--dark:   oklch(14% 0.024 255);
+  --md-primary-bg-color:         oklch(98% 0.004 255);
+  --md-primary-bg-color--light:  oklch(92% 0.005 255);
+  --md-accent-fg-color:          oklch(55% 0.14 72);
+  --md-default-bg-color:         oklch(98% 0.004 255);
+  --md-default-fg-color:         oklch(18% 0.02 255);
+  --md-default-fg-color--light:  oklch(35% 0.022 255);
+  --md-default-fg-color--lighter: oklch(55% 0.022 255);
+  --md-typeset-a-color:          oklch(44% 0.14 72);
+  --md-code-bg-color:            oklch(96% 0.008 255);
+  --md-code-fg-color:            oklch(34% 0.08 164);
+
+  --cs-surface:      oklch(100% 0 0);
+  --cs-surface-sunk: oklch(96% 0.006 255);
+  --cs-border:       oklch(89% 0.008 255);
+  --cs-gold-ink:     oklch(48% 0.12 72);
+}
+
+/* ---------- Dark scheme ---------- */
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color:         oklch(20% 0.022 255);
+  --md-primary-fg-color--light:  oklch(28% 0.028 255);
+  --md-primary-fg-color--dark:   oklch(12% 0.018 255);
+  --md-primary-bg-color:         var(--cs-ink);
+  --md-primary-bg-color--light:  var(--cs-muted);
+  --md-accent-fg-color:          var(--cs-gold);
+  --md-default-bg-color:         var(--cs-paper);
+  --md-default-fg-color:         var(--cs-ink);
+  --md-default-fg-color--light:  var(--cs-muted);
+  --md-default-fg-color--lighter: var(--cs-quiet);
+  --md-typeset-a-color:          var(--cs-gold);
+  --md-code-bg-color:            var(--cs-paper-2);
+  --md-code-fg-color:            var(--cs-mint);
+
+  --cs-surface:      var(--cs-paper-2);
+  --cs-surface-sunk: oklch(14% 0.02 255);
+  --cs-border:       var(--cs-line);
+  --cs-gold-ink:     var(--cs-gold);
+}
+
+/* ---------- Typography rhythm ---------- */
+.md-typeset {
+  font-feature-settings: "ss01", "cv02", "cv11";
+  line-height: 1.65;
+}
+
+.md-typeset h1 {
+  font-weight: 700;
+  letter-spacing: -0.032em;
+  font-size: clamp(1.85rem, 1.2rem + 1.6vw, 2.55rem);
+  line-height: 1.08;
+  margin-bottom: 0.55em;
+}
+
+.md-typeset h2 {
+  font-weight: 650;
+  letter-spacing: -0.022em;
+  font-size: 1.5rem;
+  margin-top: 2.4em;
+  padding-top: 0.45em;
+  border-top: 1px solid color-mix(in oklch, var(--md-default-fg-color) 8%, transparent);
+}
+
+.md-typeset h2:first-child,
+.md-typeset h2.no-rule {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 0.2em;
+}
+
+.md-typeset h3 {
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  font-size: 1.18rem;
+  margin-top: 1.8em;
+}
+
+.md-typeset h4 {
+  font-weight: 600;
+  font-size: 1rem;
+  margin-top: 1.6em;
+  text-transform: none;
+}
+
+/* ---------- Inline code, tidier than default ---------- */
+.md-typeset code {
+  font-size: 0.86em;
+  padding: 0.13em 0.38em;
+  border-radius: 4px;
+  background: color-mix(in oklch, var(--md-accent-fg-color) 10%, transparent);
+  border: 1px solid color-mix(in oklch, var(--md-accent-fg-color) 18%, transparent);
+}
+
+[data-md-color-scheme="slate"] .md-typeset code {
+  background: oklch(23% 0.028 255);
+  border-color: oklch(32% 0.034 255);
+  color: var(--cs-mint);
+}
+
+.md-typeset pre code {
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+/* ---------- Tables ---------- */
+.md-typeset table:not([class]) {
+  font-size: 0.88rem;
+  border: 1px solid var(--cs-border);
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+.md-typeset table:not([class]) th {
+  background: var(--cs-surface-sunk);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.md-typeset table:not([class]) td,
+.md-typeset table:not([class]) th {
+  border-top: 1px solid var(--cs-border);
+  padding: 0.55rem 0.75rem;
+}
+
+/* ---------- Hero (home) ---------- */
+.cs-hero {
+  position: relative;
+  margin: 0 0 3rem;
+  padding: clamp(1.75rem, 2.4rem + 1.2vw, 3.2rem);
+  border-radius: 1.25rem;
+  overflow: hidden;
+  color: var(--cs-ink);
+  background:
+    radial-gradient(circle at 0% 0%, oklch(32% 0.055 235 / 0.6), transparent 45%),
+    radial-gradient(circle at 100% 0%, oklch(36% 0.09 72 / 0.38), transparent 50%),
+    linear-gradient(165deg, oklch(18% 0.024 255), oklch(13% 0.018 255) 70%);
+  border: 1px solid oklch(30% 0.032 255);
+  box-shadow: 0 24px 80px oklch(4% 0.01 255 / 0.5);
+}
+
+[data-md-color-scheme="default"] .cs-hero {
+  color: var(--cs-ink);
+}
+
+.cs-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(transparent 60%, oklch(11% 0.02 255 / 0.45));
+}
+
+.cs-hero > * {
+  position: relative;
+  z-index: 1;
+}
+
+.cs-hero__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  background: oklch(26% 0.03 255 / 0.9);
+  border: 1px solid oklch(38% 0.034 255);
+  color: var(--cs-gold);
+  font-weight: 700;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.cs-hero h1 {
+  margin: 1.1rem 0 0.75rem;
+  color: var(--cs-ink);
+  font-size: clamp(2.1rem, 1.3rem + 2.6vw, 3.4rem);
+  letter-spacing: -0.035em;
+  line-height: 1.04;
+  max-width: 24ch;
+}
+
+.cs-hero__lead {
+  margin: 0 0 1.5rem;
+  max-width: 64ch;
+  font-size: clamp(1rem, 0.95rem + 0.3vw, 1.18rem);
+  color: var(--cs-muted);
+  line-height: 1.6;
+}
+
+.cs-hero__lead em {
+  color: var(--cs-gold);
+  font-style: normal;
+  font-weight: 600;
+}
+
+.cs-hero__cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 0;
+}
+
+.cs-hero .md-button {
+  border-color: oklch(38% 0.034 255);
+  background: oklch(26% 0.03 255 / 0.9);
+  color: var(--cs-ink);
+}
+
+.cs-hero .md-button:hover {
+  background: oklch(30% 0.032 255);
+}
+
+.cs-hero .md-button--primary {
+  background: var(--cs-gold);
+  border-color: transparent;
+  color: oklch(18% 0.02 255);
+  font-weight: 700;
+}
+
+.cs-hero .md-button--primary:hover {
+  background: oklch(86% 0.14 80);
+  color: oklch(14% 0.02 255);
+}
+
+.cs-hero__loop {
+  margin: 2rem 0 0;
+  padding: 1.1rem 1.2rem;
+  border: 1px solid oklch(30% 0.032 255);
+  border-radius: 0.95rem;
+  background: oklch(15% 0.02 255 / 0.6);
+  backdrop-filter: blur(4px);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.9rem 1.3rem;
+  list-style: none;
+}
+
+.cs-hero__loop li {
+  display: grid;
+  grid-template-columns: 2.3rem 1fr;
+  gap: 0.65rem;
+  align-items: start;
+  color: var(--cs-muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.cs-hero__loop li b {
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.55rem;
+  background: oklch(24% 0.028 255);
+  border: 1px solid oklch(36% 0.034 255);
+  color: var(--cs-gold);
+  font-weight: 700;
+}
+
+/* ---------- Card grid (feature / nav cards) ---------- */
+.cs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 1rem;
+  margin: 1.6rem 0;
+}
+
+.cs-card {
+  padding: 1.05rem 1.15rem 1.1rem;
+  border: 1px solid var(--cs-border);
+  border-radius: 0.9rem;
+  background: var(--cs-surface);
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.cs-card:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in oklch, var(--md-accent-fg-color) 55%, var(--cs-border));
+  background: color-mix(in oklch, var(--md-accent-fg-color) 4%, var(--cs-surface));
+}
+
+.cs-card h3 {
+  margin-top: 0.15rem;
+  margin-bottom: 0.35rem;
+  font-size: 1.02rem;
+  letter-spacing: -0.012em;
+}
+
+.cs-card h3 a {
+  text-decoration: none;
+  color: var(--md-default-fg-color);
+}
+
+.cs-card h3 a::after {
+  content: " →";
+  color: var(--cs-gold-ink);
+  font-weight: 600;
+  transition: transform 0.18s ease;
+  display: inline-block;
+}
+
+.cs-card:hover h3 a::after {
+  transform: translateX(3px);
+}
+
+.cs-card p,
+.cs-card > p:last-child {
+  margin: 0;
+  color: var(--md-default-fg-color--light);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+/* ---------- Kickers / section labels ---------- */
+.cs-kicker {
+  display: inline-block;
+  margin-bottom: 0.4rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--md-accent-fg-color) 12%, transparent);
+  border: 1px solid color-mix(in oklch, var(--md-accent-fg-color) 25%, transparent);
+  color: var(--cs-gold-ink);
+  font-family: var(--md-code-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+}
+
+/* ---------- Module-page summary <dl> ---------- */
+.cs-summary {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.35rem 1rem;
+  margin: 1rem 0 1.4rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--cs-border);
+  border-radius: 0.75rem;
+  background: var(--cs-surface-sunk);
+  font-size: 0.9rem;
+}
+
+.cs-summary dt {
+  font-weight: 600;
+  color: var(--md-default-fg-color--light);
+}
+
+.cs-summary dd {
+  margin: 0;
+  color: var(--md-default-fg-color);
+}
+
+/* ---------- Flow diagrams (simple inline, not mermaid) ---------- */
+.cs-flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 1rem 1.1rem;
+  border: 1px dashed var(--cs-border);
+  border-radius: 0.85rem;
+  background: var(--cs-surface-sunk);
+  font-family: var(--md-code-font);
+  font-size: 0.85rem;
+}
+
+.cs-flow > span {
+  padding: 0.35rem 0.65rem;
+  border-radius: 0.5rem;
+  background: var(--cs-surface);
+  border: 1px solid var(--cs-border);
+  color: var(--md-default-fg-color);
+}
+
+.cs-flow > em {
+  color: var(--cs-gold-ink);
+  font-style: normal;
+  font-family: var(--md-code-font);
+}
+
+/* ---------- Buttons (home CTAs in non-hero context) ---------- */
+.md-typeset .md-button {
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+
+/* ---------- Admonitions: tighter spacing ---------- */
+.md-typeset .admonition,
+.md-typeset details {
+  border-radius: 0.7rem;
+  border-width: 1px;
+  font-size: 0.92rem;
+}
+
+/* ---------- Navigation polish ---------- */
+.md-tabs {
+  background-color: var(--md-primary-fg-color);
+}
+
+.md-header {
+  background-color: var(--md-primary-fg-color);
+}
+
+[data-md-color-scheme="slate"] .md-header,
+[data-md-color-scheme="slate"] .md-tabs {
+  background: linear-gradient(180deg, oklch(16% 0.02 255), oklch(14% 0.018 255));
+  border-bottom: 1px solid oklch(26% 0.028 255);
+}
+
+.md-nav__title {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.md-search__input {
+  border-radius: 0.6rem;
+}
+
+/* ---------- Footer ---------- */
+.md-footer {
+  background: var(--md-primary-fg-color);
+}
+
+.md-footer-meta {
+  background: color-mix(in oklch, var(--md-primary-fg-color) 80%, black 20%);
+}
+
+/* ---------- Mermaid contrast in dark mode ---------- */
+[data-md-color-scheme="slate"] .mermaid {
+  background: var(--cs-surface-sunk);
+  border: 1px solid var(--cs-border);
+  border-radius: 0.75rem;
+  padding: 0.6rem;
+}
