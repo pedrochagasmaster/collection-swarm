@@ -15,6 +15,7 @@ const KNOWN_PAGES = [
   'dashboard', 'runs', 'launch', 'matrix', 'manual',
   'playbook', 'compliance', 'arena', 'evolution',
   'calibration', 'benchmarks', 'profiles', 'strategies',
+  'settings',
 ];
 const _KNOWN_PAGES_SET = new Set(KNOWN_PAGES);
 
@@ -37,6 +38,7 @@ const PAGE_TITLES = {
   benchmarks: 'Model Benchmarks',
   profiles: 'Profiles',
   strategies: 'Strategies',
+  settings: 'API Keys',
 };
 
 const APP_TITLE = 'Collection Swarm';
@@ -575,6 +577,7 @@ async function renderPage(page, params = {}) {
       case 'benchmarks': await renderBenchmarks(); break;
       case 'profiles': await renderProfiles(); break;
       case 'strategies': await renderStrategies(); break;
+      case 'settings': await renderSettings(); break;
     }
     mainEl.classList.remove('page-enter');
     void mainEl.offsetWidth;
@@ -2993,6 +2996,154 @@ async function renderStrategies() {
     </div>
     <div class="grid-2">${cards}</div>
   `;
+}
+
+// ── Settings (API Keys) ────────────────────────────────────────
+
+async function renderSettings() {
+  const data = await api('/settings');
+  const settings = data.settings || {};
+  const configured = data.configured || {};
+
+  const KEY_META = [
+    { key: 'nvidia_nim_api_key', label: 'NVIDIA NIM API Key', env: 'NVIDIA_NIM_API_KEY', secret: true, description: 'Required for running simulations with NVIDIA NIM models.' },
+    { key: 'cursor_api_key', label: 'Cursor API Key', env: 'CURSOR_API_KEY', secret: true, description: 'Required for Cursor SDK model backends.' },
+    { key: 'cursor_sdk_workspace', label: 'Cursor SDK Workspace', env: 'CURSOR_SDK_WORKSPACE', secret: false, description: 'Working directory for the Cursor SDK bridge (optional).' },
+  ];
+
+  const fields = KEY_META.map(m => {
+    const isSet = configured[m.key];
+    const statusIcon = isSet
+      ? '<span class="settings-status settings-status-ok" title="Configured">&#x2713;</span>'
+      : '<span class="settings-status settings-status-missing" title="Not configured">&#x2717;</span>';
+    const inputType = m.secret ? 'password' : 'text';
+    const placeholderText = isSet ? '••••••••  (saved — leave blank to keep)' : `Enter ${m.label}`;
+    return `
+      <div class="settings-field">
+        <div class="settings-field-header">
+          <label for="setting-${m.key}">${escapeHTML(m.label)} ${statusIcon}</label>
+          <code class="settings-env-hint">${escapeHTML(m.env)}</code>
+        </div>
+        <p class="settings-field-desc">${escapeHTML(m.description)}</p>
+        <div class="settings-input-row">
+          <input id="setting-${m.key}" type="${inputType}" class="input" placeholder="${placeholderText}" autocomplete="off" spellcheck="false" data-key="${m.key}" />
+          ${m.secret ? `<button type="button" class="btn btn-ghost settings-toggle-vis" onclick="toggleSettingVisibility(this)" aria-label="Toggle visibility" title="Show/hide value">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>` : ''}
+          ${isSet ? `<button type="button" class="btn btn-ghost settings-delete-btn" onclick="deleteSettingKey('${m.key}')" aria-label="Remove ${escapeHTML(m.label)}" title="Remove saved value">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+
+  mainEl.innerHTML = `
+    <div class="page-header">
+      <h1>API Keys</h1>
+      <p>Manage credentials used by simulation backends. Keys are encrypted at rest in the database and take priority over environment variables.</p>
+    </div>
+    <section class="card">
+      <div class="card-header"><h2>Credentials</h2></div>
+      <div class="card-body">
+        <form id="settings-form" onsubmit="return saveSettings(event)">
+          ${fields}
+          <div class="btn-row" style="margin-top:var(--space-5)">
+            <button type="submit" class="btn btn-primary" id="settings-save-btn">Save Changes</button>
+            <button type="button" class="btn btn-secondary" onclick="testSettingsConnection()">Test Connection</button>
+          </div>
+        </form>
+        <div id="settings-test-results" style="margin-top:var(--space-4)"></div>
+      </div>
+    </section>
+    <section class="card" style="margin-top:var(--space-5)">
+      <div class="card-header"><h2>CLI Equivalents</h2></div>
+      <div class="card-body">
+        <p style="margin-bottom:var(--space-3)">You can also manage API keys from the command line:</p>
+        <pre class="code-block"><code># Set a key (prompts for value securely)
+collection-swarm config-set nvidia_nim_api_key --prompt
+
+# View stored settings
+collection-swarm config-get
+
+# Remove a key
+collection-swarm config-delete nvidia_nim_api_key</code></pre>
+      </div>
+    </section>
+  `;
+}
+
+async function saveSettings(e) {
+  e.preventDefault();
+  const btn = $('#settings-save-btn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  try {
+    const payload = {};
+    let hasChanges = false;
+    $$('#settings-form input[data-key]').forEach(input => {
+      if (input.value.trim()) {
+        payload[input.dataset.key] = input.value.trim();
+        hasChanges = true;
+      }
+    });
+    if (!hasChanges) {
+      showToast('No changes to save.', 'info');
+      return;
+    }
+    await fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    showToast('Settings saved successfully.', 'success');
+    await renderSettings();
+  } catch (err) {
+    showToast('Failed to save settings: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save Changes';
+  }
+}
+
+async function deleteSettingKey(key) {
+  try {
+    await fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [key]: '' }),
+    });
+    showToast('Removed ' + key.replace(/_/g, ' ') + '.', 'success');
+    await renderSettings();
+  } catch (err) {
+    showToast('Failed to remove key: ' + err.message, 'error');
+  }
+}
+
+function toggleSettingVisibility(btn) {
+  const input = btn.parentElement.querySelector('input');
+  if (!input) return;
+  input.type = input.type === 'password' ? 'text' : 'password';
+}
+
+async function testSettingsConnection() {
+  const resultsEl = $('#settings-test-results');
+  if (!resultsEl) return;
+  resultsEl.innerHTML = '<p class="dim">Testing connections…</p>';
+  try {
+    const data = await api('/settings/test');
+    const keys = data.keys || {};
+    const rows = Object.entries(keys).map(([key, info]) => {
+      const icon = info.configured
+        ? '<span class="settings-status settings-status-ok">&#x2713;</span>'
+        : '<span class="settings-status settings-status-missing">&#x2717;</span>';
+      const source = info.source ? `(source: ${info.source})` : '(not set)';
+      const label = key.replace(/_/g, ' ');
+      return `<div class="settings-test-row">${icon} <strong>${escapeHTML(label)}</strong> ${escapeHTML(source)}</div>`;
+    }).join('');
+    resultsEl.innerHTML = `<div class="settings-test-results">${rows}</div>`;
+  } catch (err) {
+    resultsEl.innerHTML = `<p class="text-error">Test failed: ${escapeHTML(err.message)}</p>`;
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

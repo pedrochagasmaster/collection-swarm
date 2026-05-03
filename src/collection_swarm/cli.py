@@ -28,6 +28,7 @@ from collection_swarm.model_evaluation import (
 )
 from collection_swarm.models import EvolutionConfig, TournamentConfig
 from collection_swarm.runner import build_matrix, run_evolution_cycle, run_matrix, run_tournament
+from collection_swarm.settings import SETTING_KEYS, SECRET_KEYS, SettingsStore
 from collection_swarm.store import SimulationStore
 
 console = Console()
@@ -414,6 +415,72 @@ def seed_data(ctx: click.Context, count: int) -> None:
 
     n = generate_seed_data(db_path=ctx.obj["db_path"], num_runs=count)
     console.print(f"Seeded {n} simulations into {ctx.obj['db_path']}")
+
+
+@cli.command("config-set")
+@click.argument("key")
+@click.argument("value", required=False)
+@click.option("--prompt", "prompt_value", is_flag=True, help="Prompt for the value (hides input for secrets).")
+@click.pass_context
+def config_set(ctx: click.Context, key: str, value: str | None, prompt_value: bool) -> None:
+    """Store a setting (e.g. an API key).
+
+    KEY is one of: nvidia_nim_api_key, cursor_api_key, cursor_sdk_workspace.
+    """
+    if key not in SETTING_KEYS:
+        raise click.ClickException(f"Unknown setting key: {key}. Valid keys: {', '.join(sorted(SETTING_KEYS))}")
+    if value is None and not prompt_value:
+        prompt_value = True
+    if prompt_value:
+        hide = key in SECRET_KEYS
+        value = click.prompt(f"Enter value for {key}", hide_input=hide)
+    if not value:
+        raise click.ClickException("No value provided.")
+    ss = SettingsStore(ctx.obj["db_path"])
+    ss.set(key, value)
+    console.print(f"Saved [bold]{key}[/bold].")
+
+
+@cli.command("config-get")
+@click.argument("key", required=False)
+@click.option("--show-secrets", is_flag=True, help="Show secret values in plain text.")
+@click.pass_context
+def config_get(ctx: click.Context, key: str | None, show_secrets: bool) -> None:
+    """Show stored settings."""
+    ss = SettingsStore(ctx.obj["db_path"])
+    if key:
+        if key not in SETTING_KEYS:
+            raise click.ClickException(f"Unknown setting key: {key}. Valid keys: {', '.join(sorted(SETTING_KEYS))}")
+        val = ss.get(key)
+        if val is None:
+            console.print(f"{key}: [dim]not set[/dim]")
+        elif key in SECRET_KEYS and not show_secrets:
+            console.print(f"{key}: ••••••••")
+        else:
+            console.print(f"{key}: {val}")
+        return
+    table = Table(title="Stored Settings")
+    table.add_column("Key")
+    table.add_column("Value")
+    table.add_column("Secret")
+    all_settings = ss.get_all(mask_secrets=not show_secrets)
+    for setting_key in sorted(SETTING_KEYS):
+        val = all_settings.get(setting_key)
+        display = val if val is not None else "[dim]not set[/dim]"
+        table.add_row(setting_key, str(display), "yes" if setting_key in SECRET_KEYS else "no")
+    console.print(table)
+
+
+@cli.command("config-delete")
+@click.argument("key")
+@click.pass_context
+def config_delete(ctx: click.Context, key: str) -> None:
+    """Remove a stored setting."""
+    if key not in SETTING_KEYS:
+        raise click.ClickException(f"Unknown setting key: {key}. Valid keys: {', '.join(sorted(SETTING_KEYS))}")
+    ss = SettingsStore(ctx.obj["db_path"])
+    ss.delete(key)
+    console.print(f"Deleted [bold]{key}[/bold].")
 
 
 def _print_result(result) -> None:

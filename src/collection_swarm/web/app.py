@@ -41,6 +41,7 @@ from collection_swarm.model_evaluation import (
 )
 from collection_swarm.models import EndedBy, MatrixCell, Message, SimulationResult, TournamentConfig, TournamentResult, model_dump_jsonable, utc_now
 from collection_swarm.runner import build_matrix
+from collection_swarm.settings import SETTING_KEYS, SettingsStore, get_settings_store
 from collection_swarm.store import SimulationStore
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -156,6 +157,12 @@ class ManualTurnRequest(BaseModel):
 class CalibrationJobRequest(BaseModel):
     labels: list[dict[str, Any]] = Field(default_factory=list)
     optimize: bool = True
+
+
+class SettingsUpdateRequest(BaseModel):
+    nvidia_nim_api_key: str | None = None
+    cursor_api_key: str | None = None
+    cursor_sdk_workspace: str | None = None
 
 
 @dataclass
@@ -963,6 +970,53 @@ def create_app(
             session.result.ended_by = session.result.ended_by or EndedBy.TURN_LIMIT
             await _finish_manual_session(session, _config(), _store())
             return session.snapshot()
+
+    # ── Settings / API key management ──────────────────────────────
+
+    def _settings_store() -> SettingsStore:
+        return get_settings_store(db_path)
+
+    @app.get("/api/settings")
+    def get_settings() -> dict[str, Any]:
+        ss = _settings_store()
+        values = ss.get_all(mask_secrets=True)
+        has: dict[str, bool] = {}
+        raw = ss.get_all(mask_secrets=False)
+        for key in SETTING_KEYS:
+            has[key] = raw.get(key) is not None and raw[key] != ""
+        return {"settings": values, "configured": has}
+
+    @app.put("/api/settings")
+    def update_settings(payload: SettingsUpdateRequest) -> dict[str, Any]:
+        ss = _settings_store()
+        updates: dict[str, str] = {}
+        for key in SETTING_KEYS:
+            value = getattr(payload, key, None)
+            if value is not None:
+                updates[key] = value
+        ss.set_many(updates)
+        values = ss.get_all(mask_secrets=True)
+        has: dict[str, bool] = {}
+        raw = ss.get_all(mask_secrets=False)
+        for key in SETTING_KEYS:
+            has[key] = raw.get(key) is not None and raw[key] != ""
+        return {"settings": values, "configured": has}
+
+    @app.post("/api/settings/test")
+    async def test_settings() -> dict[str, Any]:
+        ss = _settings_store()
+        results: dict[str, dict[str, Any]] = {}
+        nim_key = ss.resolve("nvidia_nim_api_key", "NVIDIA_NIM_API_KEY")
+        results["nvidia_nim_api_key"] = {
+            "configured": bool(nim_key),
+            "source": "dashboard" if ss.get("nvidia_nim_api_key") else ("env" if nim_key else None),
+        }
+        cursor_key = ss.resolve("cursor_api_key", "CURSOR_API_KEY")
+        results["cursor_api_key"] = {
+            "configured": bool(cursor_key),
+            "source": "dashboard" if ss.get("cursor_api_key") else ("env" if cursor_key else None),
+        }
+        return {"keys": results}
 
     # ── SPA entry point ─────────────────────────────────────────────
 

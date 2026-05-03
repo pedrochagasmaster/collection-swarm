@@ -15,6 +15,7 @@ from pathlib import Path
 from collection_swarm.backends.base import LLMBackend, LLMResponse
 from collection_swarm.env import load_dotenv_if_present
 from collection_swarm.models import CursorSdkPromptConfig, LLMMessage, ModelConfig
+from collection_swarm.settings import get_settings_store
 
 
 def _repo_root() -> Path:
@@ -31,11 +32,13 @@ class CursorSdkBackend(LLMBackend):
 
     async def complete(self, model: ModelConfig, messages: list[LLMMessage]) -> LLMResponse:
         load_dotenv_if_present()
-        api_key = os.getenv("CURSOR_API_KEY")
+        ss = get_settings_store()
+        api_key = ss.resolve("cursor_api_key", "CURSOR_API_KEY")
         if not api_key:
             raise RuntimeError(
                 "CURSOR_API_KEY is required for Cursor SDK models. "
-                "Create a key in the Cursor integrations dashboard."
+                "Set it in the dashboard Settings page or create a key "
+                "in the Cursor integrations dashboard."
             )
 
         script = _bridge_script()
@@ -49,7 +52,7 @@ class CursorSdkBackend(LLMBackend):
         if not node:
             raise RuntimeError("Node.js is required on PATH for the Cursor SDK backend (Node 22+ recommended).")
 
-        cwd = os.getenv("CURSOR_SDK_WORKSPACE", str(Path.cwd().resolve()))
+        cwd = ss.resolve("cursor_sdk_workspace", "CURSOR_SDK_WORKSPACE") or str(Path.cwd().resolve())
         model_id = model.model_name or model.id
         payload = json.dumps(
             {
@@ -61,13 +64,15 @@ class CursorSdkBackend(LLMBackend):
             ensure_ascii=False,
         )
 
+        env = os.environ.copy()
+        env["CURSOR_API_KEY"] = api_key
         proc = await asyncio.create_subprocess_exec(
             node,
             str(script),
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            env=os.environ.copy(),
+            env=env,
         )
         stdout_b, stderr_b = await proc.communicate(payload.encode("utf-8"))
         stderr = stderr_b.decode("utf-8", errors="replace").strip()
