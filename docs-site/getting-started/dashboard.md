@@ -47,6 +47,7 @@ Open <http://127.0.0.1:8000> and you'll land on the Dashboard view.
 | Evolution pool      | `index.html` + `app.js` | `GET /api/evolution/pool`                                        |
 | Calibration         | `index.html` + `app.js` | `POST /api/calibration/labels`, `POST /api/jobs/calibration`     |
 | Model benchmarks    | `index.html` + `app.js` | `POST /api/jobs/model-benchmarks`                                |
+| API Keys            | `index.html` + `app.js` | `GET /api/settings`, `PUT /api/settings`, `POST /api/settings/test` |
 
 A full HTTP API matrix lives in [API reference](../reference/api.md).
 
@@ -104,3 +105,8 @@ actions that remain CLI-only:
 - `collection-swarm reset-elo` — wipe Elo ratings and history.
 
 Both could be wired up to the dashboard if needed; PRs welcome.
+
+!!! note "API key management"
+    API keys can now be managed directly from the dashboard on the
+    **Configuration → API Keys** page. You can input, save, delete, and
+    test keys without touching `.env` files or the CLI.

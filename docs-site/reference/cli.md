@@ -440,6 +440,84 @@ collection-swarm --db demo.sqlite seed --count 50
 
 ---
 
+### `config-set`
+
+Store a configuration value (such as an API key) in the database. Stored values are encrypted at rest and take priority over environment variables when backends resolve settings.
+
+```bash
+collection-swarm config-set KEY VALUE
+```
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `KEY` | STRING | **Yes** | Setting name: `nvidia_nim_api_key`, `cursor_api_key`, or `cursor_sdk_workspace` |
+| `VALUE` | STRING | **Yes** | The value to store |
+
+#### Examples
+
+```bash
+# Store the NVIDIA NIM API key
+collection-swarm config-set nvidia_nim_api_key nvapi-1234567890abcdef
+
+# Store the Cursor API key
+collection-swarm config-set cursor_api_key my-cursor-key
+
+# Store the Cursor SDK workspace path
+collection-swarm config-set cursor_sdk_workspace /home/user/workspace
+```
+
+---
+
+### `config-get`
+
+Read a stored configuration value. Secret values (API keys) are partially masked in the output.
+
+```bash
+collection-swarm config-get KEY
+```
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `KEY` | STRING | **Yes** | Setting name to retrieve |
+
+#### Examples
+
+```bash
+# Check the stored NVIDIA key (masked)
+collection-swarm config-get nvidia_nim_api_key
+# nvidia_nim_api_key = nvapi-****abcd
+
+# Check the Cursor SDK workspace
+collection-swarm config-get cursor_sdk_workspace
+# cursor_sdk_workspace = /home/user/workspace
+```
+
+---
+
+### `config-delete`
+
+Remove a stored configuration value from the database. After deletion, the backend falls back to the environment variable.
+
+```bash
+collection-swarm config-delete KEY
+```
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `KEY` | STRING | **Yes** | Setting name to delete |
+
+#### Examples
+
+```bash
+# Remove the stored NVIDIA key (fall back to NVIDIA_NIM_API_KEY env var)
+collection-swarm config-delete nvidia_nim_api_key
+
+# Remove the stored Cursor API key
+collection-swarm config-delete cursor_api_key
+```
+
+---
+
 ## Command Quick Reference
 
 | Command | Purpose |
@@ -458,3 +536,6 @@ collection-swarm --db demo.sqlite seed --count 50
 | `test-connection` | Verify backend connectivity |
 | `serve` | Launch the web dashboard |
 | `seed` | Generate demo data |
+| `config-set` | Store a setting (e.g. API key) |
+| `config-get` | Read a stored setting |
+| `config-delete` | Remove a stored setting |

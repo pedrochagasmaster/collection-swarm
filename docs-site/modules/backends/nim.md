@@ -17,7 +17,7 @@ OpenAI-compatible inference endpoint at
 ```python
 async def complete(self, model: ModelConfig, messages: list[LLMMessage]) -> LLMResponse:
     load_dotenv_if_present()
-    api_key = os.getenv("NVIDIA_NIM_API_KEY")
+    api_key = get_settings_store().resolve("nvidia_nim_api_key", "NVIDIA_NIM_API_KEY")
     if not api_key:
         raise RuntimeError("NVIDIA_NIM_API_KEY is required for NIM models")
 
@@ -42,9 +42,11 @@ async def complete(self, model: ModelConfig, messages: list[LLMMessage]) -> LLMR
     )
 ```
 
-The function reads its own API key on every call rather than caching it
-in the constructor — that way `.env` edits are picked up without a
-process restart.
+The function resolves its API key on every call via
+`settings.resolve()`, which checks the stored database value first
+(set via dashboard or CLI), then falls back to the `NVIDIA_NIM_API_KEY`
+environment variable. This means `.env` edits and dashboard changes are
+both picked up without a process restart.
 
 ## `model.litellm_model`
 

@@ -14,6 +14,24 @@ field in `config/models.yaml`.
 
 ## Configure your secrets
 
+There are three ways to provide API keys, listed in priority order:
+
+### Option 1: Dashboard (recommended)
+
+Open the web dashboard (`collection-swarm serve`), navigate to
+**Configuration → API Keys**, and enter your keys. They are encrypted at
+rest in the SQLite database and take priority over environment variables.
+
+### Option 2: CLI
+
+```bash
+collection-swarm config-set nvidia_nim_api_key <your_nvidia_key>
+collection-swarm config-set cursor_api_key <your_cursor_key>
+collection-swarm config-set cursor_sdk_workspace /absolute/path/to/your/workspace
+```
+
+### Option 3: Environment variables / `.env` file
+
 Create a `.env` file in the repo root. All backends call
 [`env.load_dotenv_if_present`](../modules/env.md), which loads
 simple `KEY=VALUE` lines without overriding variables already exported in
@@ -25,6 +43,11 @@ CURSOR_API_KEY=...
 # Optional: tell Cursor SDK which workspace to operate in. Defaults to cwd.
 CURSOR_SDK_WORKSPACE=/absolute/path/to/your/workspace
 ```
+
+!!! info "Resolution order"
+    Backends call `settings.resolve()` which checks the stored database
+    value first, then falls back to the environment variable. This means
+    dashboard/CLI-stored keys always win over `.env` or shell exports.
 
 !!! tip "Secrets on Cursor Cloud"
     If you're running this from a Cursor Cloud Agent, add the same keys

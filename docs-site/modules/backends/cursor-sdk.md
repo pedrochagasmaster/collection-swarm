@@ -20,7 +20,8 @@ JSON envelope on stdin / stdout. The Python side lives at
 ```python
 async def complete(self, model: ModelConfig, messages: list[LLMMessage]) -> LLMResponse:
     load_dotenv_if_present()
-    api_key = os.getenv("CURSOR_API_KEY")
+    store = get_settings_store()
+    api_key = store.resolve("cursor_api_key", "CURSOR_API_KEY")
     if not api_key:
         raise RuntimeError("CURSOR_API_KEY is required for Cursor SDK models. ...")
 
@@ -32,7 +33,7 @@ async def complete(self, model: ModelConfig, messages: list[LLMMessage]) -> LLMR
     if not node:
         raise RuntimeError("Node.js is required on PATH for the Cursor SDK backend (Node 22+ recommended).")
 
-    cwd = os.getenv("CURSOR_SDK_WORKSPACE", str(Path.cwd().resolve()))
+    cwd = store.resolve("cursor_sdk_workspace", "CURSOR_SDK_WORKSPACE") or str(Path.cwd().resolve())
     model_id = model.model_name or model.id
     payload = json.dumps(
         {
@@ -55,9 +56,12 @@ async def complete(self, model: ModelConfig, messages: list[LLMMessage]) -> LLMR
     stdout_b, stderr_b = await proc.communicate(payload.encode("utf-8"))
 ```
 
-The function is intentionally explicit: it validates the key, the
-script, and Node availability *before* spawning anything, so the error
-messages are the diagnostic, not a "Node 1: command not found" leak.
+The function resolves `CURSOR_API_KEY` and `CURSOR_SDK_WORKSPACE` via
+`settings.resolve()`, which checks the stored database value first
+(set via dashboard or CLI), then falls back to the corresponding
+environment variable. It validates the key, the script, and Node
+availability *before* spawning anything, so the error messages are the
+diagnostic, not a "Node 1: command not found" leak.
 
 After the subprocess exits, the backend:
 

@@ -31,7 +31,18 @@ collection-swarm list-strategies
 
 ### Set up live model backends (optional)
 
-Create a `.env` file in the repo root:
+You can provide API keys in any of these ways (checked in priority order):
+
+**Dashboard:** Start the server with `collection-swarm serve`, navigate to **Configuration → API Keys**, and enter your keys.
+
+**CLI:**
+
+```bash
+collection-swarm config-set nvidia_nim_api_key your_nvidia_key
+collection-swarm config-set cursor_api_key your_cursor_key
+```
+
+**Environment / `.env` file:** Create a `.env` file in the repo root:
 
 ```bash
 NVIDIA_NIM_API_KEY=your_nvidia_key

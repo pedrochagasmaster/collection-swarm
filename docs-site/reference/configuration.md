@@ -209,8 +209,13 @@ tiers:
 |---|---|---|
 | `scripted` | Deterministic offline responses — no LLM call | Nothing |
 | `heuristic` | Rule-based judge scoring — no LLM call | Nothing |
-| `nim` | NVIDIA NIM inference API | `NVIDIA_NIM_API_KEY` |
-| `cursor_sdk` | Cursor SDK bridge (Node.js) | `CURSOR_API_KEY`, Node.js 22+ |
+| `nim` | NVIDIA NIM inference API | `NVIDIA_NIM_API_KEY` (env var, `.env`, dashboard, or CLI) |
+| `cursor_sdk` | Cursor SDK bridge (Node.js) | `CURSOR_API_KEY` (env var, `.env`, dashboard, or CLI), Node.js 22+ |
+
+!!! info "Key resolution"
+    API keys can be set via the dashboard (**Configuration → API Keys**),
+    the CLI (`collection-swarm config-set`), or environment variables.
+    Stored settings take priority over environment variables.
 
 !!! tip "Mix and match"
     You can use different backends per role. A common setup: `nim-llama-4-maverick` for fast conversation, `cursor-claude-4.6-opus-high-thinking` for high-quality judging.

@@ -62,12 +62,14 @@ You should see a full collector/debtor transcript followed by a judgment table i
 
 ### 3. Run with Live Models
 
-Create a `.env` file in the repo root:
+Create a `.env` file in the repo root **or** configure keys in the dashboard (Configuration → API Keys):
 
 ```bash
 NVIDIA_NIM_API_KEY=your_nvidia_key
 CURSOR_API_KEY=your_cursor_key
 ```
+
+> **Tip:** You can also manage API keys from the web dashboard or via `collection-swarm config-set`. Stored settings take priority over environment variables.
 
 Install the Cursor SDK bridge:
 
@@ -202,6 +204,9 @@ Then open [http://127.0.0.1:8000](http://127.0.0.1:8000).
 | `test-connection` | Verify the default model backend is reachable |
 | `serve` | Launch the web dashboard |
 | `seed` | Generate realistic demo data for the dashboard |
+| `config-set` | Store a configuration value (e.g. API key) in the database |
+| `config-get` | Read a stored configuration value |
+| `config-delete` | Remove a stored configuration value |
 
 ### Run a Matrix
 
@@ -276,6 +281,8 @@ Uses LiteLLM against `https://integrate.api.nvidia.com/v1`.
 NVIDIA_NIM_API_KEY=...
 ```
 
+Alternatively, store the key via the dashboard (Configuration → API Keys) or CLI: `collection-swarm config-set nvidia_nim_api_key <key>`.
+
 NIM model names in `config/models.yaml` use LiteLLM's OpenAI-compatible prefix:
 
 ```yaml
@@ -290,6 +297,8 @@ Uses the official [`@cursor/sdk`](https://github.com/cursor/cookbook) through th
 CURSOR_API_KEY=...
 CURSOR_SDK_WORKSPACE=C:\path\to\workspace  # optional; defaults to cwd
 ```
+
+You can also store these via the dashboard (Configuration → API Keys) or CLI: `collection-swarm config-set cursor_api_key <key>`.
 
 Requirements: Node.js 22+ and `npm install` inside `cursor_sdk_bridge/`.
 
@@ -341,6 +350,7 @@ Requirements: Node.js 22+ and `npm install` inside `cursor_sdk_bridge/`.
 | `src/collection_swarm/runner.py` | Matrix builder and concurrent runner |
 | `src/collection_swarm/model_evaluation.py` | Cursor SDK model-role probing and report generation |
 | `src/collection_swarm/web/` | FastAPI dashboard with live simulation, matrix runs, and reporting |
+| `src/collection_swarm/settings.py` | Encrypted settings store (API keys, dashboard-managed config) |
 | `src/collection_swarm/cli.py` | Click CLI entry point |
 | `config/` | YAML configuration for profiles, strategies, models, prompts, and simulation parameters |
 
@@ -408,13 +418,13 @@ collection-swarm/
 <details>
 <summary><code>CURSOR_API_KEY is required</code></summary>
 
-Add `CURSOR_API_KEY` to a `.env` file in the repo root or export it in your shell. Backends automatically load `.env` without overriding already-exported variables.
+Add `CURSOR_API_KEY` to a `.env` file in the repo root, export it in your shell, or store it via the dashboard (Configuration → API Keys) or `collection-swarm config-set cursor_api_key <key>`. Stored settings take priority over environment variables.
 </details>
 
 <details>
 <summary><code>NVIDIA_NIM_API_KEY is required</code></summary>
 
-Add `NVIDIA_NIM_API_KEY` to `.env` or export it in your shell.
+Add `NVIDIA_NIM_API_KEY` to `.env`, export it in your shell, or store it via the dashboard (Configuration → API Keys) or `collection-swarm config-set nvidia_nim_api_key <key>`.
 </details>
 
 <details>
@@ -423,7 +433,7 @@ Add `NVIDIA_NIM_API_KEY` to `.env` or export it in your shell.
 Verify:
 - Node.js is version 22 or newer.
 - `npm install` has been run inside `cursor_sdk_bridge/`.
-- `CURSOR_API_KEY` is valid.
+- `CURSOR_API_KEY` is valid (set via `.env`, environment variable, or dashboard).
 - The `model_name` exists in Cursor SDK's model list.
 </details>
 

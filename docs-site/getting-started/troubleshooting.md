@@ -2,16 +2,17 @@
 
 ## `CURSOR_API_KEY is required`
 
-Add `CURSOR_API_KEY` to a `.env` file in the repo root or export it in
-your shell. The Cursor SDK backend calls
-[`env.load_dotenv_if_present`](../modules/env.md) before reading the
-environment, but it does **not** override variables already set in your
-shell.
+Add `CURSOR_API_KEY` to a `.env` file in the repo root, export it in
+your shell, or store it via the dashboard (**Configuration → API Keys**)
+or CLI (`collection-swarm config-set cursor_api_key <key>`). Stored
+settings take priority over environment variables.
 
 ## `NVIDIA_NIM_API_KEY is required for NIM models`
 
-Same fix: add the key to `.env` or export it. The error originates in
-[`backends/nim.py`](../modules/backends/nim.md).
+Same fix: add the key to `.env`, export it, or store it via the
+dashboard (**Configuration → API Keys**) or CLI
+(`collection-swarm config-set nvidia_nim_api_key <key>`). The error
+originates in [`backends/nim.py`](../modules/backends/nim.md).
 
 ## `Cursor SDK bridge not found at .../cursor_sdk_bridge/run.mjs`
 
@@ -32,7 +33,8 @@ The bridge returns plain JSON on success, including for handled errors.
 A non-zero exit code with non-JSON stdout means the Node process crashed
 before printing the JSON envelope. Check stderr in the raised error
 message — it often points at a missing `npm install`, an unset
-`CURSOR_API_KEY`, or an unknown model ID.
+`CURSOR_API_KEY` (set it via `.env`, environment variable, or the
+dashboard), or an unknown model ID.
 
 ## NIM returns 404
 

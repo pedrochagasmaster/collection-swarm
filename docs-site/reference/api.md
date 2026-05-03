@@ -410,6 +410,100 @@ Full option set for launching simulations — includes profiles, strategies, mod
 
 ---
 
+## Settings
+
+### `GET /api/settings`
+
+Retrieve all stored settings. Secret values (API keys) are masked in the response.
+
+**Response:**
+
+```json
+{
+  "settings": {
+    "nvidia_nim_api_key": "nvapi-****abcd",
+    "cursor_api_key": "****wxyz",
+    "cursor_sdk_workspace": "/home/user/workspace"
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `settings` | `dict[str, str]` | Key-value map of stored settings. Secret values are masked. |
+
+---
+
+### `PUT /api/settings`
+
+Create or update one or more stored settings. Keys are encrypted at rest in the SQLite database.
+
+**Request Body:**
+
+```json
+{
+  "settings": {
+    "nvidia_nim_api_key": "nvapi-1234567890abcdef",
+    "cursor_api_key": "my-cursor-key"
+  }
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `settings` | `dict[str, str]` | Yes | Key-value pairs to store. Use lowercase key names: `nvidia_nim_api_key`, `cursor_api_key`, `cursor_sdk_workspace`. |
+
+**Response:**
+
+```json
+{
+  "saved": ["nvidia_nim_api_key", "cursor_api_key"]
+}
+```
+
+**Error Responses:**
+
+| Status | Condition |
+|--------|-----------|
+| `400` | Empty settings object or invalid key name |
+
+---
+
+### `POST /api/settings/test`
+
+Test whether a stored or provided API key is valid by making a lightweight probe request to the corresponding backend.
+
+**Request Body:**
+
+```json
+{
+  "key": "nvidia_nim_api_key"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `key` | `str` | Yes | The setting key to test (e.g. `nvidia_nim_api_key`, `cursor_api_key`) |
+
+**Response:**
+
+```json
+{
+  "key": "nvidia_nim_api_key",
+  "status": "ok",
+  "message": "Successfully connected to NVIDIA NIM API."
+}
+```
+
+**Error Responses:**
+
+| Status | Condition |
+|--------|-----------|
+| `400` | Unknown or untestable key name |
+| `422` | Key not set (neither stored nor in environment) |
+
+---
+
 ## Arena
 
 ### `GET /api/arena/leaderboard`
