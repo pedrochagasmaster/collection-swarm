@@ -31,12 +31,36 @@ collection-swarm list-strategies
 
 ### Set up live model backends (optional)
 
-Create a `.env` file in the repo root:
+Collection Swarm resolves API credentials in three interchangeable ways
+(first match wins): dashboard-stored values, environment variables, then a
+friendly error. Pick whichever fits your workflow:
 
-```bash
-NVIDIA_NIM_API_KEY=your_nvidia_key
-CURSOR_API_KEY=your_cursor_key
-```
+=== "Dashboard"
+
+    Run `collection-swarm serve` and open the **Settings** page. Each
+    provider has a hidden-by-default input with Save and Clear actions.
+    Stored values persist in the simulation SQLite database.
+
+=== "CLI"
+
+    ```bash
+    collection-swarm creds set cursor                    # interactive prompt
+    collection-swarm creds set nvidia_nim --value "$KEY" # scripted setup
+    collection-swarm creds list                          # inspect state
+    ```
+
+=== ".env file"
+
+    Create a `.env` file in the repo root — useful for CI or transient
+    shells:
+
+    ```bash
+    NVIDIA_NIM_API_KEY=your_nvidia_key
+    CURSOR_API_KEY=your_cursor_key
+    ```
+
+See [`modules/credentials.md`](../modules/credentials.md) for the full
+resolution contract.
 
 For the Cursor SDK backend:
 

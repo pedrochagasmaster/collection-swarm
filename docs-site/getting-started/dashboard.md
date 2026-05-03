@@ -47,8 +47,31 @@ Open <http://127.0.0.1:8000> and you'll land on the Dashboard view.
 | Evolution pool      | `index.html` + `app.js` | `GET /api/evolution/pool`                                        |
 | Calibration         | `index.html` + `app.js` | `POST /api/calibration/labels`, `POST /api/jobs/calibration`     |
 | Model benchmarks    | `index.html` + `app.js` | `POST /api/jobs/model-benchmarks`                                |
+| Settings            | `index.html` + `app.js` | `GET /api/credentials`, `PUT /api/credentials/{id}`, `DELETE /api/credentials/{id}` |
 
 A full HTTP API matrix lives in [API reference](../reference/api.md).
+
+## Settings: managing API credentials
+
+The **Settings** page (Configuration section in the sidebar) is the
+dashboard's surface for storing the API keys the live backends need. Each
+provider card shows:
+
+- Status: **Stored in dashboard**, **From environment**, or **Not
+  configured**.
+- A hidden-by-default input for the new value, with a Show/Hide toggle.
+- A masked preview (first four + last four characters) of the stored
+  value so you can confirm which key is active without revealing it.
+- A **Clear stored value** action that removes the dashboard row and
+  lets the backends fall back to the matching env var, if any.
+
+Values live in the `dashboard_credentials` table of the same SQLite file
+that holds simulations (`output/collection_swarm.sqlite` by default), so
+switching `--db` swaps credentials along with the data.
+
+The resolver precedence is **dashboard store → environment variable →
+friendly error**. For the programmatic contract, see
+[`modules/credentials.md`](../modules/credentials.md).
 
 ## Anatomy of a job
 

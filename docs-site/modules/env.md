@@ -51,11 +51,17 @@ guard ensures `.env` is *additive*, never *overriding*.
 | Comments (`# ...`)         | Yes      |
 | `export KEY=VALUE` syntax  | No (the `export ` prefix would become part of the key name) |
 
-If you need any of the missing features, switch to `python-dotenv`. The
-backends both call this loader the same way:
+If you need any of the missing features, switch to `python-dotenv`. Both
+live backends call this loader before reading credentials. They no longer
+touch `os.environ` directly — the
+[`credentials.py`](credentials.md) resolver does that for them, so values
+loaded here are only consulted if no dashboard-stored value exists:
 
 ```python
+from collection_swarm.credentials import CredentialResolver
 from collection_swarm.env import load_dotenv_if_present
-load_dotenv_if_present()
-api_key = os.getenv("CURSOR_API_KEY")
+
+load_dotenv_if_present()                  # populate os.environ from .env
+resolver = CredentialResolver(store=store)  # store-first, env-fallback
+api_key = resolver.require("cursor")      # -> friendly error if unset
 ```

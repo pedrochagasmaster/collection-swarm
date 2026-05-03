@@ -7,19 +7,38 @@ OpenAI-compatible inference endpoint at
 `https://integrate.api.nvidia.com/v1`.
 
 <dl class="cs-summary">
-  <dt>Imports</dt><dd><code>litellm.acompletion</code>, <code>collection_swarm.env</code>, domain models</dd>
-  <dt>Network</dt><dd>Yes — needs <code>NVIDIA_NIM_API_KEY</code></dd>
+  <dt>Imports</dt><dd><code>litellm.acompletion</code>, <code>collection_swarm.env</code>, <code>collection_swarm.credentials</code>, domain models</dd>
+  <dt>Network</dt><dd>Yes — needs a <code>nvidia_nim</code> credential (dashboard or <code>NVIDIA_NIM_API_KEY</code>)</dd>
   <dt>Cost accounting</dt><dd>Computed from <code>ModelConfig.input_cost_per_m</code> and <code>output_cost_per_m</code></dd>
 </dl>
+
+## Construction
+
+```python
+NimBackend(
+    base_url: str = "https://integrate.api.nvidia.com/v1",
+    credentials: CredentialResolver | None = None,
+)
+```
+
+`credentials` is the same resolver threaded through the router (see
+[`credentials.py`](../credentials.md)). If omitted, the backend falls
+back to a resolver with no store, i.e. env-var-only lookups — useful
+for ad-hoc scripts but not how the CLI or web app construct it.
 
 ## `NimBackend.complete()`
 
 ```python
 async def complete(self, model: ModelConfig, messages: list[LLMMessage]) -> LLMResponse:
     load_dotenv_if_present()
-    api_key = os.getenv("NVIDIA_NIM_API_KEY")
-    if not api_key:
-        raise RuntimeError("NVIDIA_NIM_API_KEY is required for NIM models")
+    api_key = self._credentials.require(
+        "nvidia_nim",
+        error_message=(
+            "NVIDIA_NIM_API_KEY is required for NIM models. "
+            "Add it from the dashboard Settings page, run "
+            "`collection-swarm creds set nvidia_nim`, or export the env var."
+        ),
+    )
 
     response = await acompletion(
         model=model.litellm_model,
@@ -27,24 +46,12 @@ async def complete(self, model: ModelConfig, messages: list[LLMMessage]) -> LLMR
         api_key=api_key,
         base_url=self.base_url,
     )
-    choice = response.choices[0]
-    content = choice.message.content or ""
-    usage = getattr(response, "usage", None)
-    input_tokens = int(getattr(usage, "prompt_tokens", 0) or 0)
-    output_tokens = int(getattr(usage, "completion_tokens", 0) or 0)
-    return LLMResponse(
-        content=content,
-        input_tokens=input_tokens,
-        output_tokens=output_tokens,
-        estimated_cost_usd=_estimate_cost(model, input_tokens, output_tokens),
-        model_id=model.id,
-        backend="nim",
-    )
+    ...
 ```
 
-The function reads its own API key on every call rather than caching it
-in the constructor — that way `.env` edits are picked up without a
-process restart.
+The resolver is consulted on every call rather than cached in the
+constructor — that way dashboard edits and `.env` changes are picked up
+without a process restart.
 
 ## `model.litellm_model`
 

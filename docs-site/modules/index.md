@@ -12,6 +12,7 @@ src/collection_swarm/
 ├── models.py                       # Pydantic domain types
 ├── config.py                       # YAML loaders → AppConfig
 ├── env.py                          # Lightweight .env loader
+├── credentials.py                  # Dashboard-managed API credentials
 ├── engine.py                       # SimulationEngine + stalemate detector
 ├── agents/
 │   ├── collector.py                # CollectorAgent
@@ -50,19 +51,21 @@ forward references:
 1. [`models.py`](models.md) — every other module imports from here.
 2. [`config.py`](config.md) — how the YAML files become typed objects.
 3. [`env.py`](env.md) — the tiny dotenv helper.
-4. [`backends/`](backends/index.md) — the bottom of the model stack.
-5. [`agents/`](agents/index.md) — the three roles built on top of the
+4. [`credentials.py`](credentials.md) — dashboard-managed API keys,
+   layered on top of `env.py`.
+5. [`backends/`](backends/index.md) — the bottom of the model stack.
+6. [`agents/`](agents/index.md) — the three roles built on top of the
    backends.
-6. [`engine.py`](engine.md) — the loop that ties the agents together.
-7. [`store.py`](store.md) — the SQLite persistence layer.
-8. [`runner.py`](runner.md) — the matrix and tournament orchestrator.
-9. [`arena.py`](arena.md), [`evolution.py`](evolution.md),
-   [`adversarial.py`](adversarial.md) — the optional adversarial loop.
-10. [`calibration.py`](calibration.md) and
+7. [`engine.py`](engine.md) — the loop that ties the agents together.
+8. [`store.py`](store.md) — the SQLite persistence layer.
+9. [`runner.py`](runner.md) — the matrix and tournament orchestrator.
+10. [`arena.py`](arena.md), [`evolution.py`](evolution.md),
+    [`adversarial.py`](adversarial.md) — the optional adversarial loop.
+11. [`calibration.py`](calibration.md) and
     [`model_evaluation.py`](model-evaluation.md) — the meta-evaluation.
-11. [`analysis/`](analysis/index.md) — the read-side reports.
-12. [`web/`](web/index.md) — the dashboard.
-13. [`cli.py`](cli.md) — the operator surface.
+12. [`analysis/`](analysis/index.md) — the read-side reports.
+13. [`web/`](web/index.md) — the dashboard.
+14. [`cli.py`](cli.md) — the operator surface.
 
 Or, if you'd rather skim by topic, head straight to whichever module page
 matches what you're trying to do.
