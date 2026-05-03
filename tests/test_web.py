@@ -604,6 +604,32 @@ class TestSPA:
         resp = seeded_client.get("/static/app.js")
         assert resp.status_code == 200
 
+    def test_static_assets_include_ux_report_fixes(self, seeded_client: TestClient) -> None:
+        """Regression guard: key UX-report markers must survive in deployed assets."""
+        html = seeded_client.get("/").text
+        css = seeded_client.get("/static/styles.css").text
+        js = seeded_client.get("/static/app.js").text
+
+        assert '<a href="#main-content"' in html
+        assert 'name="theme-color"' in html
+        assert '<div class="nav-label">Overview</div>' in html
+
+        assert "window.addEventListener('hashchange'" in js
+        assert "isPageHash()" in js
+        assert "handleRunRowKey(event" in js
+        assert "quick-actions" in js or "quick-action" in js
+        assert "Synthetic analysis" in js or "Synthetic Analysis" in js
+        assert "buildPlaybookTOC" in js or "generatePlaybookTOC" in js
+        assert "handlePollFailure" in js
+        assert "aria-valuetext" in js
+
+        assert "--text-xs: 0.75rem" in css
+        assert "animation: none !important" in css
+        assert ".data-table tbody tr:focus-visible" in css
+        assert ".trust-banner" in css
+        assert ".sidebar-footer" in css and "position: sticky" in css
+        assert "min-width: 44px" in css
+
 
 class TestSeedData:
     def test_seed_creates_expected_count(self, tmp_path: Path) -> None:

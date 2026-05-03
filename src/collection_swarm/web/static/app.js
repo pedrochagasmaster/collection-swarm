@@ -16,6 +16,12 @@ const KNOWN_PAGES = [
   'playbook', 'compliance', 'arena', 'evolution',
   'calibration', 'benchmarks', 'profiles', 'strategies',
 ];
+const _KNOWN_PAGES_SET = new Set(KNOWN_PAGES);
+
+function isPageHash(hash = location.hash) {
+  const page = decodeURIComponent(String(hash || '').replace(/^#/, '')) || 'dashboard';
+  return _KNOWN_PAGES_SET.has(page);
+}
 
 const PAGE_TITLES = {
   dashboard: 'Dashboard',
@@ -94,6 +100,7 @@ window.addEventListener('popstate', (e) => {
 });
 
 window.addEventListener('hashchange', () => {
+  if (!isPageHash()) return;
   const page = location.hash.replace('#', '') || 'dashboard';
   if (page === currentPage) return;
   clearNavigationGuard();
@@ -1518,6 +1525,32 @@ function clearPoll(key) {
 
 const _pollFailCounts = {};
 
+function handlePollFailure(pollKey, panelId, statusId = null) {
+  _pollFailCounts[pollKey] = (_pollFailCounts[pollKey] || 0) + 1;
+  if (_pollFailCounts[pollKey] >= 10) {
+    clearPoll(pollKey);
+    const panel = $(`#${panelId}`);
+    const status = statusId ? $(`#${statusId}`) : null;
+    if (status) status.innerHTML = statusBadge('failed');
+    if (panel) {
+      panel.innerHTML = `
+        <div class="empty-state" role="alert">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <h3>Connection lost</h3>
+          <p>Could not reach the server after multiple retries. The job may still be running on the backend.</p>
+          <div class="btn-row" style="margin-top:var(--space-4);justify-content:center">
+            <button class="btn" type="button" onclick="location.reload()">Reload page</button>
+          </div>
+        </div>`;
+    }
+    showToast('Polling stopped \u2014 connection lost', 'error', 10000);
+    return;
+  }
+  if (_pollFailCounts[pollKey] === 3) {
+    showToast('Connection interrupted, retrying\u2026', 'error', 6000);
+  }
+}
+
 async function pollJob(jobId, panelId, statusId, pollKey) {
   try {
     const job = await api(`/jobs/${pathPart(jobId)}`);
@@ -1536,31 +1569,7 @@ async function pollJob(jobId, panelId, statusId, pollKey) {
       if (job.status === 'cancelled') showToast('Job cancelled', 'info');
     }
   } catch (_) {
-    _pollFailCounts[pollKey] = (_pollFailCounts[pollKey] || 0) + 1;
-    if (_pollFailCounts[pollKey] === 3) {
-      showToast('Connection interrupted, retrying\u2026', 'error', 6000);
-    }
-    if (_pollFailCounts[pollKey] >= 10) {
-      // Stop hammering the server and surface a recoverable error state so
-      // the panel does not stay stuck in a phantom "running" forever.
-      clearPoll(pollKey);
-      delete _pollFailCounts[pollKey];
-      const panel = $(`#${panelId}`);
-      const status = $(`#${statusId}`);
-      if (status) status.innerHTML = statusBadge('failed');
-      if (panel) {
-        panel.innerHTML = `
-          <div class="empty-state" role="alert">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-            <h3>Connection lost</h3>
-            <p>Could not reach the server after multiple retries. The job may still be running on the backend.</p>
-            <div class="btn-row" style="margin-top:var(--space-4);justify-content:center">
-              <button class="btn" type="button" onclick="location.reload()">Reload page</button>
-            </div>
-          </div>`;
-      }
-      showToast('Polling stopped \u2014 connection lost', 'error', 10000);
-    }
+    handlePollFailure(pollKey, panelId, statusId);
   }
 }
 
@@ -2007,18 +2016,22 @@ window.startModelBenchmark = async function(event) {
 async function pollBenchmarkJob(jobId) {
   try {
     const job = await api(`/jobs/${pathPart(jobId)}`);
+    if (_pollFailCounts.benchmark) {
+      _pollFailCounts.benchmark = 0;
+    }
     const panel = $('#benchmark-job-panel');
     const status = $('#benchmark-job-status');
     if (status) status.innerHTML = statusBadge(job.status);
     if (panel) renderBenchmarkJobPanel(job, panel);
     if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') {
       clearPoll('benchmark');
+      delete _pollFailCounts.benchmark;
       if (job.benchmark_report) renderBenchmarkReport(job.benchmark_report, job);
       if (job.status === 'completed') showToast('Benchmark completed', 'success');
       if (job.status === 'failed') showToast('Benchmark failed', 'error');
     }
-  } catch (err) {
-    showToast(err.message, 'error');
+  } catch (_) {
+    handlePollFailure('benchmark', 'benchmark-job-panel');
   }
 }
 
