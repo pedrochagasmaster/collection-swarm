@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Collection Swarm Documentation</title>
+    <meta
+      name="description"
+      content="Functional and conceptual documentation for the Collection Swarm simulation platform."
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to documentation</a>
+    <header class="hero" id="top">
+      <nav class="topbar" aria-label="Primary">
+          <a class="brand" href="#top" aria-label="Collection Swarm documentation home">
+          <span class="brand-mark" aria-hidden="true">CS</span>
+          <span>Collection Swarm Docs</span>
+        </a>
+        <div class="topbar-links">
+          <a href="#functional-documentation">Functional</a>
+          <a href="#conceptual-documentation">Conceptual</a>
+          <a href="#sequential-module-walkthrough">Modules</a>
+          <a href="#publishing">GitHub Pages</a>
+        </div>
+      </nav>
+
+      <div class="hero-grid">
+        <section class="hero-copy" aria-labelledby="hero-title">
+          <p class="eyebrow">Project documentation, published as a GitHub-hosted Page</p>
+          <h1 id="hero-title">Collection Swarm, from simulator idea to every module in motion.</h1>
+          <p class="hero-lede">
+            A deep guide to the AI-driven debt-collection simulator: how simulations run, why
+            modules are shaped the way they are, how data moves through the system, and where to
+            extend it safely.
+          </p>
+          <div class="hero-actions">
+            <a class="button primary" href="#sequential-module-walkthrough">Start module pass</a>
+            <a class="button secondary" href="#operate">Run the project</a>
+          </div>
+          <div class="hero-search" role="search">
+            <label class="search-label" for="doc-search">Search docs</label>
+            <input id="doc-search" type="search" placeholder="Try engine.py or CLI" autocomplete="off" />
+            <p id="search-empty" class="empty-state" hidden>No matching sections yet.</p>
+          </div>
+        </section>
+
+        <aside class="hero-panel" aria-label="Architecture summary">
+          <div class="panel-title">Core loop</div>
+          <ol class="loop">
+            <li><span>01</span> YAML config defines profiles, strategies, models, prompts.</li>
+            <li><span>02</span> Engine alternates Collector and Debtor turns.</li>
+            <li><span>03</span> Router dispatches each model call to local, NIM, or Cursor SDK.</li>
+            <li><span>04</span> Judge scores transcript and verifies constraints.</li>
+            <li><span>05</span> Store persists runs for analysis, arena, dashboard, and playbooks.</li>
+          </ol>
+        </aside>
+      </div>
+    </header>
+
+    <main id="main" class="layout">
+      <aside class="sidebar" aria-label="Documentation table of contents">
+        <nav class="toc">
+          <a href="#functional-documentation">Functional documentation</a>
+          <a href="#conceptual-documentation">Conceptual documentation</a>
+          <a href="#architecture">Architecture</a>
+          <a href="#operate">Operate</a>
+          <a href="#sequential-module-walkthrough">Sequential module walkthrough</a>
+          <a href="#configuration-layer">Configuration layer</a>
+          <a href="#domain-model-layer">Domain model layer</a>
+          <a href="#simulation-runtime">Simulation runtime</a>
+          <a href="#llm-backend-layer">LLM backend layer</a>
+          <a href="#persistence-layer">Persistence layer</a>
+          <a href="#analysis-layer">Analysis layer</a>
+          <a href="#arena-and-evolution-layer">Arena and evolution layer</a>
+          <a href="#web-dashboard-layer">Web dashboard layer</a>
+          <a href="#cli-surface">CLI surface</a>
+          <a href="#testing-map">Testing map</a>
+          <a href="#publishing">Publishing</a>
+        </nav>
+      </aside>
+
+      <article class="content">
+        <section class="doc-section searchable" id="functional-documentation">
+          <p class="section-kicker">Pass 1</p>
+          <h2>Functional documentation</h2>
+          <p>
+            Collection Swarm is an installable Python package named <code>collection-swarm</code>.
+            It exposes the <code>collection-swarm</code> console command, a FastAPI dashboard, a
+            SQLite-backed results store, and an optional Node bridge for Cursor SDK model calls.
+            The default path is offline: local scripted models let a developer run a simulation,
+            seed demo data, and exercise most flows without credentials.
+          </p>
+          <div class="command-grid">
+            <div>
+              <h3>Install</h3>
+              <pre><code>pip install -e ".[dev]"</code></pre>
+            </div>
+            <div>
+              <h3>Single simulation</h3>
+              <pre><code>collection-swarm simulate \
+  --profile cooperative_hardship \
+  --strategy empathetic_payment_plan</code></pre>
+            </div>
+            <div>
+              <h3>Dashboard</h3>
+              <pre><code>collection-swarm seed --count 24
+collection-swarm serve</code></pre>
+            </div>
+            <div>
+              <h3>Playbook</h3>
+              <pre><code>collection-swarm analyze --output output/playbook.md</code></pre>
+            </div>
+          </div>
+        </section>
+
+        <section class="doc-section searchable" id="conceptual-documentation">
+          <p class="section-kicker">Pass 2</p>
+          <h2>Conceptual documentation</h2>
+          <p>
+            The project treats debt-collection strategy as a synthetic experiment rather than a
+            direct customer workflow. A <strong>Simulation</strong> is one conversation between a
+            Collector participant and a Debtor participant. A <strong>Run</strong> is a batch of
+            simulations over a matrix. A <strong>Judgment</strong> is the evaluator's structured
+            result: payment outcome, probability, satisfaction, compliance, risk, end reason, and
+            constraint violations.
+          </p>
+          <div class="concept-map">
+            <div>
+              <strong>Profile</strong>
+              <span>Debtor archetype, account data, persona, and hard constraints.</span>
+            </div>
+            <div>
+              <strong>Strategy</strong>
+              <span>Collector tone, tactic, escalation, concession, follow-up, and context.</span>
+            </div>
+            <div>
+              <strong>Model combo</strong>
+              <span>Conversation model plus judge model, recorded with every result.</span>
+            </div>
+            <div>
+              <strong>Playbook</strong>
+              <span>Regenerable analysis report that recommends safe profile-specific tactics.</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="doc-section searchable" id="architecture">
+          <p class="section-kicker">Pass 3</p>
+          <h2>Architecture</h2>
+          <p>
+            The architecture is layered around one invariant: module internals may change, but
+            callers should keep talking in project concepts. CLI and web launch commands load
+            configuration, create agents, run the engine, persist results, and then read the store
+            through analysis or dashboard APIs.
+          </p>
+          <div class="flow" aria-label="System architecture flow">
+            <div>config/ YAML</div>
+            <span>to</span>
+            <div>AppConfig</div>
+            <span>to</span>
+            <div>SimulationEngine</div>
+            <span>to</span>
+            <div>Agents</div>
+            <span>to</span>
+            <div>LLMRouter</div>
+            <span>to</span>
+            <div>Judgment</div>
+            <span>to</span>
+            <div>SimulationStore</div>
+            <span>to</span>
+            <div>CLI, Web, Analysis</div>
+          </div>
+        </section>
+
+        <section class="doc-section searchable" id="operate">
+          <p class="section-kicker">Operations</p>
+          <h2>Operate</h2>
+          <div class="two-column">
+            <div>
+              <h3>Offline mode</h3>
+              <p>
+                Uses <code>local-scripted</code> and <code>local-judge</code>. This mode is for
+                development, smoke tests, deterministic demos, and dashboard exploration.
+              </p>
+            </div>
+            <div>
+              <h3>Live model mode</h3>
+              <p>
+                NIM needs <code>NVIDIA_NIM_API_KEY</code>. Cursor SDK needs
+                <code>CURSOR_API_KEY</code>, Node.js 22+, and installed bridge dependencies in
+                <code>cursor_sdk_bridge/</code>.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section class="doc-section searchable" id="sequential-module-walkthrough">
+          <p class="section-kicker">Pass 4</p>
+          <h2>Sequential module walkthrough</h2>
+          <p>
+            This pass walks project modules in the order a request travels through the system. Each
+            card names the file, explains what it does functionally, and states the concept it owns.
+          </p>
+
+          <div class="module-list">
+            <section class="module-card searchable" id="configuration-layer">
+              <span class="module-number">01</span>
+              <h3>Configuration layer</h3>
+              <p><code>config.py</code> loads YAML into a single <code>AppConfig</code>.</p>
+              <ul>
+                <li>Functional: reads profiles, strategies, models, prompts, and simulation settings.</li>
+                <li>Conceptual: centralizes the experiment catalog so runtime code receives typed objects.</li>
+                <li>Sources: <code>config/debtor_profiles.yaml</code>, <code>config/collector_strategies.yaml</code>, <code>config/models.yaml</code>, <code>config/prompts.yaml</code>, <code>config/simulation.yaml</code>.</li>
+              </ul>
+            </section>
+
+            <section class="module-card searchable" id="domain-model-layer">
+              <span class="module-number">02</span>
+              <h3>Domain model layer</h3>
+              <p><code>models.py</code> defines the project language as Pydantic models and enums.</p>
+              <ul>
+                <li>Functional: validates <code>Profile</code>, <code>Strategy</code>, <code>SimulationResult</code>, <code>Judgment</code>, <code>MatrixCell</code>, tournament, Elo, evolution, and calibration payloads.</li>
+                <li>Conceptual: prevents "loose dict" drift between CLI, engine, store, and web APIs.</li>
+                <li>Key invariant: constraints can include structured rules, allowing deterministic verification after LLM scoring.</li>
+              </ul>
+            </section>
+
+            <section class="module-card searchable" id="simulation-runtime">
+              <span class="module-number">03</span>
+              <h3>Simulation runtime</h3>
+              <p><code>engine.py</code> owns one complete conversation lifecycle.</p>
+              <ul>
+                <li>Functional: alternates Collector and Debtor turns, strips <code>[END_CONVERSATION]</code>, detects stalemates, applies turn limits, calls the Judge, tracks token/cost metadata, and returns a <code>SimulationResult</code>.</li>
+                <li>Conceptual: the engine is the clock. Participants only speak; they do not decide the global lifecycle.</li>
+                <li>Termination precedence: explicit end signal, then stalemate, then turn limit.</li>
+              </ul>
+            </section>
+
+            <section class="module-card searchable">
+              <span class="module-number">04</span>
+              <h3>Participant and evaluator agents</h3>
+              <p><code>agents/collector.py</code>, <code>agents/debtor.py</code>, and <code>agents/judge.py</code> adapt domain objects into model prompts.</p>
+              <ul>
+                <li><code>agents/collector.py</code>: builds a strategy and account-data system prompt, then asks the router for the collector turn.</li>
+                <li><code>agents/debtor.py</code>: injects profile persona and constraints, then translates transcript history into model messages.</li>
+                <li><code>agents/judge.py</code>: parses JSON judgment output, normalizes common outcome aliases, and merges LLM violations with deterministic constraint checks.</li>
+                <li>Conceptual: Collector and Debtor are participants; Judge is the evaluator and sees the transcript plus constraints.</li>
+              </ul>
+            </section>
+
+            <section class="module-card searchable" id="llm-backend-layer">
+              <span class="module-number">05</span>
+              <h3>LLM backend layer</h3>
+              <p>The <code>backends/</code> package hides provider details behind one async completion protocol.</p>
+              <ul>
+                <li><code>backends/base.py</code>: declares <code>LLMResponse</code> and the backend protocol.</li>
+                <li><code>backends/router.py</code>: maps model IDs to backend implementations and lazy-loads optional providers.</li>
+                <li><code>backends/scripted.py</code>: deterministic local model for offline simulations and tests.</li>
+                <li><code>backends/nim.py</code>: LiteLLM-backed NVIDIA NIM integration with token/cost accounting.</li>
+                <li><code>backends/cursor_sdk.py</code>: subprocess bridge to the TypeScript Cursor SDK via <code>cursor_sdk_bridge/run.mjs</code>.</li>
+                <li>Conceptual: routing lets the experiment compare model behavior without rewriting simulation logic.</li>
+              </ul>
+            </section>
+
+            <section class="module-card searchable" id="persistence-layer">
+              <span class="module-number">06</span>
+              <h3>Persistence layer</h3>
+              <p><code>store.py</code> stores operational and analytical state in SQLite.</p>
+              <ul>
+                <li>Functional: creates tables for runs, Elo ratings/history, tournaments, evolved strategies, evolved profiles, calibration labels, and judge prompt variants.</li>
+                <li>Functional: exposes <code>save_run</code>, <code>list_runs</code>, <code>get_strategy_comparison</code>, compliance summaries, matrix coverage, cost summaries, and pool helpers.</li>
+                <li>Conceptual: SQLite is the project memory. Analysis modules ask for domain-shaped answers instead of writing SQL.</li>
+              </ul>
+            </section>
+
+            <section class="module-card searchable" id="analysis-layer">
+              <span class="module-number">07</span>
+              <h3>Analysis layer</h3>
+              <p>The <code>analysis/</code> package turns completed simulations into recommendations.</p>
+              <ul>
+                <li><code>analysis/statistics.py</code>: ranks strategies for a profile by store-provided strategy stats.</li>
+                <li><code>analysis/compliance.py</code>: excludes unsafe profile-strategy pairs below compliance or above escalation thresholds.</li>
+                <li><code>analysis/objections.py</code>: extracts simple objection categories from debtor turns.</li>
+                <li><code>analysis/playbook.py</code>: formats rankings, exclusions, objections, and example transcripts into Markdown.</li>
+                <li>Conceptual: analysis is intentionally post-hoc. Simulations produce evidence; playbooks summarize evidence.</li>
+              </ul>
+            </section>
+
+            <section class="module-card searchable" id="arena-and-evolution-layer">
+              <span class="module-number">08</span>
+              <h3>Arena and evolution layer</h3>
+              <p><code>arena.py</code>, <code>runner.py</code>, <code>evolution.py</code>, and <code>adversarial.py</code> support competitive improvement loops.</p>
+              <ul>
+                <li><code>arena.py</code>: computes effective scores, Elo expectations, rating updates, Swiss pairings, and round-robin pairings.</li>
+                <li><code>runner.py</code>: builds matrices, executes concurrent simulations, runs tournaments, updates Elo, and orchestrates evolution cycles.</li>
+                <li><code>evolution.py</code>: asks an LLM to generate improved strategies as YAML, validates them, and falls back to deterministic mutation.</li>
+                <li><code>adversarial.py</code>: hardens debtor profiles so winning strategies face harder synthetic opponents.</li>
+                <li>Conceptual: the system can optimize both sides of the experiment, strategies improve and profiles become more challenging.</li>
+              </ul>
+            </section>
+
+            <section class="module-card searchable">
+              <span class="module-number">09</span>
+              <h3>Calibration and model evaluation</h3>
+              <p><code>calibration.py</code> and <code>model_evaluation.py</code> help decide whether evaluator scores and model-role choices are trustworthy.</p>
+              <ul>
+                <li><code>calibration.py</code>: loads human labels, compares judge scores using MAE and Pearson correlation, and reports an overall calibration score.</li>
+                <li><code>model_evaluation.py</code>: defines role probes, runs optional Cursor SDK probes, builds reports, recommends models per role, and writes Markdown or JSON.</li>
+                <li>Conceptual: the project measures the measurement layer, not just the collector strategies.</li>
+              </ul>
+            </section>
+
+            <section class="module-card searchable">
+              <span class="module-number">10</span>
+              <h3>Environment and bridge utilities</h3>
+              <p><code>env.py</code> and <code>cursor_sdk_bridge/run.mjs</code> support live-provider ergonomics.</p>
+              <ul>
+                <li><code>env.py</code>: loads a local <code>.env</code> file without overriding exported environment variables.</li>
+                <li><code>cursor_sdk_bridge/run.mjs</code>: receives JSON over stdin, runs the Cursor TypeScript SDK, and returns JSON to Python.</li>
+                <li>Conceptual: credentials and provider-specific runtime constraints stay outside the core simulation loop.</li>
+              </ul>
+            </section>
+
+            <section class="module-card searchable" id="web-dashboard-layer">
+              <span class="module-number">11</span>
+              <h3>Web dashboard layer</h3>
+              <p><code>web/app.py</code>, <code>web/seed.py</code>, and the static SPA expose Collection Swarm in the browser.</p>
+              <ul>
+                <li><code>web/app.py</code>: creates the FastAPI app, mounts static assets, defines dashboard, config, run, analysis, arena, evolution, calibration, benchmark, jobs, and manual-session APIs.</li>
+                <li><code>web/seed.py</code>: generates realistic demo <code>SimulationResult</code> rows for local exploration.</li>
+                <li><code>web/static/index.html</code>, <code>web/static/styles.css</code>, and <code>web/static/app.js</code>: render the dashboard SPA.</li>
+                <li>Conceptual: the dashboard is an operations console, not a separate domain model.</li>
+              </ul>
+            </section>
+
+            <section class="module-card searchable" id="cli-surface">
+              <span class="module-number">12</span>
+              <h3>CLI surface</h3>
+              <p><code>cli.py</code> exposes every major project capability as a command.</p>
+              <ul>
+                <li>Catalog: <code>list-profiles</code>, <code>list-strategies</code>.</li>
+                <li>Simulation: <code>simulate</code>, <code>run</code>, <code>seed</code>.</li>
+                <li>Competition: <code>tournament</code>, <code>leaderboard</code>, <code>reset-elo</code>, <code>evolve</code>.</li>
+                <li>Evaluation: <code>calibrate</code>, <code>model-report</code>, <code>test-connection</code>.</li>
+                <li>UX: <code>serve</code> launches the dashboard.</li>
+              </ul>
+            </section>
+          </div>
+        </section>
+
+        <section class="doc-section searchable" id="testing-map">
+          <p class="section-kicker">Pass 5</p>
+          <h2>Testing map</h2>
+          <p>
+            Tests mirror module boundaries. The suite covers config loading, domain validation,
+            engine termination, judge parsing and constraints, persistence, matrix orchestration,
+            arena pairings, evolution, adversarial hardening, calibration, playbook generation,
+            CLI wiring, Cursor backend contracts, model evaluation, environment loading, and web
+            API behavior.
+          </p>
+          <div class="test-grid">
+            <span>tests/test_config.py</span>
+            <span>tests/test_models.py</span>
+            <span>tests/test_engine.py</span>
+            <span>tests/test_judge.py</span>
+            <span>tests/test_store.py</span>
+            <span>tests/test_runner.py</span>
+            <span>tests/test_arena.py</span>
+            <span>tests/test_evolution.py</span>
+            <span>tests/test_adversarial.py</span>
+            <span>tests/test_calibration.py</span>
+            <span>tests/test_playbook.py</span>
+            <span>tests/test_cli.py</span>
+            <span>tests/test_web.py</span>
+            <span>tests/test_cursor_sdk_backend.py</span>
+            <span>tests/test_model_evaluation.py</span>
+            <span>tests/test_env.py</span>
+          </div>
+        </section>
+
+        <section class="doc-section searchable" id="publishing">
+          <p class="section-kicker">Delivery</p>
+          <h2>Publishing as a GitHub-hosted Page</h2>
+          <p>
+            The static site lives in <code>site/</code>. The workflow
+            <code>.github/workflows/pages.yml</code> uploads that directory with
+            <code>actions/upload-pages-artifact</code> and deploys it with
+            <code>actions/deploy-pages</code>. In repository settings, GitHub Pages should use
+            GitHub Actions as the source.
+          </p>
+          <div class="callout">
+            <strong>Coverage contract:</strong>
+            <span>
+              <code>tests/test_docs_site.py</code> verifies that this page names every major
+              project module and that the Pages workflow publishes <code>path: site</code>.
+            </span>
+          </div>
+        </section>
+      </article>
+    </main>
+
+    <footer class="footer">
+      <p>Collection Swarm documentation site. Built as a static GitHub Pages artifact.</p>
+      <a href="#top">Back to top</a>
+    </footer>
+    <script src="app.js"></script>
+  </body>
+</html>
