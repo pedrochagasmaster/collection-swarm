@@ -1,6 +1,7 @@
 title: Collection Swarm
 description: AI-driven simulator for testing debt-collection strategies before they ever touch a real customer.
 remote_theme: just-the-docs/just-the-docs@v0.10.0
+theme: just-the-docs
 url: https://pedrochagasmaster.github.io
 baseurl: /collection-swarm
 
