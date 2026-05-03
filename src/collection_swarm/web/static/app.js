@@ -3130,7 +3130,7 @@ async function testSettingsConnection() {
   if (!resultsEl) return;
   resultsEl.innerHTML = '<p class="dim">Testing connections…</p>';
   try {
-    const data = await api('/settings/test');
+    const data = await apiPost('/settings/test');
     const keys = data.keys || {};
     const rows = Object.entries(keys).map(([key, info]) => {
       const icon = info.configured
