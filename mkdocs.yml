@@ -18,6 +18,8 @@ theme:
   name: material
   language: en
   custom_dir: docs-site/overrides
+  logo: assets/logo.svg
+  favicon: assets/logo.svg
   features:
     - announce.dismiss
     - content.action.edit
@@ -146,6 +148,10 @@ nav:
       - Live model setup: getting-started/live-models.md
       - The web dashboard: getting-started/dashboard.md
       - Troubleshooting: getting-started/troubleshooting.md
+  - Architecture:
+      - Overview: architecture/overview.md
+      - Data flow: architecture/data-flow.md
+      - Domain model: architecture/domain-model.md
   - Concepts:
       - concepts/index.md
       - Vocabulary: concepts/vocabulary.md
@@ -189,6 +195,7 @@ nav:
           - app.py — FastAPI surface: modules/web/app.md
           - seed.py — demo data: modules/web/seed.md
           - Static SPA: modules/web/static.md
+          - Manual sessions: modules/web/manual-sessions.md
       - cli.py — Click CLI: modules/cli.md
   - Catalog:
       - Debtor profiles: catalog/profiles.md
@@ -200,3 +207,6 @@ nav:
       - Configuration files: reference/configuration.md
       - Database schema: reference/database.md
       - Glossary: reference/glossary.md
+  - Development:
+      - Contributing: development/contributing.md
+      - Testing: development/testing.md
