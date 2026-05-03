@@ -69,6 +69,13 @@ NVIDIA_NIM_API_KEY=your_nvidia_key
 CURSOR_API_KEY=your_cursor_key
 ```
 
+Alternatively, store keys via the dashboard Settings page or the CLI:
+
+```bash
+collection-swarm set-key NVIDIA_NIM_API_KEY
+collection-swarm set-key CURSOR_API_KEY
+```
+
 Install the Cursor SDK bridge:
 
 ```bash
@@ -201,6 +208,9 @@ Then open [http://127.0.0.1:8000](http://127.0.0.1:8000).
 | `list-strategies` | List configured collector strategies |
 | `test-connection` | Verify the default model backend is reachable |
 | `serve` | Launch the web dashboard |
+| `set-key` | Store an API key in the encrypted local database |
+| `list-keys` | Show which API keys are configured (database, environment, or not set) |
+| `remove-key` | Remove a stored API key from the database |
 | `seed` | Generate realistic demo data for the dashboard |
 
 ### Run a Matrix
@@ -276,6 +286,8 @@ Uses LiteLLM against `https://integrate.api.nvidia.com/v1`.
 NVIDIA_NIM_API_KEY=...
 ```
 
+You can also store this key via the dashboard **Settings** page or with `collection-swarm set-key NVIDIA_NIM_API_KEY`.
+
 NIM model names in `config/models.yaml` use LiteLLM's OpenAI-compatible prefix:
 
 ```yaml
@@ -290,6 +302,8 @@ Uses the official [`@cursor/sdk`](https://github.com/cursor/cookbook) through th
 CURSOR_API_KEY=...
 CURSOR_SDK_WORKSPACE=C:\path\to\workspace  # optional; defaults to cwd
 ```
+
+You can also store this key via the dashboard **Settings** page or with `collection-swarm set-key CURSOR_API_KEY`.
 
 Requirements: Node.js 22+ and `npm install` inside `cursor_sdk_bridge/`.
 
@@ -341,6 +355,7 @@ Requirements: Node.js 22+ and `npm install` inside `cursor_sdk_bridge/`.
 | `src/collection_swarm/runner.py` | Matrix builder and concurrent runner |
 | `src/collection_swarm/model_evaluation.py` | Cursor SDK model-role probing and report generation |
 | `src/collection_swarm/web/` | FastAPI dashboard with live simulation, matrix runs, and reporting |
+| `src/collection_swarm/secrets.py` | Encrypted API key storage and resolution |
 | `src/collection_swarm/cli.py` | Click CLI entry point |
 | `config/` | YAML configuration for profiles, strategies, models, prompts, and simulation parameters |
 
@@ -394,6 +409,7 @@ collection-swarm/
 │   ├── engine.py               # Simulation engine
 │   ├── models.py               # Domain models (Pydantic)
 │   ├── runner.py               # Matrix runner
+│   ├── secrets.py              # Encrypted API key storage
 │   └── store.py                # SQLite store
 ├── config/                     # YAML configuration
 ├── cursor_sdk_bridge/          # Node.js bridge for Cursor SDK
@@ -408,13 +424,13 @@ collection-swarm/
 <details>
 <summary><code>CURSOR_API_KEY is required</code></summary>
 
-Add `CURSOR_API_KEY` to a `.env` file in the repo root or export it in your shell. Backends automatically load `.env` without overriding already-exported variables.
+Add `CURSOR_API_KEY` to a `.env` file in the repo root, export it in your shell, or store it via the dashboard **Settings** page or `collection-swarm set-key CURSOR_API_KEY`.
 </details>
 
 <details>
 <summary><code>NVIDIA_NIM_API_KEY is required</code></summary>
 
-Add `NVIDIA_NIM_API_KEY` to `.env` or export it in your shell.
+Add `NVIDIA_NIM_API_KEY` to `.env`, export it in your shell, or store it via the dashboard **Settings** page or `collection-swarm set-key NVIDIA_NIM_API_KEY`.
 </details>
 
 <details>
@@ -454,6 +470,7 @@ Collection Swarm is for **synthetic testing only**.
 Generated and local-only files are gitignored:
 
 - `.env` — API keys
+- `.collection_swarm.key` — encryption key for stored API secrets
 - `output/` — SQLite databases and generated playbooks
 - `cursor_sdk_bridge/node_modules/`
 - Python build artifacts (`*.egg-info`, `__pycache__`, `dist/`)

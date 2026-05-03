@@ -14,17 +14,33 @@ field in `config/models.yaml`.
 
 ## Configure your secrets
 
-Create a `.env` file in the repo root. All backends call
-[`env.load_dotenv_if_present`](../modules/env.md), which loads
-simple `KEY=VALUE` lines without overriding variables already exported in
-your shell.
+There are three ways to provide API keys, listed by priority (highest first):
 
-```bash title=".env"
-NVIDIA_NIM_API_KEY=...
-CURSOR_API_KEY=...
-# Optional: tell Cursor SDK which workspace to operate in. Defaults to cwd.
-CURSOR_SDK_WORKSPACE=/absolute/path/to/your/workspace
-```
+1. **Dashboard or CLI** (recommended) — keys are encrypted and stored in the SQLite database.
+   ```bash
+   collection-swarm set-key NVIDIA_NIM_API_KEY
+   collection-swarm set-key CURSOR_API_KEY
+   ```
+   Or use the **Settings** page in the web dashboard.
+
+2. **Environment variables** — export keys in your shell.
+   ```bash
+   export NVIDIA_NIM_API_KEY=...
+   export CURSOR_API_KEY=...
+   ```
+
+3. **`.env` file** — create a `.env` file in the repo root. All backends call
+   [`env.load_dotenv_if_present`](../modules/env.md), which loads
+   simple `KEY=VALUE` lines without overriding variables already exported in
+   your shell.
+   ```bash title=".env"
+   NVIDIA_NIM_API_KEY=...
+   CURSOR_API_KEY=...
+   # Optional: tell Cursor SDK which workspace to operate in. Defaults to cwd.
+   CURSOR_SDK_WORKSPACE=/absolute/path/to/your/workspace
+   ```
+
+Key resolution priority: **Database-stored keys > Environment variables > `.env` file**.
 
 !!! tip "Secrets on Cursor Cloud"
     If you're running this from a Cursor Cloud Agent, add the same keys

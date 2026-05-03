@@ -2,16 +2,22 @@
 
 ## `CURSOR_API_KEY is required`
 
-Add `CURSOR_API_KEY` to a `.env` file in the repo root or export it in
-your shell. The Cursor SDK backend calls
+Add `CURSOR_API_KEY` via one of these methods (listed by resolution priority):
+
+1. Store it in the database: `collection-swarm set-key CURSOR_API_KEY` or use the dashboard **Settings** page.
+2. Export it in your shell: `export CURSOR_API_KEY=...`
+3. Add it to a `.env` file in the repo root.
+
+The Cursor SDK backend calls
 [`env.load_dotenv_if_present`](../modules/env.md) before reading the
 environment, but it does **not** override variables already set in your
 shell.
 
 ## `NVIDIA_NIM_API_KEY is required for NIM models`
 
-Same fix: add the key to `.env` or export it. The error originates in
-[`backends/nim.py`](../modules/backends/nim.md).
+Same fix: store the key via `collection-swarm set-key NVIDIA_NIM_API_KEY`,
+the dashboard **Settings** page, export it in your shell, or add it to `.env`.
+The error originates in [`backends/nim.py`](../modules/backends/nim.md).
 
 ## `Cursor SDK bridge not found at .../cursor_sdk_bridge/run.mjs`
 
@@ -91,6 +97,7 @@ imports.
 These paths are gitignored and should never be committed:
 
 - `.env` — API keys
+- `.collection_swarm.key` — encryption key for stored API secrets
 - `output/` — SQLite databases and generated playbooks
 - `cursor_sdk_bridge/node_modules/`
 - Python build artifacts (`*.egg-info`, `__pycache__`, `dist/`)

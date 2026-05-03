@@ -22,7 +22,8 @@ pip install -e ".[dev]"
 
 This pulls the runtime stack — `litellm`, `click`, `pydantic`, `pyyaml`,
 `pandas`, `rich`, `aiosqlite`, `fastapi`, `uvicorn`, `jinja2`, `markdown`,
-and `bleach` — plus the dev extras `pytest`, `pytest-asyncio`, and `httpx`.
+`bleach`, and `cryptography` — plus the dev extras `pytest`, `pytest-asyncio`,
+and `httpx`.
 
 Verify the install:
 

@@ -440,6 +440,71 @@ collection-swarm --db demo.sqlite seed --count 50
 
 ---
 
+### `set-key`
+
+Store an API key in the encrypted local database. The key value is prompted securely (hidden input with confirmation).
+
+```bash
+collection-swarm set-key KEY_NAME [OPTIONS]
+```
+
+| Argument/Option | Type | Required | Description |
+|---|---|---|---|
+| `KEY_NAME` | STRING | **Yes** | The key to store: `NVIDIA_NIM_API_KEY` or `CURSOR_API_KEY` |
+| `--value` | STRING | No | The key value. If omitted, prompts securely. |
+
+#### Examples
+
+```bash
+# Interactive (recommended — hides input)
+collection-swarm set-key NVIDIA_NIM_API_KEY
+
+# Non-interactive
+collection-swarm set-key CURSOR_API_KEY --value cur_abc123
+```
+
+---
+
+### `list-keys`
+
+Show which API keys are configured and their source.
+
+```bash
+collection-swarm list-keys
+```
+
+??? example "Sample output"
+    ```
+    ┌──────────────────────┬────────────┬────────────────────────────┐
+    │ Key                  │ Source     │ Updated                    │
+    ├──────────────────────┼────────────┼────────────────────────────┤
+    │ NVIDIA_NIM_API_KEY   │ database   │ 2026-05-03T17:48:08+00:00 │
+    │ CURSOR_API_KEY       │ not set    │ —                          │
+    └──────────────────────┴────────────┴────────────────────────────┘
+    ```
+
+---
+
+### `remove-key`
+
+Remove a stored API key from the database. Environment variables are not affected.
+
+```bash
+collection-swarm remove-key KEY_NAME
+```
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `KEY_NAME` | STRING | **Yes** | The key to remove: `NVIDIA_NIM_API_KEY` or `CURSOR_API_KEY` |
+
+#### Examples
+
+```bash
+collection-swarm remove-key NVIDIA_NIM_API_KEY
+```
+
+---
+
 ## Command Quick Reference
 
 | Command | Purpose |
@@ -456,5 +521,8 @@ collection-swarm --db demo.sqlite seed --count 50
 | `analyze` | Generate a strategy playbook |
 | `model-report` | Compare model performance per role |
 | `test-connection` | Verify backend connectivity |
+| `set-key` | Store an API key (encrypted) |
+| `list-keys` | Show API key status and source |
+| `remove-key` | Remove a stored API key |
 | `serve` | Launch the web dashboard |
 | `seed` | Generate demo data |

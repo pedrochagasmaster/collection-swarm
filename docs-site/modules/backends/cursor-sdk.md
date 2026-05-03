@@ -9,7 +9,7 @@ JSON envelope on stdin / stdout. The Python side lives at
 `cursor_sdk_bridge/run.mjs`.
 
 <dl class="cs-summary">
-  <dt>Python imports</dt><dd>standard library, <code>collection_swarm.env</code>, domain models</dd>
+  <dt>Python imports</dt><dd>standard library, <code>collection_swarm.env</code>, <code>collection_swarm.secrets.resolve_api_key</code>, domain models</dd>
   <dt>Node bridge</dt><dd><code>@cursor/sdk</code> (installed via <code>npm install</code> inside <code>cursor_sdk_bridge/</code>)</dd>
   <dt>Network</dt><dd>Yes — needs <code>CURSOR_API_KEY</code></dd>
   <dt>Process model</dt><dd>One subprocess per <code>complete()</code> call</dd>
@@ -20,7 +20,7 @@ JSON envelope on stdin / stdout. The Python side lives at
 ```python
 async def complete(self, model: ModelConfig, messages: list[LLMMessage]) -> LLMResponse:
     load_dotenv_if_present()
-    api_key = os.getenv("CURSOR_API_KEY")
+    api_key = resolve_api_key("CURSOR_API_KEY")
     if not api_key:
         raise RuntimeError("CURSOR_API_KEY is required for Cursor SDK models. ...")
 
@@ -44,13 +44,16 @@ async def complete(self, model: ModelConfig, messages: list[LLMMessage]) -> LLMR
         ensure_ascii=False,
     )
 
+    env = os.environ.copy()
+    env["CURSOR_API_KEY"] = api_key
+
     proc = await asyncio.create_subprocess_exec(
         node,
         str(script),
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
-        env=os.environ.copy(),
+        env=env,
     )
     stdout_b, stderr_b = await proc.communicate(payload.encode("utf-8"))
 ```

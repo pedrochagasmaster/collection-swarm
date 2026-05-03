@@ -1,6 +1,6 @@
 # Database schema
 
-The store is a single SQLite file with eight tables. The schema lives in
+The store is a single SQLite file with nine tables. The schema lives in
 [`store.SimulationStore._init_schema`](../modules/store.md#tables).
 
 Default location: `output/collection_swarm.sqlite`. Override via the
@@ -136,6 +136,18 @@ the same metric without one overwriting the other.
 | `transcript_prompt`   | TEXT    | Full Judge transcript template.                                   |
 | `calibration_score`   | REAL    | The `overall_score` from the calibration that snapshotted it.     |
 | `created_at`          | TEXT    | ISO 8601 (UTC).                                                   |
+
+## `api_keys`
+
+Encrypted storage for user-provided API keys. Managed by `SecretsStore` in `secrets.py`.
+
+| Column | Type | Notes |
+| --------------- | ---- | ------------------------------------------------ |
+| `name` | TEXT PK | Key name, e.g. `NVIDIA_NIM_API_KEY` |
+| `encrypted_value` | TEXT | Fernet-encrypted key value |
+| `updated_at` | TEXT | ISO 8601 (UTC) |
+
+Values are encrypted at rest with Fernet symmetric encryption (AES-128-CBC + HMAC-SHA256). The encryption key is auto-generated and stored at `<db_dir>/.collection_swarm.key`.
 
 ## Schema migrations
 

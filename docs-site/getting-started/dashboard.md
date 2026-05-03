@@ -47,6 +47,7 @@ Open <http://127.0.0.1:8000> and you'll land on the Dashboard view.
 | Evolution pool      | `index.html` + `app.js` | `GET /api/evolution/pool`                                        |
 | Calibration         | `index.html` + `app.js` | `POST /api/calibration/labels`, `POST /api/jobs/calibration`     |
 | Model benchmarks    | `index.html` + `app.js` | `POST /api/jobs/model-benchmarks`                                |
+| Settings            | `index.html` + `app.js` | `GET /api/settings/keys`, `PUT /api/settings/keys/{name}`, `DELETE /api/settings/keys/{name}` |
 
 A full HTTP API matrix lives in [API reference](../reference/api.md).
 
@@ -97,8 +98,10 @@ is persisted, and it appears in the regular Runs list with an
 ## What the dashboard cannot do
 
 By design, the dashboard is a UI on top of the same engine the CLI uses.
-Anything you can do in one you can do in the other. The only operator
-actions that remain CLI-only:
+Anything you can do in one you can do in the other. API key management is
+available through both the dashboard Settings page and the CLI
+(`set-key`, `list-keys`, `remove-key`). The only operator actions that
+remain CLI-only:
 
 - `collection-swarm test-connection` — quick router smoke test.
 - `collection-swarm reset-elo` — wipe Elo ratings and history.

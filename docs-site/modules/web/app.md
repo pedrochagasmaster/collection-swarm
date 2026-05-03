@@ -57,6 +57,7 @@ Every POST body is a Pydantic model:
 | `ManualSessionRequest`       | `POST /api/manual-sessions`            |
 | `ManualTurnRequest`          | `POST /api/manual-sessions/{id}/turn` |
 | `CalibrationJobRequest`      | `POST /api/jobs/calibration`           |
+| `SetKeyRequest`              | `PUT /api/settings/keys/{key_name}`    |
 
 Pydantic validators enforce friendly errors: `format` must be `swiss` or
 `round_robin`, `human_role` must be `collector` or `debtor`, benchmark
@@ -108,6 +109,12 @@ ones worth highlighting here:
 - `GET /api/profiles/{id}/objections` — objection counts for the
   recommended (or chosen) Strategy.
 - `GET /api/playbook?format=html|markdown` — rendered Playbook.
+
+### Settings
+
+- `GET  /api/settings/keys` — list API key status and source.
+- `PUT  /api/settings/keys/{key_name}` — store or update a key.
+- `DELETE /api/settings/keys/{key_name}` — remove a stored key.
 
 ### Config introspection
 

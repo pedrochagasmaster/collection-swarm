@@ -2,7 +2,7 @@
 
 <span class="cs-kicker">collection_swarm/cli.py</span>
 
-The `collection-swarm` script. Click group with twelve subcommands. Pure
+The `collection-swarm` script. Click group with fifteen subcommands. Pure
 glue — every command resolves the config, builds the right helpers,
 calls a domain function, and prints the result with Rich.
 
@@ -24,6 +24,7 @@ def cli(ctx, config_dir, db_path):
     ctx.ensure_object(dict)
     ctx.obj["config_dir"] = config_dir
     ctx.obj["db_path"] = db_path
+    set_db_path(db_path)
 ```
 
 Every subcommand reads `ctx.obj["config_dir"]` and `ctx.obj["db_path"]`
@@ -48,6 +49,9 @@ collection-swarm --config-dir ./alt_config --db /tmp/alt.sqlite simulate ...
 | `model-report`     | `model_report(...)`               | `model_evaluation.run_live_role_probes`, `build_model_role_report`, `write_report` |
 | `test-connection`  | `test_connection(...)`            | `LLMRouter.complete` against the default model                        |
 | `list-profiles` / `list-strategies` | `list_profiles` / `list_strategies` | `load_app_config`, formatted with Rich tables           |
+| `set-key`          | `set_key(...)`                    | `SecretsStore.set_key`                                                |
+| `list-keys`        | `list_keys(...)`                  | `SecretsStore.list_keys`                                              |
+| `remove-key`       | `remove_key(...)`                 | `SecretsStore.delete_key`                                             |
 | `serve`            | `serve(...)`                      | `web.app.create_app` + `uvicorn.run`                                  |
 | `seed`             | `seed_data(...)`                  | `web.seed.generate_seed_data`                                         |
 

@@ -410,6 +410,96 @@ Full option set for launching simulations — includes profiles, strategies, mod
 
 ---
 
+## Settings
+
+### `GET /api/settings/keys`
+
+List all known API keys with their current status and source.
+
+**Response:**
+
+```json
+{
+  "keys": [
+    {
+      "name": "CURSOR_API_KEY",
+      "source": "not_set",
+      "is_set": false,
+      "updated_at": null
+    },
+    {
+      "name": "NVIDIA_NIM_API_KEY",
+      "source": "database",
+      "is_set": true,
+      "updated_at": "2026-05-03T17:48:08+00:00"
+    }
+  ]
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | `str` | The API key name |
+| `source` | `str` | Where the key is set: `database`, `environment`, or `not_set` |
+| `is_set` | `bool` | Whether the key is available from any source |
+| `updated_at` | `str | null` | ISO 8601 timestamp when the database value was last updated |
+
+---
+
+### `PUT /api/settings/keys/{key_name}`
+
+Store or update an API key.
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `key_name` | `str` | Must be `NVIDIA_NIM_API_KEY` or `CURSOR_API_KEY` |
+
+**Request Body:**
+
+```json
+{ "value": "nvapi-..." }
+```
+
+**Response:**
+
+```json
+{ "name": "NVIDIA_NIM_API_KEY", "source": "database", "is_set": true }
+```
+
+**Error Responses:**
+
+| Status | Condition |
+|--------|-----------|
+| `400` | Unknown key name or empty value |
+
+---
+
+### `DELETE /api/settings/keys/{key_name}`
+
+Remove a stored API key from the database. Environment variable fallback is not affected.
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `key_name` | `str` | Must be `NVIDIA_NIM_API_KEY` or `CURSOR_API_KEY` |
+
+**Response:**
+
+```json
+{ "name": "NVIDIA_NIM_API_KEY", "deleted": true, "source": "not_set", "is_set": false }
+```
+
+**Error Responses:**
+
+| Status | Condition |
+|--------|-----------|
+| `400` | Unknown key name |
+
+---
+
 ## Arena
 
 ### `GET /api/arena/leaderboard`

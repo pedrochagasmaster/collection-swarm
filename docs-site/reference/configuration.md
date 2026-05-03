@@ -209,8 +209,8 @@ tiers:
 |---|---|---|
 | `scripted` | Deterministic offline responses — no LLM call | Nothing |
 | `heuristic` | Rule-based judge scoring — no LLM call | Nothing |
-| `nim` | NVIDIA NIM inference API | `NVIDIA_NIM_API_KEY` |
-| `cursor_sdk` | Cursor SDK bridge (Node.js) | `CURSOR_API_KEY`, Node.js 22+ |
+| `nim` | NVIDIA NIM inference API | `NVIDIA_NIM_API_KEY` (via Settings page, CLI, env var, or `.env`) |
+| `cursor_sdk` | Cursor SDK bridge (Node.js) | `CURSOR_API_KEY` (via Settings page, CLI, env var, or `.env`), Node.js 22+ |
 
 !!! tip "Mix and match"
     You can use different backends per role. A common setup: `nim-llama-4-maverick` for fast conversation, `cursor-claude-4.6-opus-high-thinking` for high-quality judging.

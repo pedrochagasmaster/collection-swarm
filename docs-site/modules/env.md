@@ -16,7 +16,20 @@ Cursor SDK backends; nothing else cares about it.
 
 ```python
 def load_dotenv_if_present(path: Path | None = None) -> None: ...
+
+def set_db_path(path: Path) -> None: ...
+
+def get_db_path() -> Path: ...
 ```
+
+### `set_db_path()` / `get_db_path()`
+
+Configure and retrieve the database path used by backends for secret
+resolution via `SecretsStore`. The CLI group calls `set_db_path()` early
+so that `resolve_api_key()` in the backends can locate the encrypted key
+store without an explicit path argument.
+
+### `load_dotenv_if_present()`
 
 Resolution rules:
 
