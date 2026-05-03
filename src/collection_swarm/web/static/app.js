@@ -250,6 +250,66 @@ async function apiPost(path, body = {}) {
   return res.json();
 }
 
+async function apiPut(path, body = {}) {
+  const res = await fetch(`/api${path}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let detail = `API error: ${res.status}`;
+    try {
+      const data = await res.json();
+      detail = data.detail || detail;
+    } catch (_) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+async function apiDelete(path) {
+  const res = await fetch(`/api${path}`, { method: 'DELETE' });
+  if (!res.ok) {
+    let detail = `API error: ${res.status}`;
+    try {
+      const data = await res.json();
+      detail = data.detail || detail;
+    } catch (_) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+async function apiPut(path, body = {}) {
+  const res = await fetch(`/api${path}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let detail = `API error: ${res.status}`;
+    try {
+      const data = await res.json();
+      detail = data.detail || detail;
+    } catch (_) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+async function apiDelete(path) {
+  const res = await fetch(`/api${path}`, { method: 'DELETE' });
+  if (!res.ok) {
+    let detail = `API error: ${res.status}`;
+    try {
+      const data = await res.json();
+      detail = data.detail || detail;
+    } catch (_) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
 // ── Helpers ────────────────────────────────────────────────────
 
 function escapeHTML(value) {
@@ -2948,7 +3008,7 @@ window.saveApiKey = async function(event, provider) {
     return;
   }
   try {
-    await apiPut(`/config/api-keys/${pathPart(provider)}`, { api_key: apiKey });
+    await apiPut(`/api/config/api-keys/${pathPart(provider)}`, { api_key: apiKey });
     showToast('API key saved', 'success');
     await renderSettings();
   } catch (err) {
@@ -2958,7 +3018,7 @@ window.saveApiKey = async function(event, provider) {
 
 window.clearApiKey = async function(provider) {
   try {
-    await apiDelete(`/config/api-keys/${pathPart(provider)}`);
+    await apiDelete(`/api/config/api-keys/${pathPart(provider)}`);
     showToast('API key cleared', 'success');
     await renderSettings();
   } catch (err) {
