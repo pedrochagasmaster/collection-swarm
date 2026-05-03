@@ -139,6 +139,13 @@ class TestPlaybook:
         data = resp.json()
         assert data["format"] == "html"
         assert "<h1>" in data["content"]
+        # Trust framing metadata travels with the playbook so the dashboard
+        # can render an above-the-fold disclaimer.
+        meta = data["meta"]
+        assert meta["simulation_count"] == 12
+        assert meta["thresholds"]["min_compliance_score"]
+        assert isinstance(meta["conversation_models"], list)
+        assert isinstance(meta["judge_models"], list)
 
     def test_playbook_markdown(self, seeded_client: TestClient) -> None:
         resp = seeded_client.get("/api/playbook?format=markdown")
@@ -146,6 +153,37 @@ class TestPlaybook:
         data = resp.json()
         assert data["format"] == "markdown"
         assert "# Collection Playbook" in data["content"]
+        assert data["meta"]["simulation_count"] == 12
+
+    def test_playbook_xss_sanitization(self, seeded_client: TestClient, monkeypatch) -> None:
+        """Playbook HTML must strip any embedded <script>/onerror/javascript: payloads."""
+        from collection_swarm.web import app as web_app
+
+        malicious_md = (
+            "# Title\n\n"
+            "<script>alert(1)</script>\n\n"
+            "<img src=x onerror=\"alert('xss')\">\n\n"
+            "<a href=\"javascript:alert(1)\">click</a>\n\n"
+            "Safe **bold** text.\n"
+        )
+        monkeypatch.setattr(
+            web_app,
+            "generate_playbook",
+            lambda *args, **kwargs: malicious_md,
+        )
+        resp = seeded_client.get("/api/playbook?format=html")
+        assert resp.status_code == 200
+        content = resp.json()["content"]
+        # Dangerous tags and attributes must be removed so nothing executes
+        # when the playbook HTML is later injected via innerHTML on the client.
+        assert "<script" not in content.lower()
+        assert "</script" not in content.lower()
+        assert "onerror" not in content.lower()
+        assert "javascript:" not in content.lower()
+        assert "<img" not in content.lower()
+        # Safe Markdown formatting still survives sanitization.
+        assert "<strong>bold</strong>" in content
+        assert "<h1>Title</h1>" in content
 
 
 class TestConfig:
@@ -565,6 +603,32 @@ class TestSPA:
     def test_static_js(self, seeded_client: TestClient) -> None:
         resp = seeded_client.get("/static/app.js")
         assert resp.status_code == 200
+
+    def test_static_assets_include_ux_report_fixes(self, seeded_client: TestClient) -> None:
+        """Regression guard: key UX-report markers must survive in deployed assets."""
+        html = seeded_client.get("/").text
+        css = seeded_client.get("/static/styles.css").text
+        js = seeded_client.get("/static/app.js").text
+
+        assert '<a href="#main-content"' in html
+        assert 'name="theme-color"' in html
+        assert '<div class="nav-label">Overview</div>' in html
+
+        assert "window.addEventListener('hashchange'" in js
+        assert "isPageHash()" in js
+        assert "handleRunRowKey(event" in js
+        assert "quick-actions" in js or "quick-action" in js
+        assert "Synthetic analysis" in js or "Synthetic Analysis" in js
+        assert "buildPlaybookTOC" in js or "generatePlaybookTOC" in js
+        assert "handlePollFailure" in js
+        assert "aria-valuetext" in js
+
+        assert "--text-xs: 0.75rem" in css
+        assert "animation: none !important" in css
+        assert ".data-table tbody tr:focus-visible" in css
+        assert ".trust-banner" in css
+        assert ".sidebar-footer" in css and "position: sticky" in css
+        assert "min-width: 44px" in css
 
 
 class TestSeedData:

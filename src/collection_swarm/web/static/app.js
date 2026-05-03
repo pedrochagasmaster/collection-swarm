@@ -11,12 +11,44 @@ const mainEl = $('#main-content');
 
 // ── Routing ────────────────────────────────────────────────────
 
+const KNOWN_PAGES = [
+  'dashboard', 'runs', 'launch', 'matrix', 'manual',
+  'playbook', 'compliance', 'arena', 'evolution',
+  'calibration', 'benchmarks', 'profiles', 'strategies',
+];
+const _KNOWN_PAGES_SET = new Set(KNOWN_PAGES);
+
+function isPageHash(hash = location.hash) {
+  const page = decodeURIComponent(String(hash || '').replace(/^#/, '')) || 'dashboard';
+  return _KNOWN_PAGES_SET.has(page);
+}
+
+const PAGE_TITLES = {
+  dashboard: 'Dashboard',
+  runs: 'Simulation Runs',
+  launch: 'Launch Run',
+  matrix: 'Batch Comparison',
+  manual: 'Manual Run',
+  playbook: 'Playbook',
+  compliance: 'Compliance',
+  arena: 'Arena',
+  evolution: 'Evolution',
+  calibration: 'Calibration',
+  benchmarks: 'Model Benchmarks',
+  profiles: 'Profiles',
+  strategies: 'Strategies',
+};
+
+const APP_TITLE = 'Collection Swarm';
 let currentPage = 'dashboard';
 let _lastPageParams = {};
 
-function navigateTo(page, params = {}) {
-  currentPage = page;
-  _lastPageParams[page] = params || {};
+function _setDocumentTitle(page) {
+  const label = PAGE_TITLES[page];
+  document.title = label ? `${label} — ${APP_TITLE}` : APP_TITLE;
+}
+
+function _updateActiveNav(page) {
   $$('.nav-link').forEach(el => {
     const isActive = el.dataset.page === page;
     el.classList.toggle('active', isActive);
@@ -26,21 +58,56 @@ function navigateTo(page, params = {}) {
       el.removeAttribute('aria-current');
     }
   });
+}
+
+// Confirmation guard hook — populated by pages that own ephemeral session
+// state (e.g. Manual Run). Returning false from the guard cancels navigation.
+let _navigationGuard = null;
+function setNavigationGuard(fn) { _navigationGuard = typeof fn === 'function' ? fn : null; }
+function clearNavigationGuard() { _navigationGuard = null; }
+function _runNavigationGuard(nextPage) {
+  if (!_navigationGuard) return true;
+  try {
+    return _navigationGuard(nextPage) !== false;
+  } catch (_) {
+    return true;
+  }
+}
+
+function navigateTo(page, params = {}) {
+  if (page !== currentPage && !_runNavigationGuard(page)) return;
+  // Page changed — drop any guard the previous page registered.
+  if (page !== currentPage) clearNavigationGuard();
+  currentPage = page;
+  _lastPageParams[page] = params || {};
+  _updateActiveNav(page);
   window.history.pushState({ page, params }, '', `#${page}`);
+  _setDocumentTitle(page);
   closeMobileSidebar();
   renderPage(page, params);
 }
 
 window.addEventListener('popstate', (e) => {
-  const state = e.state || { page: 'dashboard', params: {} };
-  currentPage = state.page;
-  $$('.nav-link').forEach(el => {
-    const isActive = el.dataset.page === state.page;
-    el.classList.toggle('active', isActive);
-    if (isActive) el.setAttribute('aria-current', 'page');
-    else el.removeAttribute('aria-current');
-  });
-  renderPage(state.page, state.params);
+  const state = e.state || {};
+  const page = state.page || location.hash.replace('#', '') || 'dashboard';
+  const params = state.params || {};
+  // Clear any per-page guard so back/forward never traps the user.
+  clearNavigationGuard();
+  currentPage = page;
+  _updateActiveNav(page);
+  _setDocumentTitle(page);
+  renderPage(page, params);
+});
+
+window.addEventListener('hashchange', () => {
+  if (!isPageHash()) return;
+  const page = location.hash.replace('#', '') || 'dashboard';
+  if (page === currentPage) return;
+  clearNavigationGuard();
+  currentPage = page;
+  _updateActiveNav(page);
+  _setDocumentTitle(page);
+  renderPage(page);
 });
 
 // ── Theme ──────────────────────────────────────────────────────
@@ -261,11 +328,16 @@ function scoreBarHTML(label, value) {
   const definition = definitions[label] || `${label} score.`;
   const meaning = cls === 'score-good' ? 'Good' : cls === 'score-mid' ? 'Watch' : 'Risk';
   const labelText = isRisk ? `${label} (lower is better)` : label;
+  const pctValue = Math.round(value * 100);
+  const valueText = `${pctValue}% \u2014 ${meaning}`;
   return `
     <div class="judgment-score-item">
       <span class="judgment-score-label" title="${escapeAttr(definition)}">${escapeHTML(labelText)}</span>
       <div class="score-bar-wrap">
-        <div class="score-bar" role="meter" aria-valuenow="${Math.round(value * 100)}" aria-valuemin="0" aria-valuemax="100" aria-label="${escapeAttr(`${labelText}: ${definition}`)}">
+        <div class="score-bar" role="meter"
+             aria-valuenow="${pctValue}" aria-valuemin="0" aria-valuemax="100"
+             aria-valuetext="${escapeAttr(valueText)}"
+             aria-label="${escapeAttr(`${labelText}: ${definition}`)}">
           <div class="score-bar-fill" style="width:${value * 100}%;background:var(${colorVar})"></div>
         </div>
         <span class="score-bar-label ${cls}"><span aria-hidden="true">${cls === 'score-good' ? 'OK' : cls === 'score-mid' ? '!' : 'X'}</span> ${pct(value)} ${meaning}</span>
@@ -438,6 +510,21 @@ async function renderPage(page, params = {}) {
   mainEl.innerHTML = skeleton();
   mainEl.scrollTop = 0;
   try {
+    if (!KNOWN_PAGES.includes(page)) {
+      _setDocumentTitle('dashboard');
+      mainEl.innerHTML = `
+        <div class="empty-state" role="status">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <h3>Page Not Found</h3>
+          <p>No page named "${escapeHTML(page)}".</p>
+          <div class="btn-row" style="margin-top:var(--space-4);justify-content:center">
+            <button class="btn btn-primary" type="button" onclick="navigateTo('dashboard')">Go to Dashboard</button>
+          </div>
+        </div>`;
+      return;
+    }
     switch (page) {
       case 'dashboard': await renderDashboard(params); break;
       case 'runs': await renderRuns(); break;
@@ -452,7 +539,6 @@ async function renderPage(page, params = {}) {
       case 'benchmarks': await renderBenchmarks(); break;
       case 'profiles': await renderProfiles(); break;
       case 'strategies': await renderStrategies(); break;
-      default: mainEl.innerHTML = emptyState('Not Found', 'Page not found.');
     }
     mainEl.classList.remove('page-enter');
     void mainEl.offsetWidth;
@@ -535,7 +621,7 @@ async function renderDashboard() {
       </div>
     </div>
 
-    ${total_runs === 0 ? renderFirstRunPanel() : ''}
+    ${total_runs === 0 ? renderFirstRunPanel() : renderQuickActionsStrip()}
     ${strategySection}
     ${complianceBanner}
 
@@ -574,6 +660,28 @@ async function renderDashboard() {
   `;
 
   if (data.profiles.length) setTimeout(() => loadStrategyComparison(data.profiles[0]), 0);
+}
+
+function renderQuickActionsStrip() {
+  return `
+    <section class="quick-actions" aria-label="Quick actions">
+      <button class="quick-action" type="button" onclick="navigateTo('launch')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        <span><strong>Launch new run</strong><em>Single simulation with the current defaults.</em></span>
+      </button>
+      <button class="quick-action" type="button" onclick="navigateTo('matrix')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        <span><strong>Compare strategies</strong><em>Run a matrix across profiles and strategies.</em></span>
+      </button>
+      <button class="quick-action" type="button" onclick="navigateTo('compliance')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <span><strong>Review compliance</strong><em>See the strategies excluded by current thresholds.</em></span>
+      </button>
+      <button class="quick-action" type="button" onclick="navigateTo('playbook')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        <span><strong>Open the playbook</strong><em>Synthesised recommendations from saved runs.</em></span>
+      </button>
+    </section>`;
 }
 
 function renderFirstRunPanel() {
@@ -793,8 +901,12 @@ window.filterRuns = function() {
 
   tbody.innerHTML = filtered.map(r => {
     const j = r.judgment;
+    const rowLabel = `Run ${r.id}, ${fmtId(r.profile_id)} times ${fmtId(r.strategy_id)}`;
     return `
-      <tr onclick="openTranscript(${jsArg(r.id)})">
+      <tr tabindex="0" role="row"
+          onclick="openTranscript(${jsArg(r.id)})"
+          onkeydown="handleRunRowKey(event, ${jsArg(r.id)})"
+          aria-label="${escapeAttr(rowLabel)}">
         <td>${escapeHTML(r.id)}</td>
         <td class="run-action-cell">
           <button class="btn btn-compact" type="button" onclick="event.stopPropagation();openTranscript(${jsArg(r.id)})" aria-label="View transcript for ${escapeAttr(r.id)}">View</button>
@@ -1008,8 +1120,8 @@ async function renderLaunch(params = {}) {
         </div>
       </div>
       <div class="card">
-        <div class="card-header"><h2>Live Progress</h2><div id="single-job-status">${statusBadge('queued')}</div></div>
-        <div class="card-body" id="single-job-panel">
+        <div class="card-header"><h2>Live Progress</h2><div id="single-job-status" aria-live="polite">${statusBadge('queued')}</div></div>
+        <div class="card-body" id="single-job-panel" aria-live="polite" aria-atomic="false">
           ${emptyState('Ready', 'Configure and start a simulation to see live progress here.')}
         </div>
       </div>
@@ -1048,8 +1160,20 @@ window.startSingleRun = async function(event) {
 
 async function renderMatrix(params = {}) {
   const [options, jobs] = await Promise.all([api('/config/run-options'), api('/jobs')]);
-  const profiles = checkboxList('matrix-profiles', options.profiles.map(p => [p.id, fmtId(p.id)]), params.profile ? [params.profile] : null);
-  const strategies = checkboxList('matrix-strategies', options.strategies.map(s => [s.id, fmtId(s.id)]));
+  // Defaults: nothing pre-selected for profiles/strategies so a stray click on
+  // "Start matrix" cannot kick off a combinatorial job. The single default
+  // model per axis is kept because matrices typically run against the active
+  // default model unless the user opts into a sweep.
+  const profiles = checkboxList(
+    'matrix-profiles',
+    options.profiles.map(p => [p.id, fmtId(p.id)]),
+    params.profile ? [params.profile] : [],
+  );
+  const strategies = checkboxList(
+    'matrix-strategies',
+    options.strategies.map(s => [s.id, fmtId(s.id)]),
+    [],
+  );
   const conversationModels = checkboxList(
     'matrix-conversation-models',
     options.conversation_models.map(m => [m.id, modelLabel(m)]),
@@ -1072,10 +1196,48 @@ async function renderMatrix(params = {}) {
         <div class="card-header"><h2>Matrix Setup</h2></div>
         <div class="card-body">
           <form class="control-form" onsubmit="startMatrixRun(event)">
-            <div class="form-field"><label>Profiles</label><div class="checkbox-grid" onchange="updateMatrixCount()">${profiles}</div></div>
-            <div class="form-field"><label>Strategies</label><div class="checkbox-grid" onchange="updateMatrixCount()">${strategies}</div></div>
-            <div class="form-field"><label>Conversation models</label><p class="field-summary">Each checked model role-plays both collector and debtor.</p><div class="checkbox-grid model-grid">${conversationModels}</div></div>
-            <div class="form-field"><label>Judge models</label><p class="field-summary">Each checked judge scores every generated transcript.</p><div class="checkbox-grid model-grid">${judgeModels}</div></div>
+            <div class="form-field">
+              <div class="form-field-head">
+                <label>Profiles</label>
+                <div class="form-field-tools">
+                  <button class="btn btn-compact" type="button" onclick="setCheckboxGroup('matrix-profiles', true)">Select all</button>
+                  <button class="btn btn-compact" type="button" onclick="setCheckboxGroup('matrix-profiles', false)">Clear all</button>
+                </div>
+              </div>
+              <div class="checkbox-grid" onchange="updateMatrixCount()">${profiles}</div>
+            </div>
+            <div class="form-field">
+              <div class="form-field-head">
+                <label>Strategies</label>
+                <div class="form-field-tools">
+                  <button class="btn btn-compact" type="button" onclick="setCheckboxGroup('matrix-strategies', true)">Select all</button>
+                  <button class="btn btn-compact" type="button" onclick="setCheckboxGroup('matrix-strategies', false)">Clear all</button>
+                </div>
+              </div>
+              <div class="checkbox-grid" onchange="updateMatrixCount()">${strategies}</div>
+            </div>
+            <div class="form-field">
+              <div class="form-field-head">
+                <label>Conversation models</label>
+                <div class="form-field-tools">
+                  <button class="btn btn-compact" type="button" onclick="setCheckboxGroup('matrix-conversation-models', true)">Select all</button>
+                  <button class="btn btn-compact" type="button" onclick="setCheckboxGroup('matrix-conversation-models', false)">Clear all</button>
+                </div>
+              </div>
+              <p class="field-summary">Each checked model role-plays both collector and debtor.</p>
+              <div class="checkbox-grid model-grid">${conversationModels}</div>
+            </div>
+            <div class="form-field">
+              <div class="form-field-head">
+                <label>Judge models</label>
+                <div class="form-field-tools">
+                  <button class="btn btn-compact" type="button" onclick="setCheckboxGroup('matrix-judge-models', true)">Select all</button>
+                  <button class="btn btn-compact" type="button" onclick="setCheckboxGroup('matrix-judge-models', false)">Clear all</button>
+                </div>
+              </div>
+              <p class="field-summary">Each checked judge scores every generated transcript.</p>
+              <div class="checkbox-grid model-grid">${judgeModels}</div>
+            </div>
             <div class="btn-row">
               ${inputField('matrix-reps', 'Reps', options.defaults.reps || 1, 1, 100, "updateMatrixCount()")}
               ${inputField('matrix-concurrency', 'Concurrency', 2, 1, 10)}
@@ -1086,8 +1248,8 @@ async function renderMatrix(params = {}) {
         </div>
       </div>
       <div class="card">
-        <div class="card-header"><h2>Progress</h2><div id="matrix-job-status">${statusBadge('queued')}</div></div>
-        <div class="card-body" id="matrix-job-panel">
+        <div class="card-header"><h2>Progress</h2><div id="matrix-job-status" aria-live="polite">${statusBadge('queued')}</div></div>
+        <div class="card-body" id="matrix-job-panel" aria-live="polite" aria-atomic="false">
           ${jobs.length ? jobs.map(jobSummaryHTML).join('') : emptyState('No Jobs', 'Start a matrix run to watch progress.')}
         </div>
       </div>
@@ -1155,8 +1317,8 @@ async function renderManual() {
         </div>
       </div>
       <div class="card">
-        <div class="card-header"><h2>Transcript</h2><div id="manual-status">${statusBadge('waiting_for_human')}</div></div>
-        <div class="card-body" id="manual-panel">${emptyState('No Session', 'Start a manual session to begin.')}</div>
+        <div class="card-header"><h2>Transcript</h2><div id="manual-status" aria-live="polite">${statusBadge('waiting_for_human')}</div></div>
+        <div class="card-body" id="manual-panel" aria-live="polite" aria-atomic="false">${emptyState('No Session', 'Start a manual session to begin.')}</div>
       </div>
     </div>`;
   updateManualDescriptions();
@@ -1177,6 +1339,12 @@ window.startManualSession = async function(event) {
       judge_model: $('#manual-judge-model').value,
     });
     window._manualSessionId = session.id;
+    setNavigationGuard((nextPage) => {
+      if (!window._manualSessionId) return true;
+      // Only the navigation that actually leaves Manual Run should prompt.
+      if (nextPage === 'manual') return true;
+      return window.confirm('You have an unfinished manual session. Leave this page and lose your progress?');
+    });
     renderManualSession(session);
     showToast('Session started', 'success');
   } catch (err) {
@@ -1219,6 +1387,12 @@ window.finishManualSession = async function() {
 
 function renderManualSession(session) {
   $('#manual-status').innerHTML = statusBadge(session.status);
+  if (session.status === 'completed') {
+    // Session reached the saved-and-judged terminal state; the user is free
+    // to navigate away without losing anything.
+    window._manualSessionId = null;
+    clearNavigationGuard();
+  }
   const run = session.run;
   const disabled = session.status !== 'waiting_for_human' ? 'disabled' : '';
   $('#manual-panel').innerHTML = `
@@ -1327,6 +1501,15 @@ function checkedValues(name) {
   return $$(`input[name="${name}"]:checked`).map(input => input.value);
 }
 
+window.setCheckboxGroup = function(name, value) {
+  $$(`input[name="${name}"]`).forEach(input => { input.checked = !!value; });
+  // Refresh whichever live counters happen to be on the current page; the
+  // helpers no-op when their target element is absent.
+  if (typeof updateMatrixCount === 'function') updateMatrixCount();
+  if (typeof updateBenchmarkCount === 'function') updateBenchmarkCount();
+  if (typeof updateArenaCount === 'function') updateArenaCount();
+};
+
 function appendFormError(container, message) {
   if (!container) return;
   const existing = $('.form-error', container);
@@ -1341,6 +1524,32 @@ function clearPoll(key) {
 }
 
 const _pollFailCounts = {};
+
+function handlePollFailure(pollKey, panelId, statusId = null) {
+  _pollFailCounts[pollKey] = (_pollFailCounts[pollKey] || 0) + 1;
+  if (_pollFailCounts[pollKey] >= 10) {
+    clearPoll(pollKey);
+    const panel = $(`#${panelId}`);
+    const status = statusId ? $(`#${statusId}`) : null;
+    if (status) status.innerHTML = statusBadge('failed');
+    if (panel) {
+      panel.innerHTML = `
+        <div class="empty-state" role="alert">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <h3>Connection lost</h3>
+          <p>Could not reach the server after multiple retries. The job may still be running on the backend.</p>
+          <div class="btn-row" style="margin-top:var(--space-4);justify-content:center">
+            <button class="btn" type="button" onclick="location.reload()">Reload page</button>
+          </div>
+        </div>`;
+    }
+    showToast('Polling stopped \u2014 connection lost', 'error', 10000);
+    return;
+  }
+  if (_pollFailCounts[pollKey] === 3) {
+    showToast('Connection interrupted, retrying\u2026', 'error', 6000);
+  }
+}
 
 async function pollJob(jobId, panelId, statusId, pollKey) {
   try {
@@ -1360,10 +1569,7 @@ async function pollJob(jobId, panelId, statusId, pollKey) {
       if (job.status === 'cancelled') showToast('Job cancelled', 'info');
     }
   } catch (_) {
-    _pollFailCounts[pollKey] = (_pollFailCounts[pollKey] || 0) + 1;
-    if (_pollFailCounts[pollKey] === 3) {
-      showToast('Connection interrupted, retrying\u2026', 'error', 6000);
-    }
+    handlePollFailure(pollKey, panelId, statusId);
   }
 }
 
@@ -1564,6 +1770,29 @@ document.addEventListener('keydown', (e) => {
 
 async function renderPlaybook() {
   const data = await api('/playbook?format=html');
+  const meta = data.meta || {};
+  const simulationCount = Number(meta.simulation_count || 0);
+  const conversationModels = meta.conversation_models || [];
+  const judgeModels = meta.judge_models || [];
+  const thresholds = meta.thresholds || {};
+  const sourceLine = [
+    `Generated from ${fmtNum(simulationCount)} simulated conversation${simulationCount === 1 ? '' : 's'}`,
+    conversationModels.length ? `conversation models: ${conversationModels.map(modelShortLabel).join(', ')}` : null,
+    judgeModels.length ? `judge models: ${judgeModels.map(modelShortLabel).join(', ')}` : null,
+  ].filter(Boolean).join(' \u00b7 ');
+  const thresholdLine = (thresholds.min_compliance_score != null || thresholds.max_escalation_risk != null)
+    ? `Compliance gate: \u2265 ${pct(thresholds.min_compliance_score || 0)} compliance, \u2264 ${pct(thresholds.max_escalation_risk || 0)} escalation risk.`
+    : '';
+  const trustBanner = `
+    <aside class="trust-banner" role="note" aria-label="Synthetic analysis disclaimer">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <div class="trust-banner-body">
+        <strong>Synthetic analysis &mdash; not legal or operational advice</strong>
+        <p>This playbook summarises ${fmtNum(simulationCount)} fully synthetic simulated conversation${simulationCount === 1 ? '' : 's'}. It is not legal advice, operational policy, or a substitute for human compliance review. Review every recommendation before any operational use.</p>
+        ${sourceLine ? `<p>${escapeHTML(sourceLine)}.</p>` : ''}
+        ${thresholdLine ? `<p>${escapeHTML(thresholdLine)}</p>` : ''}
+      </div>
+    </aside>`;
 
   mainEl.innerHTML = `
     <div class="page-header page-header-actions">
@@ -1576,13 +1805,57 @@ async function renderPlaybook() {
         <button class="btn" type="button" onclick="exportPlaybook()">Export Markdown</button>
       </div>
     </div>
-    <div class="card">
-      <div class="card-body">
-        <article class="playbook-content">${data.content || emptyState('No Playbook', 'Run simulations and analyze to generate a playbook.')}</article>
+    ${trustBanner}
+    <div class="playbook-layout">
+      <nav class="playbook-toc" id="playbook-toc" aria-label="Playbook contents"></nav>
+      <div class="card playbook-card">
+        <div class="card-body">
+          <article class="playbook-content" id="playbook-content">${data.content || emptyState('No Playbook', 'Run simulations and analyze to generate a playbook.')}</article>
+        </div>
       </div>
     </div>
   `;
+  buildPlaybookTOC();
 }
+
+function buildPlaybookTOC() {
+  const article = $('#playbook-content');
+  const tocEl = $('#playbook-toc');
+  if (!article || !tocEl) return;
+  const headings = $$('h2, h3', article);
+  if (headings.length < 4) {
+    tocEl.style.display = 'none';
+    return;
+  }
+  const usedIds = new Set();
+  const items = headings.map((h) => {
+    const text = h.textContent || '';
+    let slug = text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'section';
+    let unique = slug;
+    let counter = 2;
+    while (usedIds.has(unique)) {
+      unique = `${slug}-${counter++}`;
+    }
+    usedIds.add(unique);
+    h.id = unique;
+    return { id: unique, text, level: h.tagName.toLowerCase() };
+  });
+  tocEl.innerHTML = `
+    <div class="playbook-toc-head">On this page</div>
+    <ul>
+      ${items.map(item => `
+        <li class="toc-${item.level}"><a href="#${escapeAttr(item.id)}" onclick="jumpToPlaybookHeading(event, ${jsArg(item.id)})">${escapeHTML(item.text)}</a></li>
+      `).join('')}
+    </ul>`;
+}
+
+window.jumpToPlaybookHeading = function(event, id) {
+  event.preventDefault();
+  const target = document.getElementById(id);
+  if (!target) return;
+  target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  target.focus({ preventScroll: true });
+};
 
 window.exportPlaybook = async function() {
   const data = await api('/playbook?format=markdown');
@@ -1676,8 +1949,8 @@ async function renderBenchmarks() {
       </div>
 
       <div class="card">
-        <div class="card-header"><h2>Progress</h2><div id="benchmark-job-status">${statusBadge('queued')}</div></div>
-        <div class="card-body" id="benchmark-job-panel">
+        <div class="card-header"><h2>Progress</h2><div id="benchmark-job-status" aria-live="polite">${statusBadge('queued')}</div></div>
+        <div class="card-body" id="benchmark-job-panel" aria-live="polite" aria-atomic="false">
           ${benchmarkJobs.length ? benchmarkJobs.map(job => benchmarkJobSummaryHTML(job)).join('') : emptyState('Ready', 'Start a benchmark to see live progress and recommendations.')}
         </div>
       </div>
@@ -1694,9 +1967,16 @@ async function renderBenchmarks() {
 }
 
 window.selectProductionBenchmarkModels = function() {
-  const selected = new Set(['composer-2', 'gpt-5.5', 'gpt-5.4', 'gpt-5.3-codex', 'claude-sonnet-4-6', 'claude-opus-4-7', 'gemini-3.1-pro', 'gpt-5.4-mini', 'claude-haiku-4-5']);
-  $$('input[name="benchmark-models"]').forEach(input => { input.checked = selected.has(input.value); });
+  const wanted = ['composer-2', 'gpt-5.5', 'gpt-5.4', 'gpt-5.3-codex', 'claude-sonnet-4-6', 'claude-opus-4-7', 'gemini-3.1-pro', 'gpt-5.4-mini', 'claude-haiku-4-5'];
+  const inputs = $$('input[name="benchmark-models"]');
+  const available = new Set(inputs.map(input => input.value));
+  const wantedSet = new Set(wanted);
+  inputs.forEach(input => { input.checked = wantedSet.has(input.value); });
   updateBenchmarkCount();
+  const missing = wanted.filter(id => !available.has(id));
+  if (missing.length) {
+    showToast(`Production preset: ${missing.length} model${missing.length === 1 ? '' : 's'} not available (${missing.join(', ')})`, 'error', 7000);
+  }
 };
 
 window.selectAllBenchmarkModels = function() {
@@ -1736,18 +2016,22 @@ window.startModelBenchmark = async function(event) {
 async function pollBenchmarkJob(jobId) {
   try {
     const job = await api(`/jobs/${pathPart(jobId)}`);
+    if (_pollFailCounts.benchmark) {
+      _pollFailCounts.benchmark = 0;
+    }
     const panel = $('#benchmark-job-panel');
     const status = $('#benchmark-job-status');
     if (status) status.innerHTML = statusBadge(job.status);
     if (panel) renderBenchmarkJobPanel(job, panel);
     if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') {
       clearPoll('benchmark');
+      delete _pollFailCounts.benchmark;
       if (job.benchmark_report) renderBenchmarkReport(job.benchmark_report, job);
       if (job.status === 'completed') showToast('Benchmark completed', 'success');
       if (job.status === 'failed') showToast('Benchmark failed', 'error');
     }
-  } catch (err) {
-    showToast(err.message, 'error');
+  } catch (_) {
+    handlePollFailure('benchmark', 'benchmark-job-panel');
   }
 }
 
@@ -1910,14 +2194,14 @@ function benchHeatmapHTML(assessments, models, roles) {
   function heatColor(score) {
     if (score === null) return 'var(--bg-elevated)';
     if (score >= 9) return 'var(--success)';
-    if (score >= 7) return 'oklch(68% 0.14 155)';
+    if (score >= 7) return 'var(--fit-strong)';
     if (score >= 5) return 'var(--warning)';
-    if (score >= 3) return 'oklch(68% 0.14 55)';
+    if (score >= 3) return 'var(--fit-unsafe)';
     return 'var(--danger)';
   }
   function textColor(score) {
     if (score === null) return 'var(--text-tertiary)';
-    return score >= 5 ? 'oklch(15% 0 0)' : 'oklch(95% 0 0)';
+    return score >= 5 ? 'var(--heatmap-text-dark)' : 'var(--heatmap-text-light)';
   }
 
   return `
@@ -1938,9 +2222,9 @@ function benchHeatmapHTML(assessments, models, roles) {
       </div>
       <div class="bench-hm-legend">
         <span style="background:var(--danger)"></span><span>1-2</span>
-        <span style="background:oklch(68% 0.14 55)"></span><span>3-4</span>
+        <span style="background:var(--fit-unsafe)"></span><span>3-4</span>
         <span style="background:var(--warning)"></span><span>5-6</span>
-        <span style="background:oklch(68% 0.14 155)"></span><span>7-8</span>
+        <span style="background:var(--fit-strong)"></span><span>7-8</span>
         <span style="background:var(--success)"></span><span>9-10</span>
       </div>
     </div>`;
@@ -1958,7 +2242,7 @@ function benchBarChartHTML(assessments, models, roles) {
     if (!scores || !scores.length) return 0;
     return scores.reduce((a, b) => a + b, 0) / scores.length;
   }
-  const roleColors = { collector: 'var(--accent-primary)', debtor: 'oklch(65% 0.17 310)', judge: 'var(--warning)' };
+  const roleColors = { collector: 'var(--accent-primary)', debtor: 'var(--bench-debtor)', judge: 'var(--warning)' };
 
   return `
     <div class="bench-barchart-wrap">
@@ -1987,9 +2271,9 @@ function benchFitDistHTML(assessments, roles) {
   const fitOrder = ['Primary recommendation', 'Strong candidate', 'Usable with caution', 'Unsafe without parser hardening', 'Unavailable'];
   const fitColors = {
     'Primary recommendation': 'var(--success)',
-    'Strong candidate': 'oklch(68% 0.14 155)',
+    'Strong candidate': 'var(--fit-strong)',
     'Usable with caution': 'var(--warning)',
-    'Unsafe without parser hardening': 'oklch(68% 0.14 55)',
+    'Unsafe without parser hardening': 'var(--fit-unsafe)',
     'Unavailable': 'var(--danger)',
   };
   const fitShort = {
@@ -2228,8 +2512,8 @@ async function renderArena() {
         </div>
       </div>
       <div class="card">
-        <div class="card-header"><h2>Progress</h2><div id="arena-job-status">${statusBadge('queued')}</div></div>
-        <div class="card-body" id="arena-job-panel">
+        <div class="card-header"><h2>Progress</h2><div id="arena-job-status" aria-live="polite">${statusBadge('queued')}</div></div>
+        <div class="card-body" id="arena-job-panel" aria-live="polite" aria-atomic="false">
           ${tournamentJobs.length ? tournamentJobs.map(jobSummaryHTML).join('') : emptyState('No Tournaments', 'Start a tournament to update Elo ratings.')}
         </div>
       </div>
@@ -2389,9 +2673,10 @@ function evolutionTable(items, type) {
 // ── Calibration ──────────────────────────────────────────────────
 
 async function renderCalibration() {
-  const [results, variants] = await Promise.all([
+  const [results, variants, jobs] = await Promise.all([
     api('/calibration/results'),
     api('/calibration/variants'),
+    api('/jobs'),
   ]);
   const metrics = Object.entries(results.correlations || {}).map(([metric, value]) => `
     <div class="judgment-score-item">
@@ -2401,10 +2686,22 @@ async function renderCalibration() {
         <span class="score-bar-label">${Number(value || 0).toFixed(2)} corr</span>
       </div>
     </div>`).join('');
+  const calibrationJobs = jobs.filter(job => job.kind === 'calibration');
+  const labelExample = JSON.stringify([
+    {
+      transcript_id: 'sim_xxxxxxxx',
+      labeler_id: 'reviewer_alice',
+      human_scores: {
+        payment_probability: 0.7,
+        compliance_score: 0.9,
+        debtor_satisfaction: 0.6,
+      },
+    },
+  ], null, 2);
   mainEl.innerHTML = `
     <div class="page-header">
       <h1>Calibration</h1>
-      <p>Compare judge scores with human labels and track prompt variants.</p>
+      <p>Compare judge scores with human labels, run calibration jobs, and track prompt variants.</p>
     </div>
     <div class="grid-2">
       <section class="card">
@@ -2415,17 +2712,141 @@ async function renderCalibration() {
             <div class="overview-sep" aria-hidden="true"></div>
             <div class="overview-item"><span class="overview-label">Score</span><span class="overview-value">${Number(results.overall_score || 0).toFixed(2)}</span></div>
           </div>
-          ${metrics || emptyState('No Labels', 'Upload calibration labels with the API or CLI to compute correlations.')}
+          ${metrics || emptyState('No Labels', 'Upload calibration labels below to compute correlations.')}
+        </div>
+      </section>
+      <section class="card">
+        <div class="card-header"><h2>Run Calibration</h2><div id="calibration-job-status" aria-live="polite">${statusBadge('queued')}</div></div>
+        <div class="card-body">
+          <form class="control-form" onsubmit="startCalibration(event)">
+            <p class="field-summary">Re-evaluate judge alignment against the saved labels. With "store optimized variant" the resulting score is recorded as a judge prompt variant.</p>
+            <label class="check-row">
+              <input type="checkbox" id="calibration-optimize" checked>
+              <span>Store optimized variant after evaluation</span>
+            </label>
+            <button class="btn btn-primary" type="submit" id="calibration-btn">Run calibration</button>
+          </form>
+          <div id="calibration-job-panel" aria-live="polite" aria-atomic="false" style="margin-top:var(--space-4)">
+            ${calibrationJobs.length ? calibrationJobs.slice(0, 3).map(job => calibrationJobSummaryHTML(job)).join('') : emptyState('Ready', 'Run calibration to compute the alignment score against current labels.')}
+          </div>
+        </div>
+      </section>
+    </div>
+    <div class="grid-2">
+      <section class="card">
+        <div class="card-header"><h2>Upload Labels</h2></div>
+        <div class="card-body">
+          <form class="control-form" onsubmit="uploadCalibrationLabels(event)">
+            <p class="field-summary">Paste a JSON array of <code>CalibrationLabel</code> objects. Each label scores a saved transcript on a subset of judgment metrics (0&ndash;1).</p>
+            <label class="form-label" for="calibration-labels">Labels JSON</label>
+            <textarea class="form-textarea" id="calibration-labels" rows="10" placeholder="${escapeAttr(labelExample)}" spellcheck="false"></textarea>
+            <div class="btn-row">
+              <button class="btn btn-primary" type="submit" id="calibration-upload-btn">Upload labels</button>
+              <button class="btn" type="button" onclick="$('#calibration-labels').value=${jsArg(labelExample)}">Insert example</button>
+            </div>
+          </form>
         </div>
       </section>
       <section class="card">
         <div class="card-header"><h2>Prompt Variants</h2></div>
         <div class="card-body">
-          ${variants.length ? variants.map(v => `<div class="job-summary"><span>${escapeHTML(v.id)}</span><span>score ${Number(v.calibration_score || 0).toFixed(2)}</span></div>`).join('') : emptyState('No Variants', 'Use calibrate --optimize to store a scored judge prompt variant.')}
+          ${variants.length ? variants.map(v => `<div class="job-summary"><span>${escapeHTML(v.id)}</span><span>score ${Number(v.calibration_score || 0).toFixed(2)}</span></div>`).join('') : emptyState('No Variants', 'Run calibration with "Store optimized variant" enabled to record a scored judge prompt variant.')}
         </div>
       </section>
     </div>`;
 }
+
+function calibrationJobSummaryHTML(job) {
+  return `
+    <div class="status-card" style="margin-bottom:var(--space-3)">
+      <div class="job-item-head">
+        <div>
+          <div class="mono-id">${escapeHTML(job.id)}</div>
+          <div class="status-line">${escapeHTML(job.message || '')}</div>
+        </div>
+        ${statusBadge(job.status)}
+      </div>
+    </div>`;
+}
+
+window.startCalibration = async function(event) {
+  event.preventDefault();
+  const btn = $('#calibration-btn');
+  const panel = $('#calibration-job-panel');
+  const status = $('#calibration-job-status');
+  if (btn) { btn.classList.add('btn-loading'); btn.disabled = true; }
+  panel.innerHTML = skeleton();
+  clearPoll('calibration');
+  try {
+    const optimize = ($('#calibration-optimize') || {}).checked !== false;
+    const job = await apiPost('/jobs/calibration', { labels: [], optimize });
+    status.innerHTML = statusBadge(job.status);
+    panel.innerHTML = calibrationJobSummaryHTML(job);
+    showToast('Calibration started', 'success');
+    window._pollers.calibration = setInterval(
+      () => pollCalibrationJob(job.id),
+      900,
+    );
+  } catch (err) {
+    panel.innerHTML = emptyState('Calibration failed', err.message);
+    showToast(err.message, 'error');
+  } finally {
+    if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; }
+  }
+};
+
+async function pollCalibrationJob(jobId) {
+  try {
+    const job = await api(`/jobs/${pathPart(jobId)}`);
+    const panel = $('#calibration-job-panel');
+    const status = $('#calibration-job-status');
+    if (status) status.innerHTML = statusBadge(job.status);
+    if (panel) panel.innerHTML = calibrationJobSummaryHTML(job);
+    if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') {
+      clearPoll('calibration');
+      if (job.status === 'completed') {
+        showToast('Calibration completed', 'success');
+        // Refresh the page so updated correlations / variants land in view.
+        renderCalibration();
+      } else if (job.status === 'failed') {
+        showToast('Calibration failed', 'error');
+      }
+    }
+  } catch (_) { /* swallow; pollJob handles persistent failures elsewhere */ }
+}
+
+window.uploadCalibrationLabels = async function(event) {
+  event.preventDefault();
+  const textarea = $('#calibration-labels');
+  const btn = $('#calibration-upload-btn');
+  const raw = (textarea.value || '').trim();
+  if (!raw) {
+    showToast('Paste a JSON array of labels first', 'error');
+    return;
+  }
+  let labels;
+  try {
+    labels = JSON.parse(raw);
+  } catch (err) {
+    showToast(`Invalid JSON: ${err.message}`, 'error');
+    return;
+  }
+  if (!Array.isArray(labels)) {
+    showToast('Labels payload must be a JSON array', 'error');
+    return;
+  }
+  if (btn) { btn.classList.add('btn-loading'); btn.disabled = true; }
+  try {
+    const result = await apiPost('/calibration/labels', labels);
+    showToast(`Saved ${result.saved} label${result.saved === 1 ? '' : 's'}`, 'success');
+    textarea.value = '';
+    renderCalibration();
+  } catch (err) {
+    showToast(err.message, 'error');
+  } finally {
+    if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; }
+  }
+};
 
 // ── Profiles ───────────────────────────────────────────────────
 
@@ -2529,5 +2950,13 @@ async function renderStrategies() {
 
 (function init() {
   const hash = location.hash.replace('#', '') || 'dashboard';
-  navigateTo(hash);
+  // Replace the initial history entry so popstate always has a state object.
+  // Without this, pressing Back to the very first entry returns null state and
+  // the popstate handler used to fall back to the dashboard, ignoring the
+  // user's actual landing route.
+  window.history.replaceState({ page: hash, params: {} }, '', `#${hash}`);
+  currentPage = hash;
+  _updateActiveNav(hash);
+  _setDocumentTitle(hash);
+  renderPage(hash);
 })();

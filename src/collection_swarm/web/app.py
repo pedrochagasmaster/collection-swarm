@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+import bleach
 import markdown
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import HTMLResponse
@@ -43,6 +44,39 @@ from collection_swarm.runner import build_matrix
 from collection_swarm.store import SimulationStore
 
 STATIC_DIR = Path(__file__).parent / "static"
+
+# Allow-listed HTML tags & attributes for rendered Markdown output.
+# The Python ``markdown`` library does not strip raw HTML by default, so any
+# ``<script>`` or ``onerror`` payload that finds its way into a YAML-defined
+# strategy/profile/transcript would otherwise execute when injected via
+# ``innerHTML`` on the client. Sanitize before returning.
+_PLAYBOOK_ALLOWED_TAGS = [
+    "p", "h1", "h2", "h3", "h4", "h5", "h6",
+    "ul", "ol", "li",
+    "table", "thead", "tbody", "tr", "th", "td",
+    "code", "pre", "blockquote",
+    "strong", "em", "a", "br", "hr", "span", "div",
+]
+_PLAYBOOK_ALLOWED_ATTRS = {
+    "a": ["href", "title"],
+    "th": ["align"],
+    "td": ["align"],
+    "span": ["class"],
+    "div": ["class"],
+    "code": ["class"],
+}
+
+
+def _render_safe_markdown(md_text: str) -> str:
+    """Render Markdown to HTML and strip any raw HTML the Markdown contained."""
+    raw_html = markdown.markdown(md_text, extensions=["tables", "fenced_code"])
+    return bleach.clean(
+        raw_html,
+        tags=_PLAYBOOK_ALLOWED_TAGS,
+        attributes=_PLAYBOOK_ALLOWED_ATTRS,
+        protocols=["http", "https", "mailto"],
+        strip=True,
+    )
 
 
 class SimulationLaunchRequest(BaseModel):
@@ -435,7 +469,7 @@ def create_app(
     # ── Playbook (rendered) ─────────────────────────────────────────
 
     @app.get("/api/playbook")
-    def get_playbook(format: str = Query("html", description="html or markdown")) -> dict[str, str]:
+    def get_playbook(format: str = Query("html", description="html or markdown")) -> dict[str, Any]:
         store = _store()
         config = _config()
         rankings = [compare_strategies(pid, store) for pid in config.profiles]
@@ -447,10 +481,23 @@ def create_app(
             max_escalation_risk=config.simulation.max_escalation_risk,
         )
         md_text = generate_playbook(rankings, exclusions, store)
+        completed_runs = store.list_runs(status="completed")
+        simulation_count = len(completed_runs)
+        conversation_models = sorted({r.conversation_model for r in completed_runs if r.conversation_model})
+        judge_models = sorted({r.judge_model for r in completed_runs if r.judge_model})
+        meta = {
+            "simulation_count": simulation_count,
+            "conversation_models": conversation_models,
+            "judge_models": judge_models,
+            "thresholds": {
+                "min_compliance_score": config.simulation.min_compliance_score,
+                "max_escalation_risk": config.simulation.max_escalation_risk,
+            },
+            "generated_at": utc_now().isoformat(),
+        }
         if format == "markdown":
-            return {"format": "markdown", "content": md_text}
-        html = markdown.markdown(md_text, extensions=["tables", "fenced_code"])
-        return {"format": "html", "content": html}
+            return {"format": "markdown", "content": md_text, "meta": meta}
+        return {"format": "html", "content": _render_safe_markdown(md_text), "meta": meta}
 
     # ── Config info ─────────────────────────────────────────────────
 
