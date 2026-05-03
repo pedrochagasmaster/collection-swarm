@@ -18,6 +18,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
 from collection_swarm import arena
+from collection_swarm.env import set_db_path
+from collection_swarm.secrets import KNOWN_KEY_NAMES, SecretsStore
 from collection_swarm.agents.collector import CollectorAgent
 from collection_swarm.agents.debtor import DebtorAgent
 from collection_swarm.agents.judge import Judge
@@ -77,6 +79,10 @@ def _render_safe_markdown(md_text: str) -> str:
         protocols=["http", "https", "mailto"],
         strip=True,
     )
+
+
+class SetKeyRequest(BaseModel):
+    value: str = Field(min_length=1)
 
 
 class SimulationLaunchRequest(BaseModel):
@@ -225,6 +231,7 @@ def create_app(
     config_dir: Path = Path("config"),
     db_path: Path = Path("output/collection_swarm.sqlite"),
 ) -> FastAPI:
+    set_db_path(db_path)
     app = FastAPI(title="Collection Swarm Dashboard", version="0.1.0")
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
     app.state.jobs = {}
@@ -963,6 +970,47 @@ def create_app(
             session.result.ended_by = session.result.ended_by or EndedBy.TURN_LIMIT
             await _finish_manual_session(session, _config(), _store())
             return session.snapshot()
+
+    # ── API key management ──────────────────────────────────────────
+
+    def _secrets_store() -> SecretsStore:
+        return SecretsStore(db_path)
+
+    @app.get("/api/settings/keys")
+    def list_api_keys() -> dict[str, Any]:
+        store = _secrets_store()
+        stored = {item["name"]: item["updated_at"] for item in store.list_keys()}
+        keys = []
+        for name in sorted(KNOWN_KEY_NAMES):
+            env_set = bool(os.getenv(name))
+            db_set = name in stored
+            keys.append({
+                "name": name,
+                "source": "database" if db_set else ("environment" if env_set else "not_set"),
+                "is_set": db_set or env_set,
+                "updated_at": stored.get(name),
+            })
+        return {"keys": keys}
+
+    @app.put("/api/settings/keys/{key_name}")
+    def set_api_key(key_name: str, payload: SetKeyRequest) -> dict[str, Any]:
+        if key_name not in KNOWN_KEY_NAMES:
+            raise HTTPException(status_code=400, detail=f"Unknown API key '{key_name}'. Known keys: {', '.join(sorted(KNOWN_KEY_NAMES))}")
+        _secrets_store().set_key(key_name, payload.value)
+        return {"name": key_name, "source": "database", "is_set": True}
+
+    @app.delete("/api/settings/keys/{key_name}")
+    def delete_api_key(key_name: str) -> dict[str, Any]:
+        if key_name not in KNOWN_KEY_NAMES:
+            raise HTTPException(status_code=400, detail=f"Unknown API key '{key_name}'.")
+        deleted = _secrets_store().delete_key(key_name)
+        env_set = bool(os.getenv(key_name))
+        return {
+            "name": key_name,
+            "deleted": deleted,
+            "source": "environment" if env_set else "not_set",
+            "is_set": env_set,
+        }
 
     # ── SPA entry point ─────────────────────────────────────────────
 

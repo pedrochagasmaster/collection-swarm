@@ -13,8 +13,9 @@ import shutil
 from pathlib import Path
 
 from collection_swarm.backends.base import LLMBackend, LLMResponse
-from collection_swarm.env import load_dotenv_if_present
+from collection_swarm.env import get_db_path, load_dotenv_if_present
 from collection_swarm.models import CursorSdkPromptConfig, LLMMessage, ModelConfig
+from collection_swarm.secrets import resolve_api_key
 
 
 def _repo_root() -> Path:
@@ -31,11 +32,13 @@ class CursorSdkBackend(LLMBackend):
 
     async def complete(self, model: ModelConfig, messages: list[LLMMessage]) -> LLMResponse:
         load_dotenv_if_present()
-        api_key = os.getenv("CURSOR_API_KEY")
+        api_key = resolve_api_key("CURSOR_API_KEY", get_db_path())
         if not api_key:
             raise RuntimeError(
                 "CURSOR_API_KEY is required for Cursor SDK models. "
-                "Create a key in the Cursor integrations dashboard."
+                "Set it via the dashboard Settings page, the CLI "
+                "(collection-swarm set-key CURSOR_API_KEY), or the "
+                "CURSOR_API_KEY environment variable."
             )
 
         script = _bridge_script()
@@ -61,13 +64,16 @@ class CursorSdkBackend(LLMBackend):
             ensure_ascii=False,
         )
 
+        sub_env = os.environ.copy()
+        sub_env["CURSOR_API_KEY"] = api_key
+
         proc = await asyncio.create_subprocess_exec(
             node,
             str(script),
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            env=os.environ.copy(),
+            env=sub_env,
         )
         stdout_b, stderr_b = await proc.communicate(payload.encode("utf-8"))
         stderr = stderr_b.decode("utf-8", errors="replace").strip()

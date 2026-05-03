@@ -14,7 +14,7 @@ const mainEl = $('#main-content');
 const KNOWN_PAGES = [
   'dashboard', 'runs', 'launch', 'matrix', 'manual',
   'playbook', 'compliance', 'arena', 'evolution',
-  'calibration', 'benchmarks', 'profiles', 'strategies',
+  'calibration', 'benchmarks', 'settings', 'profiles', 'strategies',
 ];
 const _KNOWN_PAGES_SET = new Set(KNOWN_PAGES);
 
@@ -35,6 +35,7 @@ const PAGE_TITLES = {
   evolution: 'Evolution',
   calibration: 'Calibration',
   benchmarks: 'Model Benchmarks',
+  settings: 'Settings',
   profiles: 'Profiles',
   strategies: 'Strategies',
 };
@@ -238,6 +239,36 @@ async function apiPost(path, body = {}) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
+  if (!res.ok) {
+    let detail = `API error: ${res.status}`;
+    try {
+      const data = await res.json();
+      detail = data.detail || detail;
+    } catch (_) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+async function apiPut(path, body = {}) {
+  const res = await fetch(`/api${path}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let detail = `API error: ${res.status}`;
+    try {
+      const data = await res.json();
+      detail = data.detail || detail;
+    } catch (_) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+async function apiDelete(path) {
+  const res = await fetch(`/api${path}`, { method: 'DELETE' });
   if (!res.ok) {
     let detail = `API error: ${res.status}`;
     try {
@@ -573,6 +604,7 @@ async function renderPage(page, params = {}) {
       case 'evolution': await renderEvolution(); break;
       case 'calibration': await renderCalibration(); break;
       case 'benchmarks': await renderBenchmarks(); break;
+      case 'settings': await renderSettings(); break;
       case 'profiles': await renderProfiles(); break;
       case 'strategies': await renderStrategies(); break;
     }
@@ -2896,6 +2928,112 @@ window.uploadCalibrationLabels = async function(event) {
     showToast(err.message, 'error');
   } finally {
     if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; }
+  }
+};
+
+// ── Settings (API Keys) ────────────────────────────────────────
+
+const KEY_LABELS = {
+  NVIDIA_NIM_API_KEY: { label: 'NVIDIA NIM API Key', hint: 'Used for NVIDIA NIM / LiteLLM backend calls.' },
+  CURSOR_API_KEY: { label: 'Cursor API Key', hint: 'Used for Cursor SDK agent backend. Create one at cursor.com.' },
+};
+
+async function renderSettings() {
+  const data = await api('/settings/keys');
+  const keys = data.keys || [];
+
+  const rows = keys.map(k => {
+    const meta = KEY_LABELS[k.name] || { label: k.name, hint: '' };
+    const sourceClass = k.source === 'database' ? 'badge-success'
+      : k.source === 'environment' ? 'badge-warning' : 'badge-danger';
+    const sourceLabel = k.source === 'database' ? 'Stored'
+      : k.source === 'environment' ? 'Env var' : 'Not set';
+    return `
+      <div class="card settings-key-card" data-key="${escapeHTML(k.name)}">
+        <div class="settings-key-header">
+          <div>
+            <h3 class="settings-key-name">${escapeHTML(meta.label)}</h3>
+            <p class="settings-key-hint">${escapeHTML(meta.hint)}</p>
+          </div>
+          <span class="badge ${sourceClass}">${sourceLabel}</span>
+        </div>
+        <div class="settings-key-body">
+          <div class="settings-key-input-row">
+            <input type="password" class="form-input settings-key-input" id="input-${escapeHTML(k.name)}"
+              placeholder="Enter API key value" autocomplete="off" />
+            <button class="btn btn-sm settings-toggle-vis" type="button" onclick="toggleKeyVisibility('${escapeHTML(k.name)}')" aria-label="Toggle visibility">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+          <div class="btn-row settings-key-actions">
+            <button class="btn btn-primary btn-sm" type="button" onclick="saveApiKey('${escapeHTML(k.name)}')">Save</button>
+            ${k.source === 'database' ? `<button class="btn btn-danger btn-sm" type="button" onclick="removeApiKey('${escapeHTML(k.name)}')">Remove</button>` : ''}
+          </div>
+          ${k.updated_at ? `<p class="settings-key-updated">Last updated: ${new Date(k.updated_at).toLocaleString()}</p>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+
+  mainEl.innerHTML = `
+    <div class="page-header">
+      <h1>Settings</h1>
+      <p class="page-subtitle">Manage API keys for LLM backends. Keys are encrypted and stored locally. Environment variables are used as fallback.</p>
+    </div>
+    <section class="settings-keys-section" aria-label="API key management">
+      ${rows || emptyState('No keys configured', 'No backend keys are recognised by this installation.')}
+    </section>
+    <section class="settings-info" aria-label="Settings information">
+      <div class="card">
+        <h3>How keys are resolved</h3>
+        <ol class="settings-info-list">
+          <li><strong>Dashboard / CLI stored keys</strong> take highest priority.</li>
+          <li><strong>Environment variables</strong> are used as fallback.</li>
+          <li>A <code>.env</code> file in the project root is loaded automatically if present.</li>
+        </ol>
+        <p style="margin-top:var(--space-3)">
+          You can also manage keys from the CLI:<br>
+          <code>collection-swarm set-key NVIDIA_NIM_API_KEY</code><br>
+          <code>collection-swarm list-keys</code><br>
+          <code>collection-swarm remove-key CURSOR_API_KEY</code>
+        </p>
+      </div>
+    </section>`;
+}
+
+function toggleKeyVisibility(name) {
+  const input = $(`#input-${name}`);
+  if (!input) return;
+  input.type = input.type === 'password' ? 'text' : 'password';
+}
+
+window.saveApiKey = async function(name) {
+  const input = $(`#input-${name}`);
+  if (!input) return;
+  const value = input.value.trim();
+  if (!value) { showToast('Enter a key value first.', 'warning'); return; }
+  const card = $(`.settings-key-card[data-key="${name}"]`);
+  const btn = card ? $('button.btn-primary', card) : null;
+  try {
+    if (btn) { btn.classList.add('btn-loading'); btn.disabled = true; }
+    await apiPut(`/settings/keys/${encodeURIComponent(name)}`, { value });
+    showToast(`${(KEY_LABELS[name] || {}).label || name} saved.`, 'success');
+    input.value = '';
+    await renderSettings();
+  } catch (err) {
+    showToast(err.message, 'error');
+  } finally {
+    if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; }
+  }
+};
+
+window.removeApiKey = async function(name) {
+  if (!confirm(`Remove the stored ${(KEY_LABELS[name] || {}).label || name}?`)) return;
+  try {
+    await apiDelete(`/settings/keys/${encodeURIComponent(name)}`);
+    showToast(`${(KEY_LABELS[name] || {}).label || name} removed.`, 'success');
+    await renderSettings();
+  } catch (err) {
+    showToast(err.message, 'error');
   }
 };
 

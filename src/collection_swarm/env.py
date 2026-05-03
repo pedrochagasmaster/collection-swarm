@@ -5,6 +5,20 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+# Module-level DB path used by backends to locate the secrets store.
+# Set by the CLI / web app at startup; defaults to the conventional path.
+_db_path: Path = Path("output/collection_swarm.sqlite")
+
+
+def set_db_path(path: Path | str) -> None:
+    """Configure the database path used for secret resolution."""
+    global _db_path
+    _db_path = Path(path)
+
+
+def get_db_path() -> Path:
+    return _db_path
+
 
 def load_dotenv_if_present(path: Path | None = None) -> None:
     """Load simple KEY=VALUE entries from .env without overriding real env vars."""

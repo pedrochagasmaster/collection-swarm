@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import os
-
 from litellm import acompletion
 
 from collection_swarm.backends.base import LLMResponse
-from collection_swarm.env import load_dotenv_if_present
+from collection_swarm.env import get_db_path, load_dotenv_if_present
 from collection_swarm.models import LLMMessage, ModelConfig
+from collection_swarm.secrets import resolve_api_key
 
 
 class NimBackend:
@@ -17,9 +16,14 @@ class NimBackend:
 
     async def complete(self, model: ModelConfig, messages: list[LLMMessage]) -> LLMResponse:
         load_dotenv_if_present()
-        api_key = os.getenv("NVIDIA_NIM_API_KEY")
+        api_key = resolve_api_key("NVIDIA_NIM_API_KEY", get_db_path())
         if not api_key:
-            raise RuntimeError("NVIDIA_NIM_API_KEY is required for NIM models")
+            raise RuntimeError(
+                "NVIDIA_NIM_API_KEY is required for NIM models. "
+                "Set it via the dashboard Settings page, the CLI "
+                "(collection-swarm set-key NVIDIA_NIM_API_KEY), or the "
+                "NVIDIA_NIM_API_KEY environment variable."
+            )
 
         response = await acompletion(
             model=model.litellm_model,

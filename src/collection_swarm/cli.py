@@ -9,6 +9,7 @@ import click
 from rich.console import Console
 from rich.table import Table
 
+from collection_swarm.env import set_db_path
 from collection_swarm.agents.collector import CollectorAgent
 from collection_swarm.agents.debtor import DebtorAgent
 from collection_swarm.agents.judge import Judge
@@ -48,6 +49,7 @@ def cli(ctx: click.Context, config_dir: Path, db_path: Path) -> None:
     ctx.ensure_object(dict)
     ctx.obj["config_dir"] = config_dir
     ctx.obj["db_path"] = db_path
+    set_db_path(db_path)
 
 
 @cli.command("list-profiles")
@@ -414,6 +416,67 @@ def seed_data(ctx: click.Context, count: int) -> None:
 
     n = generate_seed_data(db_path=ctx.obj["db_path"], num_runs=count)
     console.print(f"Seeded {n} simulations into {ctx.obj['db_path']}")
+
+
+@cli.command("set-key")
+@click.argument("key_name")
+@click.option("--value", prompt=True, hide_input=True, confirmation_prompt=True, help="The API key value.")
+@click.pass_context
+def set_key(ctx: click.Context, key_name: str, value: str) -> None:
+    """Store an API key in the encrypted local database.
+
+    KEY_NAME must be one of NVIDIA_NIM_API_KEY or CURSOR_API_KEY.
+    """
+    from collection_swarm.secrets import KNOWN_KEY_NAMES, SecretsStore
+
+    if key_name not in KNOWN_KEY_NAMES:
+        raise click.ClickException(f"Unknown key '{key_name}'. Known keys: {', '.join(sorted(KNOWN_KEY_NAMES))}")
+    SecretsStore(ctx.obj["db_path"]).set_key(key_name, value)
+    console.print(f"Stored {key_name} in {ctx.obj['db_path']}")
+
+
+@cli.command("list-keys")
+@click.pass_context
+def list_keys(ctx: click.Context) -> None:
+    """Show which API keys are configured (database or environment)."""
+    import os
+
+    from collection_swarm.secrets import KNOWN_KEY_NAMES, SecretsStore
+
+    store = SecretsStore(ctx.obj["db_path"])
+    stored = {item["name"]: item["updated_at"] for item in store.list_keys()}
+    table = Table(title="API Keys")
+    table.add_column("Key")
+    table.add_column("Source")
+    table.add_column("Updated")
+    for name in sorted(KNOWN_KEY_NAMES):
+        if name in stored:
+            source = "[green]database[/green]"
+            updated = stored[name]
+        elif os.getenv(name):
+            source = "[yellow]environment[/yellow]"
+            updated = "—"
+        else:
+            source = "[red]not set[/red]"
+            updated = "—"
+        table.add_row(name, source, updated)
+    console.print(table)
+
+
+@cli.command("remove-key")
+@click.argument("key_name")
+@click.pass_context
+def remove_key(ctx: click.Context, key_name: str) -> None:
+    """Remove a stored API key from the database."""
+    from collection_swarm.secrets import KNOWN_KEY_NAMES, SecretsStore
+
+    if key_name not in KNOWN_KEY_NAMES:
+        raise click.ClickException(f"Unknown key '{key_name}'. Known keys: {', '.join(sorted(KNOWN_KEY_NAMES))}")
+    deleted = SecretsStore(ctx.obj["db_path"]).delete_key(key_name)
+    if deleted:
+        console.print(f"Removed {key_name} from {ctx.obj['db_path']}")
+    else:
+        console.print(f"{key_name} was not stored in the database.")
 
 
 def _print_result(result) -> None:
