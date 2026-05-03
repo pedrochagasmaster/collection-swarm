@@ -7,17 +7,23 @@ import os
 from litellm import acompletion
 
 from collection_swarm.backends.base import LLMResponse
+from collection_swarm.credentials import ApiKeyProvider
 from collection_swarm.env import load_dotenv_if_present
 from collection_swarm.models import LLMMessage, ModelConfig
 
 
 class NimBackend:
-    def __init__(self, base_url: str = "https://integrate.api.nvidia.com/v1") -> None:
+    def __init__(
+        self,
+        base_url: str = "https://integrate.api.nvidia.com/v1",
+        api_keys: ApiKeyProvider | None = None,
+    ) -> None:
         self.base_url = base_url
+        self.api_keys = api_keys
 
     async def complete(self, model: ModelConfig, messages: list[LLMMessage]) -> LLMResponse:
         load_dotenv_if_present()
-        api_key = os.getenv("NVIDIA_NIM_API_KEY")
+        api_key = self.api_keys.get_api_key("nvidia_nim") if self.api_keys else os.getenv("NVIDIA_NIM_API_KEY")
         if not api_key:
             raise RuntimeError("NVIDIA_NIM_API_KEY is required for NIM models")
 

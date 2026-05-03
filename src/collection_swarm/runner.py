@@ -12,6 +12,7 @@ from collection_swarm.agents.debtor import DebtorAgent
 from collection_swarm.agents.judge import Judge
 from collection_swarm.backends.router import LLMRouter
 from collection_swarm.config import AppConfig
+from collection_swarm.credentials import ApiKeyProvider
 from collection_swarm.engine import SimulationEngine
 from collection_swarm.adversarial import harden_profiles
 from collection_swarm.evolution import cull_strategies, evolve_strategies
@@ -66,8 +67,9 @@ async def run_matrix(
     store: SimulationStore,
     cells: list[MatrixCell],
     concurrency: int = 2,
+    api_keys: ApiKeyProvider | None = None,
 ) -> RunSummary:
-    router = LLMRouter(config.models, cursor_sdk_prompts=config.prompts.cursor_sdk)
+    router = LLMRouter(config.models, cursor_sdk_prompts=config.prompts.cursor_sdk, api_keys=api_keys)
     semaphore = asyncio.Semaphore(concurrency)
 
     async def run_cell(cell: MatrixCell) -> SimulationResult:
@@ -101,6 +103,7 @@ async def run_tournament(
     judge_model: str | None = None,
     concurrency: int = 2,
     on_round_complete: Callable[[TournamentResult], Awaitable[None]] | None = None,
+    api_keys: ApiKeyProvider | None = None,
 ) -> TournamentResult:
     conversation_model = conversation_model or config.default_conversation_model
     judge_model = judge_model or config.default_judge_model
@@ -121,7 +124,7 @@ async def run_tournament(
     result = TournamentResult(config=tournament_config)
     history: set[tuple[str, str]] = set()
     total_cost = 0.0
-    router = LLMRouter(config.models, cursor_sdk_prompts=config.prompts.cursor_sdk)
+    router = LLMRouter(config.models, cursor_sdk_prompts=config.prompts.cursor_sdk, api_keys=api_keys)
     semaphore = asyncio.Semaphore(concurrency)
 
     async def run_cell(cell: MatrixCell) -> SimulationResult:
@@ -214,8 +217,9 @@ async def run_evolution_cycle(
     judge_model: str | None = None,
     concurrency: int = 2,
     on_generation_complete: Callable[[int, TournamentResult], Awaitable[None]] | None = None,
+    api_keys: ApiKeyProvider | None = None,
 ) -> list[TournamentResult]:
-    router = LLMRouter(config.models, cursor_sdk_prompts=config.prompts.cursor_sdk)
+    router = LLMRouter(config.models, cursor_sdk_prompts=config.prompts.cursor_sdk, api_keys=api_keys)
     results: list[TournamentResult] = []
     active_strategy_ids = list(strategy_ids or config.strategies)
     active_profile_ids = list(profile_ids or config.profiles)

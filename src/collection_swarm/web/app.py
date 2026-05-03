@@ -28,6 +28,8 @@ from collection_swarm.analysis.statistics import compare_strategies
 from collection_swarm.backends.base import LLMResponse
 from collection_swarm.backends.router import LLMRouter
 from collection_swarm.config import load_app_config
+from collection_swarm.credentials import CredentialStore
+from collection_swarm.credentials import CredentialStore
 from collection_swarm.engine import SimulationEngine, stalemate_detected, strip_end_signal
 from collection_swarm.model_evaluation import (
     DEFAULT_CURSOR_PROBE_MODELS,
@@ -158,6 +160,10 @@ class CalibrationJobRequest(BaseModel):
     optimize: bool = True
 
 
+class ApiKeyUpdateRequest(BaseModel):
+    api_key: str = Field(min_length=1)
+
+
 @dataclass
 class WebRunJob:
     id: str
@@ -235,6 +241,9 @@ def create_app(
 
     def _store() -> SimulationStore:
         return SimulationStore(db_path)
+
+    def _credential_store() -> CredentialStore:
+        return CredentialStore(db_path)
 
     def _config():
         return load_app_config(config_dir)
@@ -536,6 +545,27 @@ def create_app(
     @app.get("/api/config/run-options")
     def run_options() -> dict[str, Any]:
         return _model_options(_config())
+
+    @app.get("/api/config/api-keys")
+    def list_api_keys() -> dict[str, Any]:
+        return {"providers": [info.__dict__ for info in _credential_store().list_api_keys()]}
+
+    @app.put("/api/config/api-keys/{provider}")
+    def set_api_key(provider: str, payload: ApiKeyUpdateRequest) -> dict[str, Any]:
+        try:
+            info = _credential_store().set_api_key(provider, payload.api_key)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=f"API key provider '{provider}' not found") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return info.__dict__
+
+    @app.delete("/api/config/api-keys/{provider}")
+    def clear_api_key(provider: str) -> dict[str, Any]:
+        try:
+            return _credential_store().clear_api_key(provider).__dict__
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=f"API key provider '{provider}' not found") from exc
 
     # ── Arena / Tournament APIs ─────────────────────────────────────
 
@@ -839,6 +869,7 @@ def create_app(
                 payload.strategy_ids,
                 payload.judge_profile_ids,
                 payload.concurrency,
+                CredentialStore(db_path),
             )
         )
         return job.snapshot()
@@ -893,7 +924,7 @@ def create_app(
         )
         app.state.manual_sessions[session.id] = session
         if payload.human_role == "debtor":
-            await _append_ai_turn(session, config, role="collector")
+            await _append_ai_turn(session, config, role="collector", api_keys=_credential_store())
             if session.status != "completed":
                 session.status = "waiting_for_human"
                 session.message = "Waiting for human debtor turn."
@@ -924,25 +955,25 @@ def create_app(
             session.result.turn_count = len(session.result.transcript)
             if ended:
                 session.result.ended_by = EndedBy(session.human_role)
-                await _finish_manual_session(session, config, _store())
+                await _finish_manual_session(session, config, _store(), _credential_store())
                 return session.snapshot()
             if len(session.result.transcript) >= settings.max_turns:
                 session.result.ended_by = EndedBy.TURN_LIMIT
-                await _finish_manual_session(session, config, _store())
+                await _finish_manual_session(session, config, _store(), _credential_store())
                 return session.snapshot()
 
             ai_role = "debtor" if session.human_role == "collector" else "collector"
-            await _append_ai_turn(session, config, ai_role)
+            await _append_ai_turn(session, config, ai_role, api_keys=_credential_store())
             if session.result.ended_by or len(session.result.transcript) >= settings.max_turns:
                 session.result.ended_by = session.result.ended_by or EndedBy.TURN_LIMIT
-                await _finish_manual_session(session, config, _store())
+                await _finish_manual_session(session, config, _store(), _credential_store())
             elif stalemate_detected(
                 session.result.transcript,
                 settings.stalemate_window,
                 settings.stalemate_similarity_threshold,
             ):
                 session.result.ended_by = EndedBy.STALEMATE
-                await _finish_manual_session(session, config, _store())
+                await _finish_manual_session(session, config, _store(), _credential_store())
             else:
                 session.status = "waiting_for_human"
                 session.message = f"Waiting for human {session.human_role} turn."
@@ -961,7 +992,7 @@ def create_app(
             if not session.result.transcript:
                 raise HTTPException(status_code=400, detail="Manual session has no turns to judge")
             session.result.ended_by = session.result.ended_by or EndedBy.TURN_LIMIT
-            await _finish_manual_session(session, _config(), _store())
+            await _finish_manual_session(session, _config(), _store(), _credential_store())
             return session.snapshot()
 
     # ── SPA entry point ─────────────────────────────────────────────
@@ -1249,6 +1280,7 @@ async def _run_model_benchmark_job(
     strategy_ids: list[str],
     judge_profile_ids: list[str],
     concurrency: int,
+    api_keys: CredentialStore,
 ) -> None:
     try:
         job.status = "running"
@@ -1275,6 +1307,7 @@ async def _run_model_benchmark_job(
                     roles=("judge",),
                     scenario=judge_scenario,
                     concurrency=concurrency,
+                    api_keys=api_keys,
                 )
                 all_probes.extend(judge_probes)
                 ok = sum(1 for p in judge_probes if p.status == "ok")
@@ -1296,6 +1329,7 @@ async def _run_model_benchmark_job(
                         roles=non_judge_roles,
                         scenario=scenario,
                         concurrency=concurrency,
+                        api_keys=api_keys,
                     )
                     all_probes.extend(probes)
                     ok = sum(1 for p in probes if p.status == "ok")
@@ -1340,8 +1374,13 @@ def _fail_job(job: WebRunJob, exc: Exception) -> None:
     job.ended_at = utc_now().isoformat()
 
 
-def _make_engine(config, conversation_model: str, judge_model: str) -> SimulationEngine:
-    router = LLMRouter(config.models, cursor_sdk_prompts=config.prompts.cursor_sdk)
+def _make_engine(
+    config,
+    conversation_model: str,
+    judge_model: str,
+    api_keys: CredentialStore | None = None,
+) -> SimulationEngine:
+    router = LLMRouter(config.models, cursor_sdk_prompts=config.prompts.cursor_sdk, api_keys=api_keys)
     settings = config.simulation.conversation
     return SimulationEngine(
         collector=CollectorAgent(router, conversation_model, config.prompts.collector),
@@ -1354,11 +1393,16 @@ def _make_engine(config, conversation_model: str, judge_model: str) -> Simulatio
     )
 
 
-async def _append_ai_turn(session: ManualSession, config, role: str) -> None:
+async def _append_ai_turn(
+    session: ManualSession,
+    config,
+    role: str,
+    api_keys: CredentialStore | None = None,
+) -> None:
     session.status = "ai_thinking"
     session.message = f"AI {role} is responding."
     result = session.result
-    router = LLMRouter(config.models, cursor_sdk_prompts=config.prompts.cursor_sdk)
+    router = LLMRouter(config.models, cursor_sdk_prompts=config.prompts.cursor_sdk, api_keys=api_keys)
     profile = config.profile(result.profile_id)
     settings = config.simulation.conversation
     if role == "collector":
@@ -1381,14 +1425,19 @@ def _append_response(result: SimulationResult, role: str, response: LLMResponse,
         result.ended_by = EndedBy(role)
 
 
-async def _finish_manual_session(session: ManualSession, config, store: SimulationStore) -> None:
+async def _finish_manual_session(
+    session: ManualSession,
+    config,
+    store: SimulationStore,
+    api_keys: CredentialStore | None = None,
+) -> None:
     session.status = "judging"
     session.message = "Judging manual run."
     result = session.result
     result.turn_count = len(result.transcript)
     result.ended_by = result.ended_by or EndedBy.TURN_LIMIT
     judge = Judge(
-        LLMRouter(config.models, cursor_sdk_prompts=config.prompts.cursor_sdk),
+        LLMRouter(config.models, cursor_sdk_prompts=config.prompts.cursor_sdk, api_keys=api_keys),
         result.judge_model,
         config.prompts.judge,
     )

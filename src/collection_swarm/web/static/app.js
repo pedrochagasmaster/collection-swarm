@@ -14,7 +14,7 @@ const mainEl = $('#main-content');
 const KNOWN_PAGES = [
   'dashboard', 'runs', 'launch', 'matrix', 'manual',
   'playbook', 'compliance', 'arena', 'evolution',
-  'calibration', 'benchmarks', 'profiles', 'strategies',
+  'calibration', 'benchmarks', 'profiles', 'strategies', 'settings',
 ];
 const _KNOWN_PAGES_SET = new Set(KNOWN_PAGES);
 
@@ -37,6 +37,7 @@ const PAGE_TITLES = {
   benchmarks: 'Model Benchmarks',
   profiles: 'Profiles',
   strategies: 'Strategies',
+  settings: 'Settings',
 };
 
 const APP_TITLE = 'Collection Swarm';
@@ -573,6 +574,7 @@ async function renderPage(page, params = {}) {
       case 'evolution': await renderEvolution(); break;
       case 'calibration': await renderCalibration(); break;
       case 'benchmarks': await renderBenchmarks(); break;
+      case 'settings': await renderSettings(); break;
       case 'profiles': await renderProfiles(); break;
       case 'strategies': await renderStrategies(); break;
     }
@@ -2896,6 +2898,71 @@ window.uploadCalibrationLabels = async function(event) {
     showToast(err.message, 'error');
   } finally {
     if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; }
+  }
+};
+
+// ── Settings ───────────────────────────────────────────────────
+
+async function renderSettings() {
+  const data = await api('/config/api-keys');
+  const providers = data.providers || [];
+  const rows = providers.map(provider => `
+    <div class="api-key-row" data-provider="${escapeAttr(provider.provider)}">
+      <div>
+        <h3>${escapeHTML(provider.label)}</h3>
+        <p>${escapeHTML(provider.env_var)} ${provider.configured ? `· ${escapeHTML(provider.source || 'configured')}` : '· not configured'}</p>
+      </div>
+      <div class="api-key-status">
+        <span class="badge ${provider.configured ? 'badge-success' : 'badge-warning'}">${provider.configured ? 'Configured' : 'Missing'}</span>
+        <code>${escapeHTML(provider.masked_value || 'No key saved')}</code>
+      </div>
+      <form class="api-key-form" onsubmit="saveApiKey(event, ${jsArg(provider.provider)})">
+        <input id="api-key-${escapeAttr(provider.provider)}" type="password" autocomplete="off" placeholder="Paste ${escapeAttr(provider.label)} key" aria-label="${escapeAttr(provider.label)} API key">
+        <button class="btn btn-primary" type="submit">Save key</button>
+        <button class="btn" type="button" onclick="clearApiKey(${jsArg(provider.provider)})" ${provider.configured ? '' : 'disabled'}>Clear</button>
+      </form>
+    </div>
+  `).join('');
+
+  mainEl.innerHTML = `
+    <div class="page-header">
+      <h1>Settings</h1>
+      <p>Store live model keys for dashboard jobs and CLI commands without exporting global environment variables.</p>
+    </div>
+    <section class="card">
+      <div class="card-header"><h2>Live model API keys</h2></div>
+      <div class="card-body">
+        <p class="field-summary">Keys are saved in the configured SQLite database and only masked values are shown.</p>
+        <div class="api-key-list">${rows}</div>
+      </div>
+    </section>
+  `;
+}
+
+window.saveApiKey = async function(event, provider) {
+  event.preventDefault();
+  const input = $(`#api-key-${provider}`);
+  const apiKey = (input?.value || '').trim();
+  if (!apiKey) {
+    showToast('Paste a key before saving', 'error');
+    return;
+  }
+  try {
+    await apiPut(`/config/api-keys/${pathPart(provider)}`, { api_key: apiKey });
+    showToast('API key saved', 'success');
+    await renderSettings();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+};
+
+window.clearApiKey = async function(provider) {
+  try {
+    await apiDelete(`/config/api-keys/${pathPart(provider)}`);
+    showToast('API key cleared', 'success');
+    await renderSettings();
+  } catch (err) {
+    showToast(err.message, 'error');
   }
 };
 

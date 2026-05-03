@@ -18,6 +18,7 @@ from collection_swarm.analysis.statistics import compare_strategies
 from collection_swarm.backends.router import LLMRouter
 from collection_swarm.calibration import evaluate_judge, load_calibration_labels
 from collection_swarm.config import load_app_config
+from collection_swarm.credentials import CredentialStore, SUPPORTED_API_KEY_PROVIDERS
 from collection_swarm.engine import SimulationEngine
 from collection_swarm.model_evaluation import (
     DEFAULT_CURSOR_PROBE_MODELS,
@@ -108,7 +109,11 @@ def simulate(
     config = load_app_config(ctx.obj["config_dir"])
     conversation_model = conversation_model or config.default_conversation_model
     judge_model = judge_model or config.default_judge_model
-    router = LLMRouter(config.models, cursor_sdk_prompts=config.prompts.cursor_sdk)
+    router = LLMRouter(
+        config.models,
+        cursor_sdk_prompts=config.prompts.cursor_sdk,
+        api_keys=CredentialStore(ctx.obj["db_path"]),
+    )
     settings = config.simulation.conversation
     engine = SimulationEngine(
         CollectorAgent(router, conversation_model, config.prompts.collector),
@@ -152,7 +157,15 @@ def run_command(
         judge_models=_split_csv(judge_models),
         reps=reps or config.simulation.default_repetitions,
     )
-    summary = asyncio.run(run_matrix(config, SimulationStore(ctx.obj["db_path"]), cells, concurrency=concurrency))
+    summary = asyncio.run(
+        run_matrix(
+            config,
+            SimulationStore(ctx.obj["db_path"]),
+            cells,
+            concurrency=concurrency,
+            api_keys=CredentialStore(ctx.obj["db_path"]),
+        )
+    )
     console.print(f"Completed {summary.completed}/{summary.total} simulations; failed {summary.failed}.")
 
 
@@ -195,6 +208,7 @@ def tournament(
             conversation_model=conversation_model,
             judge_model=judge_model,
             concurrency=concurrency,
+            api_keys=CredentialStore(ctx.obj["db_path"]),
         )
     )
     console.print(f"Tournament {result.id} completed: {result.total_games} games across {result.rounds_completed} rounds.")
@@ -267,6 +281,7 @@ def evolve(
             profile_ids=_split_csv(profiles),
             strategy_ids=_split_csv(strategies),
             concurrency=concurrency,
+            api_keys=CredentialStore(ctx.obj["db_path"]),
         )
     )
     console.print(f"Evolution completed: {len(results)} generation{'s' if len(results) != 1 else ''}.")
@@ -379,12 +394,62 @@ def test_connection(ctx: click.Context) -> None:
         console.print(f"Configured default backend is '{model.backend}'. Run a simulation to test live credentials.")
         return
     result = asyncio.run(
-        LLMRouter(config.models, cursor_sdk_prompts=config.prompts.cursor_sdk).complete(
+        LLMRouter(
+            config.models,
+            cursor_sdk_prompts=config.prompts.cursor_sdk,
+            api_keys=CredentialStore(ctx.obj["db_path"]),
+        ).complete(
             config.default_conversation_model,
             [],
         )
     )
     console.print(f"Backend ready: {result.backend} ({result.model_id}), output_tokens={result.output_tokens}")
+
+
+@cli.group("api-keys")
+def api_keys() -> None:
+    """Manage dashboard-stored live model API keys."""
+
+
+@api_keys.command("list")
+@click.pass_context
+def list_api_keys(ctx: click.Context) -> None:
+    """List configured key providers without revealing secrets."""
+    table = Table(title="API Keys")
+    table.add_column("Provider")
+    table.add_column("Status")
+    table.add_column("Source")
+    table.add_column("Value")
+    for info in CredentialStore(ctx.obj["db_path"]).list_api_keys():
+        table.add_row(
+            info.label,
+            "configured" if info.configured else "missing",
+            info.source or "-",
+            info.masked_value or "-",
+        )
+    console.print(table)
+
+
+@api_keys.command("set")
+@click.argument("provider", type=click.Choice(list(SUPPORTED_API_KEY_PROVIDERS)))
+@click.option("--key", "api_key", prompt=True, hide_input=True, confirmation_prompt=False)
+@click.pass_context
+def set_api_key(ctx: click.Context, provider: str, api_key: str) -> None:
+    """Save a provider key in the dashboard database."""
+    try:
+        info = CredentialStore(ctx.obj["db_path"]).set_api_key(provider, api_key)
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
+    console.print(f"Saved {info.label} API key ({info.masked_value}).")
+
+
+@api_keys.command("clear")
+@click.argument("provider", type=click.Choice(list(SUPPORTED_API_KEY_PROVIDERS)))
+@click.pass_context
+def clear_api_key(ctx: click.Context, provider: str) -> None:
+    """Remove a provider key from the dashboard database."""
+    info = CredentialStore(ctx.obj["db_path"]).clear_api_key(provider)
+    console.print(f"Cleared {info.label} API key.")
 
 
 @cli.command()

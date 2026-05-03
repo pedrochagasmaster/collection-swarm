@@ -48,6 +48,24 @@ def test_model_report_cli_writes_markdown(tmp_path) -> None:
     assert "Cursor Model Role Evaluation" in output_path.read_text(encoding="utf-8")
 
 
+def test_api_keys_cli_sets_lists_and_clears_dashboard_keys(tmp_path) -> None:
+    db_path = tmp_path / "keys.sqlite"
+    runner = CliRunner()
+
+    set_result = runner.invoke(cli, ["--db", str(db_path), "api-keys", "set", "cursor", "--key", "sk-cursor-123456"])
+    list_result = runner.invoke(cli, ["--db", str(db_path), "api-keys", "list"])
+    clear_result = runner.invoke(cli, ["--db", str(db_path), "api-keys", "clear", "cursor"])
+
+    assert set_result.exit_code == 0
+    assert "Saved Cursor API key" in set_result.output
+    assert list_result.exit_code == 0
+    assert "Cursor" in list_result.output
+    assert "************3456" in list_result.output
+    assert "sk-cursor-123456" not in list_result.output
+    assert clear_result.exit_code == 0
+    assert "Cleared Cursor API key" in clear_result.output
+
+
 def test_tournament_cli_swiss(tmp_path) -> None:
     result = CliRunner().invoke(
         cli,

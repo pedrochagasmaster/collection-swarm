@@ -1,7 +1,7 @@
 """Cursor coding agent via the official TypeScript SDK (subprocess bridge).
 
-See https://github.com/cursor/cookbook — set CURSOR_API_KEY and install bridge deps
-(`npm install` in `cursor_sdk_bridge/`). Requires Node.js 22+ on PATH.
+See https://github.com/cursor/cookbook. Requires Node.js 22+ on PATH and
+bridge deps (`npm install` in `cursor_sdk_bridge/`).
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ import shutil
 from pathlib import Path
 
 from collection_swarm.backends.base import LLMBackend, LLMResponse
+from collection_swarm.credentials import ApiKeyProvider
 from collection_swarm.env import load_dotenv_if_present
 from collection_swarm.models import CursorSdkPromptConfig, LLMMessage, ModelConfig
 
@@ -26,16 +27,17 @@ def _bridge_script() -> Path:
 
 
 class CursorSdkBackend(LLMBackend):
-    def __init__(self, prompts: CursorSdkPromptConfig) -> None:
+    def __init__(self, prompts: CursorSdkPromptConfig, credential_store: ApiKeyProvider | None = None) -> None:
         self.prompts = prompts
+        self.credential_store = credential_store
 
     async def complete(self, model: ModelConfig, messages: list[LLMMessage]) -> LLMResponse:
         load_dotenv_if_present()
-        api_key = os.getenv("CURSOR_API_KEY")
+        api_key = self.credential_store.get_api_key("cursor") if self.credential_store else os.getenv("CURSOR_API_KEY")
         if not api_key:
             raise RuntimeError(
                 "CURSOR_API_KEY is required for Cursor SDK models. "
-                "Create a key in the Cursor integrations dashboard."
+                "Add it in the dashboard settings or set CURSOR_API_KEY."
             )
 
         script = _bridge_script()
@@ -67,7 +69,7 @@ class CursorSdkBackend(LLMBackend):
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            env=os.environ.copy(),
+            env={**os.environ.copy(), "CURSOR_API_KEY": api_key},
         )
         stdout_b, stderr_b = await proc.communicate(payload.encode("utf-8"))
         stderr = stderr_b.decode("utf-8", errors="replace").strip()

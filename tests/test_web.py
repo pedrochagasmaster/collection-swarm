@@ -187,6 +187,31 @@ class TestPlaybook:
 
 
 class TestConfig:
+    def test_api_key_settings_store_and_mask_values(self, empty_client: TestClient) -> None:
+        resp = empty_client.get("/api/config/api-keys")
+        assert resp.status_code == 200
+        assert {item["provider"] for item in resp.json()["providers"]} == {"cursor", "nvidia_nim"}
+        assert all(item["configured"] is False for item in resp.json()["providers"])
+
+        resp = empty_client.put("/api/config/api-keys/cursor", json={"api_key": "sk-cursor-123456"})
+        assert resp.status_code == 200
+        assert resp.json()["configured"] is True
+        assert resp.json()["source"] == "dashboard"
+        assert resp.json()["masked_value"] == "************3456"
+
+        data = empty_client.get("/api/config/api-keys").json()
+        cursor = next(item for item in data["providers"] if item["provider"] == "cursor")
+        assert cursor["configured"] is True
+        assert cursor["masked_value"] == "************3456"
+
+        resp = empty_client.delete("/api/config/api-keys/cursor")
+        assert resp.status_code == 200
+        assert resp.json()["configured"] is False
+
+    def test_api_key_settings_reject_unknown_provider(self, empty_client: TestClient) -> None:
+        resp = empty_client.put("/api/config/api-keys/unknown", json={"api_key": "sk-test"})
+        assert resp.status_code == 404
+
     def test_list_profiles(self, seeded_client: TestClient) -> None:
         resp = seeded_client.get("/api/config/profiles")
         assert resp.status_code == 200

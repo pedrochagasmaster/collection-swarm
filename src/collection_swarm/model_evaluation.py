@@ -21,6 +21,7 @@ from collection_swarm.agents.debtor import DebtorAgent
 from collection_swarm.agents.judge import Judge
 from collection_swarm.backends.router import LLMRouter
 from collection_swarm.config import AppConfig
+from collection_swarm.credentials import ApiKeyProvider
 from collection_swarm.models import Judgment, Message, ModelConfig, model_dump_jsonable
 
 EvaluationRole = Literal["collector", "debtor", "judge"]
@@ -520,6 +521,7 @@ async def run_live_role_probes(
     roles: tuple[EvaluationRole, ...] | list[EvaluationRole] = ("collector", "debtor", "judge"),
     scenario: ProbeScenario | None = None,
     concurrency: int = 1,
+    api_keys: ApiKeyProvider | None = None,
 ) -> tuple[RoleProbe, ...]:
     """Run live Cursor SDK probes for the requested models and roles.
 
@@ -545,7 +547,7 @@ async def run_live_role_probes(
             model_name=model_name,
         )
     probe_config = config.model_copy(update={"models": models})
-    router = LLMRouter(probe_config.models, cursor_sdk_prompts=probe_config.prompts.cursor_sdk)
+    router = LLMRouter(probe_config.models, cursor_sdk_prompts=probe_config.prompts.cursor_sdk, api_keys=api_keys)
     semaphore = asyncio.Semaphore(concurrency)
 
     async def run_one(model_name: str, role: EvaluationRole) -> RoleProbe:
