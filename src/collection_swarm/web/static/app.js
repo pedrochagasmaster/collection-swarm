@@ -3008,7 +3008,7 @@ window.saveApiKey = async function(event, provider) {
     return;
   }
   try {
-    await apiPut(`/api/config/api-keys/${pathPart(provider)}`, { api_key: apiKey });
+    await apiPut(`/config/api-keys/${pathPart(provider)}`, { api_key: apiKey });
     showToast('API key saved', 'success');
     await renderSettings();
   } catch (err) {
@@ -3018,7 +3018,7 @@ window.saveApiKey = async function(event, provider) {
 
 window.clearApiKey = async function(provider) {
   try {
-    await apiDelete(`/api/config/api-keys/${pathPart(provider)}`);
+    await apiDelete(`/config/api-keys/${pathPart(provider)}`);
     showToast('API key cleared', 'success');
     await renderSettings();
   } catch (err) {
