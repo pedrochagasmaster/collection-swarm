@@ -130,6 +130,10 @@ def test_mkdocs_config_and_workflow_are_wired_correctly() -> None:
     assert "mkdocs build --strict" in workflow
     assert "actions/upload-pages-artifact" in workflow
     assert "actions/deploy-pages" in workflow
+    # configure-pages with enablement:true bootstraps Pages on fresh
+    # repos so the first deploy doesn't 404 on "Pages not enabled".
+    assert "actions/configure-pages" in workflow
+    assert "enablement: true" in workflow
 
 
 def test_home_page_links_to_core_sections() -> None:
