@@ -17,9 +17,9 @@
   --navy: oklch(0.22 0.05 255);
   --navy-mid: oklch(0.28 0.05 255);
   --navy-light: oklch(0.33 0.05 255);
-  --slate: oklch(0.40 0.03 255);
-  --steel: oklch(0.55 0.02 255);
-  --silver: oklch(0.70 0.015 255);
+  --slate: oklch(0.38 0.03 255);
+  --steel: oklch(0.50 0.02 255);
+  --silver: oklch(0.62 0.015 255);
   --mist: oklch(0.82 0.01 255);
   --cloud: oklch(0.90 0.008 255);
   --ice: oklch(0.96 0.005 250);
@@ -79,7 +79,7 @@ body {
   width: 100%;
   min-height: calc(100vh - var(--nav-height));
   display: flex; align-items: center; justify-content: center;
-  padding: 52px 6px 4px;
+  padding: 52px 6px 2px;
 }
 .slide:first-of-type { padding-top: 52px; }
 .si {
@@ -93,7 +93,7 @@ body {
   min-height: 0;
   background: var(--white); border-radius: 2px;
   box-shadow: 0 1px 3px oklch(0.2 0 0 / 0.04), 0 6px 24px oklch(0.2 0 0 / 0.03);
-  padding: 56px 64px; display: flex; flex-direction: column;
+  padding: 40px 52px; display: flex; flex-direction: column;
   position: relative; overflow: hidden;
 }
 .si::before {
@@ -101,44 +101,44 @@ body {
   width: 100%; height: 4px; background: var(--navy);
 }
 .sn {
-  position: absolute; top: 22px; right: 30px;
-  font-size: 11px; font-weight: 700;
+  position: absolute; top: 16px; right: 26px;
+  font-size: 10px; font-weight: 700;
   color: var(--silver); letter-spacing: .05em;
 }
 
 /* TYPOGRAPHY */
 .at {
-  font-size: 27px; font-weight: 800; line-height: 1.18;
-  color: var(--navy); letter-spacing: -0.025em;
-  margin-bottom: 8px; max-width: 58ch;
+  font-size: 24px; font-weight: 800; line-height: 1.2;
+  color: var(--navy); letter-spacing: -0.02em;
+  margin-bottom: 6px; max-width: 58ch;
 }
 .st {
-  font-size: 16px; font-weight: 400; color: var(--steel);
-  margin-bottom: 30px; line-height: 1.55; max-width: 62ch;
+  font-size: 14px; font-weight: 400; color: var(--slate);
+  margin-bottom: 20px; line-height: 1.5; max-width: 62ch;
 }
 .sl {
-  font-size: 11px; font-weight: 700;
+  font-size: 10px; font-weight: 700;
   letter-spacing: 0.14em; text-transform: uppercase;
-  color: var(--gold); margin-bottom: 14px;
+  color: var(--gold); margin-bottom: 10px;
 }
 .fn {
-  font-size: 10px; color: var(--silver);
-  margin-top: auto; padding-top: 14px;
+  font-size: 9px; color: var(--steel);
+  margin-top: auto; padding-top: 10px;
   border-top: 1px solid var(--cloud);
 }
 
 /* LAYOUT */
-.split { display: grid; gap: 48px; flex: 1; align-items: start; }
+.split { display: grid; gap: 32px; flex: 1; align-items: start; }
 .s64 { grid-template-columns: 1.5fr 1fr; }
 .s55 { grid-template-columns: 1fr 1fr; }
 .s46 { grid-template-columns: 1fr 1.5fr; }
-.cols3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
-.cols4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
-.cols5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; }
+.cols3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.cols4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.cols5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
 
 /* CARDS */
 .card {
-  padding: 24px; border: 1px solid var(--cloud);
+  padding: 18px; border: 1px solid var(--cloud);
   border-radius: 2px; background: var(--white);
 }
 .card-top { border-top: 3px solid var(--navy); }
@@ -148,32 +148,32 @@ body {
   border-radius: 2px;
 }
 .metric-box {
-  padding: 12px 14px;
+  padding: 10px 12px;
   border: 1px solid var(--cloud);
   border-radius: 2px;
   background: oklch(0.99 0.002 250);
 }
 .metric-box .k {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
   letter-spacing: .08em;
   text-transform: uppercase;
   color: var(--steel);
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 .metric-box .v {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 800;
   color: var(--navy);
 }
 
 /* CALLOUT — redesigned: no side-stripe, full background tint instead */
 .callout {
-  padding: 20px 24px; border-radius: 2px;
+  padding: 14px 18px; border-radius: 2px;
   background: var(--gold-dim);
   border: 1px solid oklch(0.62 0.08 80 / 0.15);
 }
-.callout p { font-size: 13px; color: var(--navy); line-height: 1.55; }
+.callout p { font-size: 12px; color: var(--navy); line-height: 1.55; }
 .callout.callout-blue {
   background: var(--blue-dim);
   border-color: oklch(0.55 0.08 260 / 0.15);
@@ -195,18 +195,18 @@ body {
 
 /* KEY TAKEAWAY annotation for data slides */
 .key-takeaway {
-  display: flex; gap: 12px; align-items: flex-start;
-  padding: 16px 20px; border-radius: 2px;
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 12px 16px; border-radius: 2px;
   background: var(--navy); color: var(--white);
 }
 .key-takeaway::before {
   content: '→';
-  font-size: 16px; font-weight: 900;
+  font-size: 14px; font-weight: 900;
   color: var(--gold); flex-shrink: 0;
   line-height: 1.3;
 }
 .key-takeaway p {
-  font-size: 13px; line-height: 1.5;
+  font-size: 11px; line-height: 1.45;
   color: var(--mist);
 }
 .key-takeaway strong { color: var(--white); }
@@ -214,7 +214,7 @@ body {
 /* COVER */
 .cover .si {
   background: var(--navy); justify-content: center; align-items: center;
-  text-align: center; padding: 80px;
+  text-align: center; padding: 56px 64px;
 }
 .cover .si::before { background: var(--gold); }
 .cover .si::after {
@@ -230,17 +230,17 @@ body {
 }
 
 /* HEATMAP */
-.hm { width: 100%; border-collapse: collapse; font-size: 12px; }
+.hm { width: 100%; border-collapse: collapse; font-size: 11px; }
 .hm th {
-  padding: 10px 12px; text-align: left;
-  font-size: 10px; font-weight: 700;
+  padding: 6px 8px; text-align: left;
+  font-size: 9px; font-weight: 700;
   letter-spacing: .05em; text-transform: uppercase;
   color: var(--steel); border-bottom: 2px solid var(--cloud);
 }
-.hm th.col-head { text-align: center; color: var(--navy); font-size: 10px; }
-.hm td { padding: 10px 12px; border-bottom: 1px solid var(--cloud); }
-.hm td.profile-label { font-weight: 600; color: var(--navy); font-size: 12px; white-space: nowrap; }
-.hm .cell { text-align: center; font-weight: 700; font-size: 11px; border-radius: 2px; }
+.hm th.col-head { text-align: center; color: var(--navy); font-size: 9px; }
+.hm td { padding: 6px 8px; border-bottom: 1px solid var(--cloud); }
+.hm td.profile-label { font-weight: 600; color: var(--navy); font-size: 11px; white-space: nowrap; }
+.hm .cell { text-align: center; font-weight: 700; font-size: 10px; border-radius: 2px; }
 .hm .best { background: oklch(0.92 0.06 150); color: oklch(0.35 0.08 150); }
 .hm .good { background: oklch(0.92 0.06 85); color: oklch(0.40 0.10 60); }
 .hm .poor { background: oklch(0.92 0.06 25); color: oklch(0.40 0.12 25); }
@@ -249,7 +249,7 @@ body {
 
 /* ARCHETYPE CARDS */
 .arch-card {
-  padding: 20px; border-radius: 2px;
+  padding: 16px; border-radius: 2px;
   border: 1px solid var(--cloud);
   position: relative; overflow: hidden;
 }
@@ -261,70 +261,70 @@ body {
 .arch-card.strategic::before { background: var(--orange); }
 .arch-card.quick::before { background: var(--purple); }
 .arch-card.complex::before { background: var(--red); }
-.arch-card h4 { font-size: 13px; font-weight: 700; color: var(--navy); margin-bottom: 6px; }
-.arch-card .arch-count { font-size: 22px; font-weight: 900; line-height: 1; margin-bottom: 4px; }
-.arch-card p { font-size: 12px; color: var(--slate); line-height: 1.5; }
-.arch-card .arch-profiles { font-size: 10px; color: var(--steel); margin-top: 10px; line-height: 1.5; }
+.arch-card h4 { font-size: 13px; font-weight: 700; color: var(--navy); margin-bottom: 4px; }
+.arch-card .arch-count { font-size: 20px; font-weight: 900; line-height: 1; margin-bottom: 3px; }
+.arch-card p { font-size: 11px; color: var(--slate); line-height: 1.45; }
+.arch-card .arch-profiles { font-size: 9px; color: var(--steel); margin-top: 6px; line-height: 1.4; }
 
 /* STRATEGY ROW */
 .strat-row {
-  display: flex; gap: 16px; align-items: flex-start;
-  padding: 16px 0; border-bottom: 1px solid var(--cloud);
+  display: flex; gap: 14px; align-items: flex-start;
+  padding: 11px 0; border-bottom: 1px solid var(--cloud);
 }
 .strat-row:last-child { border-bottom: none; }
 .strat-icon {
-  width: 36px; height: 36px; border-radius: 2px;
+  width: 32px; height: 32px; border-radius: 2px;
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0; font-size: 14px;
 }
-.strat-row h4 { font-size: 13px; font-weight: 700; color: var(--navy); margin-bottom: 3px; }
-.strat-row p { font-size: 11px; color: var(--slate); line-height: 1.45; }
-.strat-row .strat-for { font-size: 10px; color: var(--steel); margin-top: 4px; }
+.strat-row h4 { font-size: 13px; font-weight: 700; color: var(--navy); margin-bottom: 2px; }
+.strat-row p { font-size: 11px; color: var(--slate); line-height: 1.4; }
+.strat-row .strat-for { font-size: 9px; color: var(--steel); margin-top: 3px; }
 
 /* EVAL DIMENSION */
 .eval-card {
-  padding: 16px; border: 1px solid var(--cloud);
+  padding: 12px; border: 1px solid var(--cloud);
   border-radius: 2px; text-align: left;
 }
 .eval-card .ev-value {
-  font-size: 11px; font-weight: 800; color: var(--navy);
-  text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px;
+  font-size: 10px; font-weight: 800; color: var(--navy);
+  text-transform: uppercase; letter-spacing: .04em; margin-bottom: 3px;
 }
-.eval-card .ev-label { font-size: 11px; color: var(--slate); line-height: 1.4; }
+.eval-card .ev-label { font-size: 10px; color: var(--slate); line-height: 1.35; }
 .eval-card .ev-bar {
-  height: 4px; background: var(--cloud);
-  border-radius: 2px; margin-top: 8px; overflow: hidden;
+  height: 3px; background: var(--cloud);
+  border-radius: 2px; margin-top: 6px; overflow: hidden;
 }
 .eval-card .ev-fill { height: 100%; border-radius: 2px; }
 
 /* PROFILE ANATOMY */
 .anatomy-dim {
-  display: flex; gap: 10px; align-items: center;
-  padding: 8px 0; border-bottom: 1px solid var(--cloud);
+  display: flex; gap: 8px; align-items: center;
+  padding: 5px 0; border-bottom: 1px solid var(--cloud);
 }
 .anatomy-dim:last-child { border-bottom: none; }
 .anatomy-dim .dim-label {
-  font-size: 11px; font-weight: 700; color: var(--navy);
-  width: 120px; flex-shrink: 0;
+  font-size: 10px; font-weight: 700; color: var(--navy);
+  width: 100px; flex-shrink: 0;
 }
-.anatomy-dim .dim-value { font-size: 11px; color: var(--slate); }
+.anatomy-dim .dim-value { font-size: 10px; color: var(--slate); }
 
 /* PLAYBOOK ENTRY */
 .pb-entry {
   background: var(--ice); border: 1px solid var(--cloud);
-  border-radius: 2px; padding: 28px 32px;
+  border-radius: 2px; padding: 20px 24px;
 }
 
 /* PAIN POINT ROW — no side-stripe, uses numbered icons instead */
 .pain-row {
-  display: flex; gap: 16px; align-items: flex-start;
-  padding: 14px 0; border-bottom: 1px solid var(--cloud);
+  display: flex; gap: 12px; align-items: flex-start;
+  padding: 10px 0; border-bottom: 1px solid var(--cloud);
 }
 .pain-row:last-child { border-bottom: none; }
 .pain-num {
-  width: 28px; height: 28px; border-radius: 50%;
+  width: 24px; height: 24px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0; font-size: 11px; font-weight: 800;
+  flex-shrink: 0; font-size: 10px; font-weight: 800;
   color: var(--white);
 }
 
@@ -348,25 +348,72 @@ body {
 /* CLOSING SLIDE */
 .closing .si {
   background: var(--navy); justify-content: center;
-  align-items: center; text-align: center; padding: 80px;
+  align-items: center; text-align: center; padding: 56px 64px;
 }
 .closing .si::before { background: var(--gold); }
 
-/* RESPONSIVE */
+/* RESPONSIVE — medium viewports (laptops, small desktops) */
+@media (max-width: 1440px) {
+  .si { padding: 24px 32px; }
+  .cover .si, .closing .si { padding: 32px 40px; }
+  .at { font-size: 18px; margin-bottom: 4px; }
+  .st { font-size: 11px; margin-bottom: 10px; }
+  .sl { font-size: 9px; margin-bottom: 6px; }
+  .fn { font-size: 8px; padding-top: 6px; }
+  .split { gap: 16px; }
+  .cols3 { gap: 10px; }
+  .strat-row { padding: 6px 0; }
+  .strat-row h4 { font-size: 11px; }
+  .strat-row p { font-size: 9px; }
+  .strat-row .strat-for { font-size: 8px; margin-top: 2px; }
+  .strat-icon { width: 24px; height: 24px; font-size: 11px; }
+  .arch-card { padding: 9px 10px; }
+  .arch-card h4 { font-size: 11px; margin-bottom: 2px; }
+  .arch-card .arch-count { font-size: 15px; margin-bottom: 2px; }
+  .arch-card p { font-size: 9px; line-height: 1.25; }
+  .arch-card .arch-profiles { font-size: 8px; margin-top: 3px; line-height: 1.25; }
+  .key-takeaway { padding: 8px 12px; }
+  .key-takeaway p { font-size: 9px; line-height: 1.35; }
+  .key-takeaway::before { font-size: 12px; }
+  .callout { padding: 8px 12px; }
+  .callout p { font-size: 10px; }
+  .eval-card { padding: 8px; }
+  .eval-card .ev-value { font-size: 9px; }
+  .eval-card .ev-label { font-size: 8px; }
+  .eval-card .ev-bar { margin-top: 4px; }
+  .pb-entry { padding: 14px 18px; }
+  .metric-box { padding: 8px 10px; }
+  .metric-box .k { font-size: 8px; margin-bottom: 2px; }
+  .metric-box .v { font-size: 14px; }
+  .anatomy-dim { padding: 3px 0; }
+  .anatomy-dim .dim-label { width: 85px; font-size: 9px; }
+  .anatomy-dim .dim-value { font-size: 9px; }
+  .pain-row { padding: 6px 0; gap: 8px; }
+  .pain-num { width: 20px; height: 20px; font-size: 9px; }
+  .hm th { padding: 5px 6px; font-size: 8px; }
+  .hm th.col-head { font-size: 8px; }
+  .hm td { padding: 5px 6px; }
+  .hm td.profile-label { font-size: 10px; }
+  .hm .cell { font-size: 9px; }
+}
+
+/* RESPONSIVE — small viewports */
 @media (max-width: 900px) {
   .slide {
     min-height: auto;
-    padding: 60px 8px 8px;
+    padding: 56px 8px 8px;
   }
   .si {
     width: 100%;
     aspect-ratio: auto;
     min-height: calc(100vh - var(--slide-chrome));
-    padding: 32px 24px;
+    padding: 24px 20px;
   }
+  .cover .si, .closing .si { padding: 32px 24px; }
   .split { grid-template-columns: 1fr !important; }
   .cols3, .cols4, .cols5 { grid-template-columns: 1fr; }
-  .at { font-size: 22px; }
+  .at { font-size: 18px; }
+  .st { font-size: 12px; }
   .hm { font-size: 10px; }
 }
 </style>
@@ -393,14 +440,14 @@ body {
       <line x1="50" y1="8" x2="50" y2="92" stroke="currentColor" stroke-width=".5" style="color:var(--gold)"/>
     </svg>
     <div style="position:relative;z-index:2;max-width:760px;">
-      <div class="reveal" style="font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);margin-bottom:28px;">Post-Liquidation Collection Strategy</div>
-      <h1 class="reveal reveal-delay-1" style="font-size:44px;font-weight:900;color:var(--white);line-height:1.1;letter-spacing:-.03em;margin-bottom:16px;">Profile-specific strategies recover more while reducing compliance risk to zero</h1>
-      <p class="reveal reveal-delay-2" style="font-size:18px;font-weight:400;color:var(--silver);line-height:1.5;margin-bottom:48px;">AI simulation tests every negotiation approach against every debtor archetype, before it reaches a single customer.</p>
-      <div style="width:48px;height:2px;background:var(--gold);margin:0 auto 48px;"></div>
-      <div class="reveal reveal-delay-3" style="display:flex;gap:56px;justify-content:center;flex-wrap:wrap;">
-        <div style="text-align:center;"><div style="font-size:32px;font-weight:900;color:var(--gold-light);">14</div><div style="font-size:10px;color:var(--silver);text-transform:uppercase;letter-spacing:.08em;margin-top:4px;">Debtor Profiles</div></div>
-        <div style="text-align:center;"><div style="font-size:32px;font-weight:900;color:var(--gold-light);">13</div><div style="font-size:10px;color:var(--silver);text-transform:uppercase;letter-spacing:.08em;margin-top:4px;">Strategies</div></div>
-        <div style="text-align:center;"><div style="font-size:32px;font-weight:900;color:var(--gold-light);">182</div><div style="font-size:10px;color:var(--silver);text-transform:uppercase;letter-spacing:.08em;margin-top:4px;">Combinations Tested</div></div>
+      <div class="reveal" style="font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);margin-bottom:22px;">Post-Liquidation Collection Strategy</div>
+      <h1 class="reveal reveal-delay-1" style="font-size:40px;font-weight:900;color:var(--white);line-height:1.12;letter-spacing:-.03em;margin-bottom:14px;">Profile-specific strategies recover more while reducing compliance risk to zero</h1>
+      <p class="reveal reveal-delay-2" style="font-size:16px;font-weight:400;color:var(--silver);line-height:1.5;margin-bottom:36px;">AI simulation tests every negotiation approach against every debtor archetype, before it reaches a single customer.</p>
+      <div style="width:40px;height:2px;background:var(--gold);margin:0 auto 36px;"></div>
+      <div class="reveal reveal-delay-3" style="display:flex;gap:48px;justify-content:center;flex-wrap:wrap;">
+        <div style="text-align:center;"><div style="font-size:30px;font-weight:900;color:var(--gold-light);">14</div><div style="font-size:10px;color:var(--silver);text-transform:uppercase;letter-spacing:.08em;margin-top:3px;">Debtor Profiles</div></div>
+        <div style="text-align:center;"><div style="font-size:30px;font-weight:900;color:var(--gold-light);">13</div><div style="font-size:10px;color:var(--silver);text-transform:uppercase;letter-spacing:.08em;margin-top:3px;">Strategies</div></div>
+        <div style="text-align:center;"><div style="font-size:30px;font-weight:900;color:var(--gold-light);">182</div><div style="font-size:10px;color:var(--silver);text-transform:uppercase;letter-spacing:.08em;margin-top:3px;">Combinations Tested</div></div>
       </div>
     </div>
   </div>
@@ -416,37 +463,37 @@ body {
     <div class="sl">Executive Summary</div>
     <div class="at">Deploy AI-simulated strategy testing to match each debtor profile to its highest-recovery, lowest-risk approach</div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;margin-bottom:28px;flex:0;">
-      <div class="reveal" style="padding:30px 24px;background:var(--ice);border:1px solid var(--cloud);border-radius:2px 0 0 2px;">
-        <div style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--steel);margin-bottom:12px;">Situation</div>
-        <div style="font-size:15px;font-weight:700;color:var(--navy);line-height:1.4;margin-bottom:10px;">Will Bank's liquidation created 14 distinct debtor populations</div>
-        <div style="font-size:13px;color:var(--slate);line-height:1.55;">Each population has different capacity, emotional state, trust level, and legal constraints. A blocked-salary worker in Sao Paulo has little in common with a micro-merchant in Recife.</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;margin-bottom:16px;flex:0;">
+      <div class="reveal" style="padding:18px 18px;background:var(--ice);border:1px solid var(--cloud);border-radius:2px 0 0 2px;">
+        <div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--steel);margin-bottom:8px;">Situation</div>
+        <div style="font-size:13px;font-weight:700;color:var(--navy);line-height:1.35;margin-bottom:6px;">Will Bank's liquidation created 14 distinct debtor populations</div>
+        <div style="font-size:11px;color:var(--slate);line-height:1.45;">Each population has different capacity, emotional state, trust level, and legal constraints. A blocked-salary worker in Sao Paulo has little in common with a micro-merchant in Recife.</div>
       </div>
-      <div class="reveal reveal-delay-1" style="padding:30px 24px;background:var(--navy);color:var(--white);">
-        <div style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);margin-bottom:12px;">Complication</div>
-        <div style="font-size:15px;font-weight:700;color:var(--white);line-height:1.4;margin-bottom:10px;">A single collection script creates both recovery leakage and compliance exposure</div>
-        <div style="font-size:13px;color:var(--mist);line-height:1.55;">Assertive tactics on vulnerable debtors trigger CDC art. 42 exposure. Empathetic approaches on strategic negotiators leave money on the table. Real-world A/B testing is too slow and ethically constrained.</div>
+      <div class="reveal reveal-delay-1" style="padding:18px 18px;background:var(--navy);color:var(--white);">
+        <div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);margin-bottom:8px;">Complication</div>
+        <div style="font-size:13px;font-weight:700;color:var(--white);line-height:1.35;margin-bottom:6px;">A single collection script creates both recovery leakage and compliance exposure</div>
+        <div style="font-size:11px;color:var(--mist);line-height:1.45;">Assertive tactics on vulnerable debtors trigger CDC art. 42 exposure. Empathetic approaches on strategic negotiators leave money on the table. Real-world A/B testing is too slow and ethically constrained.</div>
       </div>
-      <div class="reveal reveal-delay-2" style="padding:30px 24px;background:var(--gold-dim);border:1px solid oklch(0.62 0.08 80 / 0.15);border-radius:0 2px 2px 0;">
-        <div style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);margin-bottom:12px;">Resolution</div>
-        <div style="font-size:15px;font-weight:700;color:var(--navy);line-height:1.4;margin-bottom:10px;">AI simulation tests every strategy against every profile before a single customer is exposed</div>
-        <div style="font-size:13px;color:var(--slate);line-height:1.55;">Three AI agents, Collector, Debtor, and Judge, simulate conversations, score them blind, and produce a ranked playbook with statistical confidence.</div>
+      <div class="reveal reveal-delay-2" style="padding:18px 18px;background:var(--gold-dim);border:1px solid oklch(0.62 0.08 80 / 0.15);border-radius:0 2px 2px 0;">
+        <div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);margin-bottom:8px;">Resolution</div>
+        <div style="font-size:13px;font-weight:700;color:var(--navy);line-height:1.35;margin-bottom:6px;">AI simulation tests every strategy against every profile before a single customer is exposed</div>
+        <div style="font-size:11px;color:var(--slate);line-height:1.45;">Three AI agents, Collector, Debtor, and Judge, simulate conversations, score them blind, and produce a ranked playbook with statistical confidence.</div>
       </div>
     </div>
 
-    <div class="reveal reveal-delay-3" style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:14px;">Why approve the pilot</div>
-    <div class="reveal reveal-delay-3" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:32px;">
-      <div style="padding:20px;background:oklch(0.97 0.02 160);border:1px solid oklch(0.55 0.04 160 / 0.18);border-radius:2px;">
-        <div style="font-size:11px;font-weight:800;color:var(--green);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">1. Higher recovery</div>
-        <div style="font-size:13px;color:var(--slate);line-height:1.55;">Profile-matched strategies show 40-60% higher payment probability in simulation than generic scripts, because the approach matches the debtor's actual capacity and emotional state.</div>
+    <div class="reveal reveal-delay-3" style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px;">Why approve the pilot</div>
+    <div class="reveal reveal-delay-3" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;">
+      <div style="padding:14px;background:oklch(0.97 0.02 160);border:1px solid oklch(0.55 0.04 160 / 0.18);border-radius:2px;">
+        <div style="font-size:10px;font-weight:800;color:var(--green);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px;">1. Higher recovery</div>
+        <div style="font-size:11px;color:var(--slate);line-height:1.45;">Profile-matched strategies show 40-60% higher payment probability in simulation than generic scripts, because the approach matches the debtor's actual capacity and emotional state.</div>
       </div>
-      <div style="padding:20px;background:oklch(0.97 0.015 255);border:1px solid oklch(0.55 0.03 255 / 0.15);border-radius:2px;">
-        <div style="font-size:11px;font-weight:800;color:var(--blue);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">2. Zero compliance risk</div>
-        <div style="font-size:13px;color:var(--slate);line-height:1.55;">Compliance gating excludes dangerous strategy-profile mismatches before deployment. Every recommendation needs a compliance score >= 0.8 and escalation risk <= 0.3.</div>
+      <div style="padding:14px;background:oklch(0.97 0.015 255);border:1px solid oklch(0.55 0.03 255 / 0.15);border-radius:2px;">
+        <div style="font-size:10px;font-weight:800;color:var(--blue);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px;">2. Zero compliance risk</div>
+        <div style="font-size:11px;color:var(--slate);line-height:1.45;">Compliance gating excludes dangerous strategy-profile mismatches before deployment. Every recommendation needs a compliance score >= 0.8 and escalation risk <= 0.3.</div>
       </div>
-      <div style="padding:20px;background:var(--gold-dim);border:1px solid oklch(0.62 0.05 80 / 0.15);border-radius:2px;">
-        <div style="font-size:11px;font-weight:800;color:var(--gold);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">3. Zero customer exposure</div>
-        <div style="font-size:13px;color:var(--slate);line-height:1.55;">All 182 strategy-profile combinations are tested with synthetic data and AI agents. No real debtor is contacted until the playbook is validated by domain experts.</div>
+      <div style="padding:14px;background:var(--gold-dim);border:1px solid oklch(0.62 0.05 80 / 0.15);border-radius:2px;">
+        <div style="font-size:10px;font-weight:800;color:var(--gold);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px;">3. Zero customer exposure</div>
+        <div style="font-size:11px;color:var(--slate);line-height:1.45;">All 182 strategy-profile combinations are tested with synthetic data and AI agents. No real debtor is contacted until the playbook is validated by domain experts.</div>
       </div>
     </div>
 
@@ -466,55 +513,55 @@ body {
     <div class="sn">03</div>
     <div class="sl">The Challenge</div>
     <div class="at">One-size-fits-all collection fails because 14 debtor situations demand 14 different approaches, and deploying the wrong one creates legal exposure</div>
-    <div class="st">Debtors differ on financial capacity, emotional state, trust level, digital access, and hard constraints. Deploying untested strategies risks compliance violations, brand damage, and lost recovery.</div>
+    <div class="st" style="margin-bottom:12px;">Debtors differ on financial capacity, emotional state, trust level, digital access, and hard constraints. Deploying untested strategies risks compliance violations, brand damage, and lost recovery.</div>
 
     <div class="split s64" style="flex:1;">
       <div>
-        <div style="display:flex;flex-direction:column;gap:14px;">
+        <div style="display:flex;flex-direction:column;gap:4px;">
           <div class="reveal pain-row">
             <div class="pain-num" style="background:var(--green);">1</div>
             <div>
-              <div style="font-size:13px;font-weight:700;color:var(--navy);">Hardship profiles need protection, not pressure</div>
-              <div style="font-size:12px;color:var(--steel);line-height:1.5;">Blocked salaries, benefit-dependent households, and over-indebted families (Lei 14.181) require vulnerability-aware approaches that respect the mínimo existencial.</div>
+              <div style="font-size:12px;font-weight:700;color:var(--navy);">Hardship profiles need protection, not pressure</div>
+              <div style="font-size:11px;color:var(--steel);line-height:1.4;">Blocked salaries, benefit-dependent households, and over-indebted families (Lei 14.181) require vulnerability-aware approaches that respect the mínimo existencial.</div>
             </div>
           </div>
           <div class="reveal reveal-delay-1 pain-row">
             <div class="pain-num" style="background:var(--blue);">2</div>
             <div>
-              <div style="font-size:13px;font-weight:700;color:var(--navy);">Trust deficit is the first barrier, not willingness to pay</div>
-              <div style="font-size:12px;color:var(--steel);line-height:1.5;">Post-liquidation scam alerts (FGC, Procon-SP) mean skeptical debtors will hang up before hearing the offer, unless legitimacy is established first.</div>
+              <div style="font-size:12px;font-weight:700;color:var(--navy);">Trust deficit is the first barrier, not willingness to pay</div>
+              <div style="font-size:11px;color:var(--steel);line-height:1.4;">Post-liquidation scam alerts (FGC, Procon-SP) mean skeptical debtors will hang up before hearing the offer, unless legitimacy is established first.</div>
             </div>
           </div>
           <div class="reveal reveal-delay-2 pain-row">
             <div class="pain-num" style="background:var(--orange);">3</div>
             <div>
-              <div style="font-size:13px;font-weight:700;color:var(--navy);">Informed debtors negotiate, not comply</div>
-              <div style="font-size:12px;color:var(--steel);line-height:1.5;">CDC art. 42-aware disputers, Feirão veterans demanding 70%+ discounts, and micro-merchants with irregular cashflow each require specialized playbooks.</div>
+              <div style="font-size:12px;font-weight:700;color:var(--navy);">Informed debtors negotiate, not comply</div>
+              <div style="font-size:11px;color:var(--steel);line-height:1.4;">CDC art. 42-aware disputers, Feirão veterans demanding 70%+ discounts, and micro-merchants with irregular cashflow each require specialized playbooks.</div>
             </div>
           </div>
           <div class="reveal reveal-delay-3 pain-row" style="border-bottom:none;">
             <div class="pain-num" style="background:var(--red);">4</div>
             <div>
-              <div style="font-size:13px;font-weight:700;color:var(--navy);">Wrong strategy × wrong profile = compliance risk</div>
-              <div style="font-size:12px;color:var(--steel);line-height:1.5;">Assertive tactics on vulnerable profiles create FDCPA/CDC exposure. Empathetic approaches on strategic negotiators leave recovery on the table.</div>
+              <div style="font-size:12px;font-weight:700;color:var(--navy);">Wrong strategy × wrong profile = compliance risk</div>
+              <div style="font-size:11px;color:var(--steel);line-height:1.4;">Assertive tactics on vulnerable profiles create FDCPA/CDC exposure. Empathetic approaches on strategic negotiators leave recovery on the table.</div>
             </div>
           </div>
         </div>
       </div>
       <div>
-        <div class="reveal" style="background:var(--navy);border-radius:2px;padding:28px;color:var(--white);margin-bottom:16px;">
-          <div style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);margin-bottom:16px;">The Core Question</div>
-          <div style="font-size:18px;font-weight:700;line-height:1.35;color:var(--white);margin-bottom:16px;">Which strategy works best for which debtor, and how do we know before we deploy?</div>
-          <div style="font-size:12px;color:var(--mist);line-height:1.5;">Real-world A/B testing is too slow, too risky, and ethically constrained. We need a way to test every strategy against every profile at scale, with zero customer exposure.</div>
+        <div class="reveal" style="background:var(--navy);border-radius:2px;padding:20px;color:var(--white);margin-bottom:12px;">
+          <div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);margin-bottom:10px;">The Core Question</div>
+          <div style="font-size:15px;font-weight:700;line-height:1.3;color:var(--white);margin-bottom:10px;">Which strategy works best for which debtor, and how do we know before we deploy?</div>
+          <div style="font-size:11px;color:var(--mist);line-height:1.45;">Real-world A/B testing is too slow, too risky, and ethically constrained. We need a way to test every strategy against every profile at scale, with zero customer exposure.</div>
         </div>
-        <div class="reveal reveal-delay-1" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          <div style="padding:16px;background:var(--red-dim);border:1px solid oklch(0.53 0.06 25 / 0.12);border-radius:2px;text-align:center;">
-            <div style="font-size:24px;font-weight:900;color:var(--red);">0</div>
-            <div style="font-size:10px;font-weight:600;color:var(--slate);text-transform:uppercase;letter-spacing:.04em;margin-top:4px;">Risk-free live-testing options</div>
+        <div class="reveal reveal-delay-1" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div style="padding:12px;background:var(--red-dim);border:1px solid oklch(0.53 0.06 25 / 0.12);border-radius:2px;text-align:center;">
+            <div style="font-size:22px;font-weight:900;color:var(--red);">0</div>
+            <div style="font-size:9px;font-weight:600;color:var(--slate);text-transform:uppercase;letter-spacing:.04em;margin-top:3px;">Risk-free live-testing options</div>
           </div>
-          <div style="padding:16px;background:var(--gold-dim);border:1px solid oklch(0.62 0.06 80 / 0.12);border-radius:2px;text-align:center;">
-            <div style="font-size:24px;font-weight:900;color:var(--gold);">182</div>
-            <div style="font-size:10px;font-weight:600;color:var(--slate);text-transform:uppercase;letter-spacing:.04em;margin-top:4px;">Profile × Strategy combinations</div>
+          <div style="padding:12px;background:var(--gold-dim);border:1px solid oklch(0.62 0.06 80 / 0.12);border-radius:2px;text-align:center;">
+            <div style="font-size:22px;font-weight:900;color:var(--gold);">182</div>
+            <div style="font-size:9px;font-weight:600;color:var(--slate);text-transform:uppercase;letter-spacing:.04em;margin-top:3px;">Profile × Strategy combinations</div>
           </div>
         </div>
       </div>
@@ -530,26 +577,26 @@ body {
   <div class="si">
     <div class="sn">04</div>
     <div class="sl">Methodology</div>
-    <div class="at" style="text-align:center;margin:0 auto 6px;">Three AI roles simulate every conversation, evaluate independently, and surface the best strategy for each debtor type</div>
-    <div class="st" style="text-align:center;margin:0 auto 40px;">No real customers are contacted. All data is synthetic. The evaluation agent never knows which strategy was intended, eliminating confirmation bias.</div>
+    <div class="at" style="text-align:center;margin:0 auto 4px;">Three AI roles simulate every conversation, evaluate independently, and surface the best strategy for each debtor type</div>
+    <div class="st" style="text-align:center;margin:0 auto 20px;">No real customers are contacted. All data is synthetic. The evaluation agent never knows which strategy was intended, eliminating confirmation bias.</div>
 
-    <div style="display:flex;align-items:stretch;gap:0;margin-bottom:40px;flex:0;">
-      <div class="reveal" style="flex:1;padding:28px 24px;background:var(--navy);border-radius:2px 0 0 2px;color:var(--white);text-align:center;">
-        <div style="font-size:32px;font-weight:900;color:var(--gold);margin-bottom:8px;">1</div>
-        <div style="font-size:15px;font-weight:700;margin-bottom:6px;">Simulate</div>
-        <div style="font-size:11px;color:var(--mist);line-height:1.5;">AI Collector and AI Debtor agents conduct multi-turn conversations. The Debtor embodies a real profile: personality, constraints, emotional state.</div>
+    <div style="display:flex;align-items:stretch;gap:0;margin-bottom:20px;flex:0;">
+      <div class="reveal" style="flex:1;padding:18px 18px;background:var(--navy);border-radius:2px 0 0 2px;color:var(--white);text-align:center;">
+        <div style="font-size:26px;font-weight:900;color:var(--gold);margin-bottom:4px;">1</div>
+        <div style="font-size:13px;font-weight:700;margin-bottom:4px;">Simulate</div>
+        <div style="font-size:10px;color:var(--mist);line-height:1.45;">AI Collector and AI Debtor agents conduct multi-turn conversations. The Debtor embodies a real profile: personality, constraints, emotional state.</div>
       </div>
       <div style="width:2px;background:var(--gold);flex-shrink:0;"></div>
-      <div class="reveal reveal-delay-1" style="flex:1;padding:28px 24px;background:var(--navy-mid);text-align:center;color:var(--white);">
-        <div style="font-size:32px;font-weight:900;color:var(--gold);margin-bottom:8px;">2</div>
-        <div style="font-size:15px;font-weight:700;margin-bottom:6px;">Evaluate</div>
-        <div style="font-size:11px;color:var(--mist);line-height:1.5;">An independent Judge reads the transcript blind, with no knowledge of the strategy. It scores on 7 dimensions and flags constraint violations.</div>
+      <div class="reveal reveal-delay-1" style="flex:1;padding:18px 18px;background:var(--navy-mid);text-align:center;color:var(--white);">
+        <div style="font-size:26px;font-weight:900;color:var(--gold);margin-bottom:4px;">2</div>
+        <div style="font-size:13px;font-weight:700;margin-bottom:4px;">Evaluate</div>
+        <div style="font-size:10px;color:var(--mist);line-height:1.45;">An independent Judge reads the transcript blind, with no knowledge of the strategy. It scores on 7 dimensions and flags constraint violations.</div>
       </div>
       <div style="width:2px;background:var(--gold);flex-shrink:0;"></div>
-      <div class="reveal reveal-delay-2" style="flex:1;padding:28px 24px;background:var(--navy-light);border-radius:0 2px 2px 0;text-align:center;color:var(--white);">
-        <div style="font-size:32px;font-weight:900;color:var(--gold);margin-bottom:8px;">3</div>
-        <div style="font-size:15px;font-weight:700;margin-bottom:6px;">Recommend</div>
-        <div style="font-size:11px;color:var(--mist);line-height:1.5;">Results aggregate across repetitions. Statistical methods prevent false winners. A per-profile playbook ranks strategies with confidence intervals.</div>
+      <div class="reveal reveal-delay-2" style="flex:1;padding:18px 18px;background:var(--navy-light);border-radius:0 2px 2px 0;text-align:center;color:var(--white);">
+        <div style="font-size:26px;font-weight:900;color:var(--gold);margin-bottom:4px;">3</div>
+        <div style="font-size:13px;font-weight:700;margin-bottom:4px;">Recommend</div>
+        <div style="font-size:10px;color:var(--mist);line-height:1.45;">Results aggregate across repetitions. Statistical methods prevent false winners. A per-profile playbook ranks strategies with confidence intervals.</div>
       </div>
     </div>
 
@@ -577,52 +624,52 @@ body {
     <div class="sn">05</div>
     <div class="sl">The Debtor Landscape</div>
     <div class="at">Only 3 of 14 profiles are quick-resolution candidates, the other 11 need specialized handling</div>
-    <div class="st" style="margin-bottom:22px;max-width:54ch;">Profiles are built from real post-liquidation scenarios: blocked salaries, FGC reimbursement delays, Procon-SP scam alerts, and Lei 14.181 superendividamento cases.</div>
+    <div class="st" style="margin-bottom:12px;max-width:54ch;">Profiles are built from real post-liquidation scenarios: blocked salaries, FGC reimbursement delays, Procon-SP scam alerts, and Lei 14.181 superendividamento cases.</div>
 
-    <div style="display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:12px;margin-bottom:14px;">
-      <div class="reveal arch-card hardship" style="padding:16px 18px;">
+    <div style="display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:8px;margin-bottom:8px;">
+      <div class="reveal arch-card hardship">
         <div class="arch-count" style="color:var(--green);">5</div>
         <h4>Hardship &amp; Vulnerability</h4>
-        <p style="font-size:11px;line-height:1.45;">Financial distress, blocked funds, or benefit-dependent households. They need protection-first approaches that respect essential expenses.</p>
-        <div class="arch-profiles" style="font-size:9px;line-height:1.4;"><strong>Profiles:</strong> Cooperative Hardship, Blocked Balance, Benefit Dependent, Over-indebted, Low Digital Access</div>
+        <p style="font-size:10px;line-height:1.35;">Financial distress, blocked funds, or benefit-dependent households. Protection-first approaches that respect essential expenses.</p>
+        <div class="arch-profiles"><strong>Profiles:</strong> Cooperative Hardship, Blocked Balance, Benefit Dependent, Over-indebted, Low Digital Access</div>
       </div>
-      <div class="reveal reveal-delay-1 arch-card trust" style="padding:16px 18px;">
+      <div class="reveal reveal-delay-1 arch-card trust">
         <div class="arch-count" style="color:var(--blue);">3</div>
         <h4>Trust &amp; Legitimacy</h4>
-        <p style="font-size:11px;line-height:1.45;">Skeptical of post-liquidation contact. They will not engage until the collector proves legitimacy and references official channels.</p>
-        <div class="arch-profiles" style="font-size:9px;line-height:1.4;"><strong>Profiles:</strong> Scam Suspicious, Liquidation Confused, FGC Waiting</div>
+        <p style="font-size:10px;line-height:1.35;">Skeptical of post-liquidation contact. Will not engage until the collector proves legitimacy and references official channels.</p>
+        <div class="arch-profiles"><strong>Profiles:</strong> Scam Suspicious, Liquidation Confused, FGC Waiting</div>
       </div>
-      <div class="reveal reveal-delay-2 arch-card strategic" style="padding:16px 18px;">
+      <div class="reveal reveal-delay-2 arch-card strategic">
         <div class="arch-count" style="color:var(--orange);">3</div>
         <h4>Strategic &amp; Informed</h4>
-        <p style="font-size:11px;line-height:1.45;">Know their rights, negotiate aggressively, or demand documentation. They respond to structured offers, not emotional appeals.</p>
-        <div class="arch-profiles" style="font-size:9px;line-height:1.4;"><strong>Profiles:</strong> Written Proof Disputer, Serial Renegotiator, Micro Merchant</div>
+        <p style="font-size:10px;line-height:1.35;">Know their rights, negotiate aggressively, or demand documentation. They respond to structured offers, not emotional appeals.</p>
+        <div class="arch-profiles"><strong>Profiles:</strong> Written Proof Disputer, Serial Renegotiator, Micro Merchant</div>
       </div>
-      <div class="reveal reveal-delay-3 arch-card quick" style="padding:16px 18px;">
+      <div class="reveal reveal-delay-3 arch-card quick">
         <div class="arch-count" style="color:var(--purple);">3</div>
         <h4>Quick Resolution</h4>
-        <p style="font-size:11px;line-height:1.45;">Willing and able to resolve quickly if the approach matches their situation and channel preference.</p>
-        <div class="arch-profiles" style="font-size:9px;line-height:1.4;"><strong>Profiles:</strong> Young First Card, Consignado Steady, Cooperative (able)</div>
+        <p style="font-size:10px;line-height:1.35;">Willing and able to resolve quickly if the approach matches their situation and channel preference.</p>
+        <div class="arch-profiles"><strong>Profiles:</strong> Young First Card, Consignado Steady, Cooperative (able)</div>
       </div>
-      <div class="reveal reveal-delay-4 arch-card complex" style="grid-column:span 2;padding:16px 18px;">
+      <div class="reveal reveal-delay-4 arch-card complex" style="grid-column:span 2;">
         <div class="arch-count" style="color:var(--red);">2+</div>
         <h4>Hostile &amp; Avoidant</h4>
-        <p style="font-size:11px;line-height:1.45;">Will disengage fast. Angry, suspicious of scams, or overwhelmed by multiple creditors, they require de-escalation before any offer.</p>
-        <div class="arch-profiles" style="font-size:9px;line-height:1.4;"><strong>Profiles:</strong> Hostile Avoidant, Overwhelmed Multi-creditor</div>
+        <p style="font-size:10px;line-height:1.35;">Will disengage fast. Angry, suspicious of scams, or overwhelmed by multiple creditors, they require de-escalation before any offer.</p>
+        <div class="arch-profiles"><strong>Profiles:</strong> Hostile Avoidant, Overwhelmed Multi-creditor</div>
       </div>
     </div>
 
-    <div class="split s55" style="gap:16px;">
-      <div class="reveal soft-panel" style="display:flex;align-items:center;gap:16px;padding:12px 14px;">
-        <div style="width:150px;flex-shrink:0;">
-          <canvas id="clusterChart" width="150" height="150"></canvas>
+    <div class="split s55" style="gap:12px;">
+      <div class="reveal soft-panel" style="display:flex;align-items:center;gap:12px;padding:10px 12px;">
+        <div style="width:120px;flex-shrink:0;">
+          <canvas id="clusterChart" width="120" height="120"></canvas>
         </div>
         <div>
-          <div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:6px;">Profile distribution by cluster</div>
-          <div style="font-size:12px;color:var(--slate);line-height:1.5;">The largest cluster, Hardship &amp; Vulnerability, represents debtors where wrong-strategy risk is highest. Aggressive collection on these profiles creates compliance exposure under CDC art. 42 and Lei 14.181.</div>
+          <div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:4px;">Profile distribution by cluster</div>
+          <div style="font-size:11px;color:var(--slate);line-height:1.4;">The largest cluster, Hardship &amp; Vulnerability, represents debtors where wrong-strategy risk is highest. Aggressive collection on these profiles creates compliance exposure under CDC art. 42 and Lei 14.181.</div>
         </div>
       </div>
-      <div class="reveal reveal-delay-1 key-takeaway" style="padding:14px 18px;">
+      <div class="reveal reveal-delay-1 key-takeaway" style="padding:10px 14px;">
         <p><strong>Implication:</strong> Standard collection approaches work for only 21% of profiles. The remaining 79% require fundamentally different postures, validating the need for profile-specific strategy matching.</p>
       </div>
     </div>
@@ -642,9 +689,9 @@ body {
 
     <div class="split s55" style="flex:1;">
       <div>
-        <div class="reveal" style="background:var(--ice);border:1px solid var(--cloud);border-radius:2px;padding:24px;margin-bottom:16px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-            <div style="font-size:15px;font-weight:800;color:var(--navy);">Cooperative Hardship</div>
+        <div class="reveal" style="background:var(--ice);border:1px solid var(--cloud);border-radius:2px;padding:16px;margin-bottom:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <div style="font-size:14px;font-weight:800;color:var(--navy);">Cooperative Hardship</div>
             <span class="badge" style="background:var(--green);color:var(--white);">Hardship</span>
           </div>
           <div class="anatomy-dim"><div class="dim-label">Archetype</div><div class="dim-value">Cooperative: wants to pay, can't afford full amount</div></div>
@@ -659,28 +706,28 @@ body {
             </div>
           </div>
         </div>
-        <div class="reveal reveal-delay-1" style="font-size:12px;color:var(--slate);line-height:1.5;padding:0 4px;">
+        <div class="reveal reveal-delay-1" style="font-size:10px;color:var(--slate);line-height:1.45;padding:0 4px;">
           <strong>Backstory drives behavior:</strong> A mother in Fortaleza, classes C/D, opened a Will Bank account attracted by "diz sim aos invisíveis." Took a personal loan for roof repair, fell behind after spouse's hours were cut. Responds well to empathy, simple language, and installments aligned to the 5th business day.
         </div>
       </div>
       <div>
-        <div class="reveal" style="margin-bottom:20px;">
-          <div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:12px;">Information Asymmetry</div>
-          <div style="font-size:12px;color:var(--slate);line-height:1.5;margin-bottom:16px;">The Collector only sees what a real collector would see. The full profile (emotional state, constraints, backstory) remains hidden, preserving simulation realism.</div>
+        <div class="reveal" style="margin-bottom:12px;">
+          <div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px;">Information Asymmetry</div>
+          <div style="font-size:11px;color:var(--slate);line-height:1.45;margin-bottom:10px;">The Collector only sees what a real collector would see. The full profile (emotional state, constraints, backstory) remains hidden, preserving simulation realism.</div>
 
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-            <div style="padding:16px;background:var(--navy);border-radius:2px;color:var(--white);">
-              <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:10px;">Collector sees</div>
-              <div style="font-size:11px;color:var(--mist);line-height:1.6;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div style="padding:12px;background:var(--navy);border-radius:2px;color:var(--white);">
+              <div style="font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:6px;">Collector sees</div>
+              <div style="font-size:10px;color:var(--mist);line-height:1.5;">
                 <div>• Debt amount: R$850</div>
                 <div>• Debt type: personal loan</div>
                 <div>• Days overdue: 75</div>
                 <div>• Prior contacts: 1</div>
               </div>
             </div>
-            <div style="padding:16px;background:var(--ice);border:1px solid var(--cloud);border-radius:2px;">
-              <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--red);margin-bottom:10px;">Hidden from collector</div>
-              <div style="font-size:11px;color:var(--slate);line-height:1.6;">
+            <div style="padding:12px;background:var(--ice);border:1px solid var(--cloud);border-radius:2px;">
+              <div style="font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--red);margin-bottom:6px;">Hidden from collector</div>
+              <div style="font-size:10px;color:var(--slate);line-height:1.5;">
                 <div>• Emotional state: anxious</div>
                 <div>• Backstory &amp; motivation</div>
                 <div>• Payment cap: R$80/mo</div>
@@ -707,7 +754,7 @@ body {
     <div class="sn">07</div>
     <div class="sl">Strategy Toolkit</div>
     <div class="at">13 strategies across five behavioral categories ensure every debtor archetype has at least two viable approaches to test against</div>
-    <div class="st">Each strategy is defined by 7+ behavioral dimensions: tone, opening approach, negotiation tactic, escalation style, concession willingness, compliance adherence, and follow-up.</div>
+    <div class="st" style="margin-bottom:12px;">Each strategy is defined by 7+ behavioral dimensions: tone, opening approach, negotiation tactic, escalation style, concession willingness, compliance adherence, and follow-up.</div>
 
     <div class="split s64" style="flex:1;">
       <div>
@@ -764,23 +811,23 @@ body {
       </div>
 
       <div>
-        <div class="reveal" style="padding:24px;background:var(--navy);border-radius:2px;color:var(--white);margin-bottom:16px;">
-          <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:12px;">Behavioral Economics Foundation</div>
-          <div style="font-size:12px;color:var(--mist);line-height:1.6;">
-            <div style="margin-bottom:10px;">Strategies are grounded in evidence-based framing:</div>
-            <div style="margin-bottom:6px;"><span style="color:var(--gold);font-weight:700;">Gain framing</span> — "Preserve your CPF score" outperforms "avoid consequences"</div>
-            <div style="margin-bottom:6px;"><span style="color:var(--gold);font-weight:700;">Loss aversion</span> — "This discount expires" for settlement-ready profiles</div>
-            <div style="margin-bottom:6px;"><span style="color:var(--gold);font-weight:700;">Implementation intention</span> — "I'll call Tuesday at 7pm" creates commitment</div>
+        <div class="reveal" style="padding:16px;background:var(--navy);border-radius:2px;color:var(--white);margin-bottom:10px;">
+          <div style="font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:8px;">Behavioral Economics Foundation</div>
+          <div style="font-size:10px;color:var(--mist);line-height:1.5;">
+            <div style="margin-bottom:6px;">Strategies are grounded in evidence-based framing:</div>
+            <div style="margin-bottom:4px;"><span style="color:var(--gold);font-weight:700;">Gain framing</span> — "Preserve your CPF score" outperforms "avoid consequences"</div>
+            <div style="margin-bottom:4px;"><span style="color:var(--gold);font-weight:700;">Loss aversion</span> — "This discount expires" for settlement-ready profiles</div>
+            <div style="margin-bottom:4px;"><span style="color:var(--gold);font-weight:700;">Implementation intention</span> — "I'll call Tuesday at 7pm" creates commitment</div>
             <div><span style="color:var(--gold);font-weight:700;">Default bias</span> — One recommended option reduces decision paralysis</div>
           </div>
         </div>
 
-        <div class="reveal reveal-delay-1" style="padding:20px;background:var(--ice);border:1px solid var(--cloud);border-radius:2px;">
-          <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--steel);margin-bottom:12px;">Universal Safeguards</div>
-          <div style="font-size:12px;color:var(--slate);line-height:1.6;">
-            <div style="margin-bottom:4px;">• Every strategy requires strict CDC/FDCPA compliance</div>
-            <div style="margin-bottom:4px;">• All payments via boleto registrado only</div>
-            <div style="margin-bottom:4px;">• Proactive liquidation disclosure on every contact</div>
+        <div class="reveal reveal-delay-1" style="padding:14px;background:var(--ice);border:1px solid var(--cloud);border-radius:2px;">
+          <div style="font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--steel);margin-bottom:8px;">Universal Safeguards</div>
+          <div style="font-size:10px;color:var(--slate);line-height:1.5;">
+            <div style="margin-bottom:3px;">• Every strategy requires strict CDC/FDCPA compliance</div>
+            <div style="margin-bottom:3px;">• All payments via boleto registrado only</div>
+            <div style="margin-bottom:3px;">• Proactive liquidation disclosure on every contact</div>
             <div>• No requests for card data, Pix, or passwords</div>
           </div>
         </div>
@@ -794,7 +841,7 @@ body {
      SLIDE 8 — STRATEGY × PROFILE FIT (KEY SLIDE)
      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
 <section class="slide" data-slide="8">
-  <div class="si" style="padding:40px 48px;">
+  <div class="si">
     <div class="sn">08</div>
     <div class="sl">Strategy × Profile Fit</div>
     <div class="at">No single strategy dominates: Assertive Settlement is best for serial renegotiators but contraindicated for 7 of 11 profiles, proving that one-size-fits-all fails</div>
@@ -938,11 +985,11 @@ body {
       </table>
     </div>
 
-    <div style="display:flex;gap:16px;margin-top:16px;flex-wrap:wrap;">
-      <div class="reveal key-takeaway" style="flex:1;min-width:280px;">
+    <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;">
+      <div class="reveal key-takeaway" style="flex:1;min-width:240px;">
         <p><strong>Reading the matrix:</strong> No strategy column is uniformly green. Each profile's best fit is different, validating the profile-matching approach over any single default script.</p>
       </div>
-      <div class="reveal reveal-delay-1 callout callout-red" style="flex:1;min-width:280px;">
+      <div class="reveal reveal-delay-1 callout callout-red" style="flex:1;min-width:240px;">
         <p><strong>Red cells are compliance risks:</strong> Deploying assertive tactics on hardship or trust-deficit profiles risks CDC art. 42 violations, Procon complaints, and brand damage to the liquidator's reputation.</p>
       </div>
     </div>
@@ -962,15 +1009,15 @@ body {
 
     <div class="split s46" style="flex:1;">
       <div>
-        <div class="reveal" style="font-size:14px;color:var(--slate);line-height:1.6;margin-bottom:24px;">
+        <div class="reveal" style="font-size:12px;color:var(--slate);line-height:1.5;margin-bottom:16px;">
           The independent Judge evaluates each simulated conversation without knowing which strategy was deployed. This blind evaluation mirrors how a compliance auditor would assess a real call: judging what happened, not what was intended.
         </div>
 
-        <div class="reveal reveal-delay-1" style="padding:20px;background:var(--navy);border-radius:2px;color:var(--white);margin-bottom:16px;">
-          <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:10px;">Ranking Logic</div>
-          <div style="font-size:12px;color:var(--mist);line-height:1.6;">
-            <div style="margin-bottom:6px;"><strong style="color:var(--white);">Primary:</strong> Payment probability drives strategy ranking</div>
-            <div style="margin-bottom:6px;"><strong style="color:var(--white);">Gate:</strong> Compliance score &lt; 0.8 → strategy excluded for that profile</div>
+        <div class="reveal reveal-delay-1" style="padding:14px 16px;background:var(--navy);border-radius:2px;color:var(--white);margin-bottom:12px;">
+          <div style="font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:8px;">Ranking Logic</div>
+          <div style="font-size:11px;color:var(--mist);line-height:1.5;">
+            <div style="margin-bottom:4px;"><strong style="color:var(--white);">Primary:</strong> Payment probability drives strategy ranking</div>
+            <div style="margin-bottom:4px;"><strong style="color:var(--white);">Gate:</strong> Compliance score &lt; 0.8 → strategy excluded for that profile</div>
             <div><strong style="color:var(--white);">Tie-break:</strong> When two strategies can't be statistically separated after max repetitions, both are reported as tied, no false winner</div>
           </div>
         </div>
@@ -981,42 +1028,42 @@ body {
       </div>
 
       <div>
-        <div class="reveal" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          <div class="eval-card" style="border-top:3px solid var(--navy);">
+        <div class="reveal" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div class="eval-card" style="border-top:2px solid var(--navy);">
             <div class="ev-value" style="color:var(--navy);">Payment Probability</div>
-            <div class="ev-label">Estimated likelihood debtor would actually follow through on commitment</div>
+            <div class="ev-label">Estimated likelihood debtor would follow through on commitment</div>
             <div class="ev-bar"><div class="ev-fill" style="width:78%;background:var(--navy);"></div></div>
           </div>
-          <div class="eval-card" style="border-top:3px solid var(--gold);">
+          <div class="eval-card" style="border-top:2px solid var(--gold);">
             <div class="ev-value" style="color:var(--gold);">Compliance Score</div>
             <div class="ev-label">Adherence to CDC, FDCPA, and fair collection regulations</div>
             <div class="ev-bar"><div class="ev-fill" style="width:92%;background:var(--gold);"></div></div>
-            <div style="font-size:9px;color:var(--steel);margin-top:4px;">Gate: ≥ 0.8 required</div>
+            <div style="font-size:8px;color:var(--steel);margin-top:3px;">Gate: ≥ 0.8 required</div>
           </div>
-          <div class="eval-card" style="border-top:3px solid var(--green);">
+          <div class="eval-card" style="border-top:2px solid var(--green);">
             <div class="ev-value" style="color:var(--green);">Debtor Satisfaction</div>
-            <div class="ev-label">How the debtor experienced the interaction, affects long-term recovery</div>
+            <div class="ev-label">How the debtor experienced the interaction</div>
             <div class="ev-bar"><div class="ev-fill" style="width:65%;background:var(--green);"></div></div>
           </div>
-          <div class="eval-card" style="border-top:3px solid var(--blue);">
+          <div class="eval-card" style="border-top:2px solid var(--blue);">
             <div class="ev-value" style="color:var(--blue);">Rapport Built</div>
-            <div class="ev-label">Quality of relationship, predicts callback success and plan adherence</div>
+            <div class="ev-label">Quality of relationship, predicts callback success</div>
             <div class="ev-bar"><div class="ev-fill" style="width:70%;background:var(--blue);"></div></div>
           </div>
-          <div class="eval-card" style="border-top:3px solid var(--red);">
+          <div class="eval-card" style="border-top:2px solid var(--red);">
             <div class="ev-value" style="color:var(--red);">Escalation Risk</div>
-            <div class="ev-label">Risk of complaint, lawsuit, Procon filing, or brand damage</div>
+            <div class="ev-label">Risk of complaint, lawsuit, or brand damage</div>
             <div class="ev-bar"><div class="ev-fill" style="width:15%;background:var(--red);"></div></div>
-            <div style="font-size:9px;color:var(--steel);margin-top:4px;">Exclusion if &gt; 0.3</div>
+            <div style="font-size:8px;color:var(--steel);margin-top:3px;">Exclusion if &gt; 0.3</div>
           </div>
-          <div class="eval-card" style="border-top:3px solid var(--teal);">
+          <div class="eval-card" style="border-top:2px solid var(--teal);">
             <div class="ev-value" style="color:var(--teal);">Efficiency</div>
-            <div class="ev-label">Number of turns to reach outcome, fewer is better for both parties</div>
+            <div class="ev-label">Number of turns to reach outcome</div>
             <div class="ev-bar"><div class="ev-fill" style="width:55%;background:var(--teal);"></div></div>
           </div>
         </div>
-        <div class="reveal reveal-delay-1" style="margin-top:10px;padding:12px 16px;background:var(--ice);border:1px solid var(--cloud);border-radius:2px;">
-          <div style="font-size:11px;color:var(--slate);line-height:1.5;text-align:center;">
+        <div class="reveal reveal-delay-1" style="margin-top:8px;padding:8px 12px;background:var(--ice);border:1px solid var(--cloud);border-radius:2px;">
+          <div style="font-size:10px;color:var(--slate);line-height:1.4;text-align:center;">
             <strong>Compliance exclusion is per (profile, strategy) pair</strong>: a strategy can be excluded for one profile and recommended for another.
           </div>
         </div>
@@ -1033,67 +1080,67 @@ body {
   <div class="si">
     <div class="sn">10</div>
     <div class="sl">The Deliverable</div>
-    <div class="at" style="text-align:center;margin:0 auto 8px;max-width:44ch;">The playbook turns simulation output into concrete per-profile guidance on what to do, what to avoid, and why</div>
-    <div class="st" style="text-align:center;margin:0 auto 36px;">Each entry includes recommended strategy, expected payment probability, compliance score, sample scripts, and explicit anti-patterns.</div>
+    <div class="at" style="text-align:center;margin:0 auto 4px;max-width:44ch;">The playbook turns simulation output into concrete per-profile guidance on what to do, what to avoid, and why</div>
+    <div class="st" style="text-align:center;margin:0 auto 18px;">Each entry includes recommended strategy, expected payment probability, compliance score, sample scripts, and explicit anti-patterns.</div>
 
-    <div style="flex:1;display:flex;flex-direction:column;gap:16px;max-width:1040px;margin:0 auto;width:100%;">
+    <div style="flex:1;display:flex;flex-direction:column;gap:12px;max-width:1040px;margin:0 auto;width:100%;">
       <div class="reveal pb-entry">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
           <div>
-            <div style="font-size:19px;font-weight:800;color:var(--navy);">Cooperative Hardship</div>
-            <div style="font-size:12px;color:var(--steel);margin-top:2px;">Mother in Fortaleza, R$850 debt, anxious, wants to preserve CPF</div>
+            <div style="font-size:16px;font-weight:800;color:var(--navy);">Cooperative Hardship</div>
+            <div style="font-size:11px;color:var(--steel);margin-top:2px;">Mother in Fortaleza, R$850 debt, anxious, wants to preserve CPF</div>
           </div>
-          <span class="badge" style="background:var(--green);color:var(--white);font-size:10px;">Recommended</span>
+          <span class="badge" style="background:var(--green);color:var(--white);font-size:9px;">Recommended</span>
         </div>
-        <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:12px;margin-bottom:20px;">
-          <div class="metric-box"><div class="k">Best Strategy</div><div class="v" style="font-size:16px;">Empathetic Payment Plan</div></div>
+        <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
+          <div class="metric-box"><div class="k">Best Strategy</div><div class="v" style="font-size:14px;">Empathetic Payment Plan</div></div>
           <div class="metric-box"><div class="k">Payment Probability</div><div class="v" style="color:var(--green);">78%</div></div>
           <div class="metric-box"><div class="k">Compliance</div><div class="v" style="color:var(--gold);">0.95</div></div>
           <div class="metric-box"><div class="k">Escalation Risk</div><div class="v" style="color:var(--green);">0.05</div></div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
           <div>
-            <div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px;">What works</div>
-            <div style="font-size:12px;color:var(--slate);line-height:1.65;">
-              <div style="margin-bottom:4px;">- Open acknowledging the liquidation situation</div>
-              <div style="margin-bottom:4px;">- Propose installments <= R$80 aligned to 5th business day</div>
-              <div style="margin-bottom:4px;">- Frame as CPF/score preservation (gain framing)</div>
+            <div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:5px;">What works</div>
+            <div style="font-size:11px;color:var(--slate);line-height:1.5;">
+              <div style="margin-bottom:2px;">- Open acknowledging the liquidation situation</div>
+              <div style="margin-bottom:2px;">- Propose installments <= R$80 aligned to 5th business day</div>
+              <div style="margin-bottom:2px;">- Frame as CPF/score preservation (gain framing)</div>
               <div>- Offer boleto registrado via official channel only</div>
             </div>
           </div>
           <div>
-            <div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:8px;">What to avoid</div>
-            <div style="font-size:12px;color:var(--slate);line-height:1.65;">
-              <div style="margin-bottom:4px;">- Assertive tone drops probability to ~31%</div>
-              <div style="margin-bottom:4px;">- Settlement offers perceived as dismissive of hardship</div>
-              <div style="margin-bottom:4px;">- Pushing past R$80/month constraint</div>
+            <div style="font-size:11px;font-weight:700;color:var(--red);margin-bottom:5px;">What to avoid</div>
+            <div style="font-size:11px;color:var(--slate);line-height:1.5;">
+              <div style="margin-bottom:2px;">- Assertive tone drops probability to ~31%</div>
+              <div style="margin-bottom:2px;">- Settlement offers perceived as dismissive of hardship</div>
+              <div style="margin-bottom:2px;">- Pushing past R$80/month constraint</div>
               <div>- Requesting card data or Pix during call</div>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="reveal reveal-delay-1" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
-        <div style="padding:16px 20px;background:var(--ice);border:1px solid var(--cloud);border-radius:2px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-            <div style="font-size:13px;font-weight:700;color:var(--navy);">Scam Suspicious</div>
-            <span class="badge" style="background:var(--blue);color:var(--white);font-size:9px;">Trust-first</span>
+      <div class="reveal reveal-delay-1" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+        <div style="padding:12px 14px;background:var(--ice);border:1px solid var(--cloud);border-radius:2px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <div style="font-size:12px;font-weight:700;color:var(--navy);">Scam Suspicious</div>
+            <span class="badge" style="background:var(--blue);color:var(--white);font-size:8px;">Trust-first</span>
           </div>
-          <div style="font-size:11px;color:var(--slate);line-height:1.5;">Best: <strong>Liquidation Explainer</strong><br>Lead with BCB reference, defer collection until validated</div>
+          <div style="font-size:10px;color:var(--slate);line-height:1.45;">Best: <strong>Liquidation Explainer</strong><br>Lead with BCB reference, defer collection until validated</div>
         </div>
-        <div style="padding:16px 20px;background:var(--ice);border:1px solid var(--cloud);border-radius:2px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-            <div style="font-size:13px;font-weight:700;color:var(--navy);">Serial Renegotiator</div>
-            <span class="badge" style="background:var(--orange);color:var(--white);font-size:9px;">Assertive</span>
+        <div style="padding:12px 14px;background:var(--ice);border:1px solid var(--cloud);border-radius:2px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <div style="font-size:12px;font-weight:700;color:var(--navy);">Serial Renegotiator</div>
+            <span class="badge" style="background:var(--orange);color:var(--white);font-size:8px;">Assertive</span>
           </div>
-          <div style="font-size:11px;color:var(--slate);line-height:1.5;">Best: <strong>Assertive Settlement</strong><br>One-shot offer with loss-aversion deadline framing</div>
+          <div style="font-size:10px;color:var(--slate);line-height:1.45;">Best: <strong>Assertive Settlement</strong><br>One-shot offer with loss-aversion deadline framing</div>
         </div>
-        <div style="padding:16px 20px;background:var(--ice);border:1px solid var(--cloud);border-radius:2px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-            <div style="font-size:13px;font-weight:700;color:var(--navy);">Young First Card</div>
-            <span class="badge" style="background:var(--purple);color:var(--white);font-size:9px;">Digital</span>
+        <div style="padding:12px 14px;background:var(--ice);border:1px solid var(--cloud);border-radius:2px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <div style="font-size:12px;font-weight:700;color:var(--navy);">Young First Card</div>
+            <span class="badge" style="background:var(--purple);color:var(--white);font-size:8px;">Digital</span>
           </div>
-          <div style="font-size:11px;color:var(--slate);line-height:1.5;">Best: <strong>WhatsApp Self-Service</strong><br>Brief, no-judgment path to self-negotiate portal</div>
+          <div style="font-size:10px;color:var(--slate);line-height:1.45;">Best: <strong>WhatsApp Self-Service</strong><br>Brief, no-judgment path to self-negotiate portal</div>
         </div>
       </div>
     </div>
@@ -1115,67 +1162,67 @@ body {
         <div style="position:relative;padding-left:28px;">
           <div style="position:absolute;left:9px;top:12px;bottom:12px;width:2px;background:var(--cloud);"></div>
 
-          <div class="reveal soft-panel" style="position:relative;padding:16px 18px;margin-bottom:10px;">
-            <div style="position:absolute;left:-23px;top:20px;width:10px;height:10px;border-radius:50%;background:var(--gold);border:2px solid var(--white);box-shadow:0 0 0 2px var(--gold);"></div>
-            <div class="badge" style="background:var(--gold);color:var(--white);margin-bottom:6px;">Phase 1 - Validate</div>
-            <h4 style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:4px;">Pilot with highest-risk profiles</h4>
-            <p style="font-size:12px;color:var(--slate);line-height:1.5;">Run simulations for Cooperative Hardship, Scam Suspicious, Hostile Avoidant, Young First Card, and Over-indebted Chronic against the 4 core strategies. Validate that simulation results match domain expert expectations.</p>
+          <div class="reveal soft-panel" style="position:relative;padding:13px 16px;margin-bottom:7px;">
+            <div style="position:absolute;left:-23px;top:17px;width:10px;height:10px;border-radius:50%;background:var(--gold);border:2px solid var(--white);box-shadow:0 0 0 2px var(--gold);"></div>
+            <div class="badge" style="background:var(--gold);color:var(--white);margin-bottom:4px;">Phase 1 - Validate</div>
+            <h4 style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:3px;">Pilot with highest-risk profiles</h4>
+            <p style="font-size:11px;color:var(--slate);line-height:1.4;">Run simulations for Cooperative Hardship, Scam Suspicious, Hostile Avoidant, Young First Card, and Over-indebted Chronic against the 4 core strategies.</p>
           </div>
 
-          <div class="reveal reveal-delay-1 soft-panel" style="position:relative;padding:16px 18px;margin-bottom:10px;">
-            <div style="position:absolute;left:-23px;top:20px;width:10px;height:10px;border-radius:50%;background:var(--navy);border:2px solid var(--white);box-shadow:0 0 0 2px var(--navy);"></div>
-            <div class="badge" style="background:var(--navy);color:var(--white);margin-bottom:6px;">Phase 2 - Expand</div>
-            <h4 style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:4px;">Full matrix with statistical rigor</h4>
-            <p style="font-size:12px;color:var(--slate);line-height:1.5;">Scale to all 14 profiles x 13 strategies with sufficient repetitions per cell for statistical significance. Run across multiple AI model combinations to control for model-specific bias.</p>
+          <div class="reveal reveal-delay-1 soft-panel" style="position:relative;padding:13px 16px;margin-bottom:7px;">
+            <div style="position:absolute;left:-23px;top:17px;width:10px;height:10px;border-radius:50%;background:var(--navy);border:2px solid var(--white);box-shadow:0 0 0 2px var(--navy);"></div>
+            <div class="badge" style="background:var(--navy);color:var(--white);margin-bottom:4px;">Phase 2 - Expand</div>
+            <h4 style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:3px;">Full matrix with statistical rigor</h4>
+            <p style="font-size:11px;color:var(--slate);line-height:1.4;">Scale to all 14 profiles x 13 strategies with sufficient repetitions per cell for statistical significance.</p>
           </div>
 
-          <div class="reveal reveal-delay-2 soft-panel" style="position:relative;padding:16px 18px;margin-bottom:10px;">
-            <div style="position:absolute;left:-23px;top:20px;width:10px;height:10px;border-radius:50%;background:var(--blue);border:2px solid var(--white);box-shadow:0 0 0 2px var(--blue);"></div>
-            <div class="badge" style="background:var(--blue);color:var(--white);margin-bottom:6px;">Phase 3 - Deploy</div>
-            <h4 style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:4px;">Playbook delivery and collector training</h4>
-            <p style="font-size:12px;color:var(--slate);line-height:1.5;">Generate the production playbook with per-profile strategy recommendations, sample scripts, and compliance guardrails. Train collection teams on profile-specific approaches.</p>
+          <div class="reveal reveal-delay-2 soft-panel" style="position:relative;padding:13px 16px;margin-bottom:7px;">
+            <div style="position:absolute;left:-23px;top:17px;width:10px;height:10px;border-radius:50%;background:var(--blue);border:2px solid var(--white);box-shadow:0 0 0 2px var(--blue);"></div>
+            <div class="badge" style="background:var(--blue);color:var(--white);margin-bottom:4px;">Phase 3 - Deploy</div>
+            <h4 style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:3px;">Playbook delivery and collector training</h4>
+            <p style="font-size:11px;color:var(--slate);line-height:1.4;">Generate the production playbook with per-profile strategy recommendations, sample scripts, and compliance guardrails.</p>
           </div>
 
-          <div class="reveal reveal-delay-3 soft-panel" style="position:relative;padding:16px 18px;">
-            <div style="position:absolute;left:-23px;top:20px;width:10px;height:10px;border-radius:50%;background:var(--green);border:2px solid var(--white);box-shadow:0 0 0 2px var(--green);"></div>
-            <div class="badge" style="background:var(--green);color:var(--white);margin-bottom:6px;">Phase 4 - Iterate</div>
-            <h4 style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:4px;">Continuous refinement from real-world feedback</h4>
-            <p style="font-size:12px;color:var(--slate);line-height:1.5;">Feed real collection outcomes back into profiles and strategies. Add new debtor archetypes as they emerge. Evolve strategies based on regulatory changes and recovery data.</p>
+          <div class="reveal reveal-delay-3 soft-panel" style="position:relative;padding:13px 16px;">
+            <div style="position:absolute;left:-23px;top:17px;width:10px;height:10px;border-radius:50%;background:var(--green);border:2px solid var(--white);box-shadow:0 0 0 2px var(--green);"></div>
+            <div class="badge" style="background:var(--green);color:var(--white);margin-bottom:4px;">Phase 4 - Iterate</div>
+            <h4 style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:3px;">Continuous refinement from real-world feedback</h4>
+            <p style="font-size:11px;color:var(--slate);line-height:1.4;">Feed real collection outcomes back into profiles and strategies. Evolve strategies based on regulatory changes and recovery data.</p>
           </div>
         </div>
       </div>
 
       <div>
-        <div class="reveal" style="padding:24px;background:var(--navy);border-radius:2px;color:var(--white);margin-bottom:16px;">
-          <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:16px;">Expected Impact</div>
-          <div style="display:flex;flex-direction:column;gap:14px;">
+        <div class="reveal" style="padding:18px;background:var(--navy);border-radius:2px;color:var(--white);margin-bottom:10px;">
+          <div style="font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:12px;">Expected Impact</div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
             <div>
-              <div style="font-size:20px;font-weight:900;color:var(--gold-light);">Higher recovery rate</div>
-              <div style="font-size:11px;color:var(--mist);margin-top:2px;">Match each debtor to the strategy with the highest payment probability, not the one-size-fits-all default</div>
+              <div style="font-size:17px;font-weight:900;color:var(--gold-light);">Higher recovery rate</div>
+              <div style="font-size:11px;color:var(--mist);margin-top:2px;">Match each debtor to the strategy with the highest payment probability</div>
             </div>
             <div style="width:100%;height:1px;background:oklch(1 0 0 / 0.1);"></div>
             <div>
-              <div style="font-size:20px;font-weight:900;color:var(--gold-light);">Lower compliance risk</div>
-              <div style="font-size:11px;color:var(--mist);margin-top:2px;">Prevent dangerous strategy x profile mismatches before they reach a customer. Eliminate assertive tactics on vulnerable populations.</div>
+              <div style="font-size:17px;font-weight:900;color:var(--gold-light);">Lower compliance risk</div>
+              <div style="font-size:11px;color:var(--mist);margin-top:2px;">Prevent dangerous strategy x profile mismatches before they reach a customer</div>
             </div>
             <div style="width:100%;height:1px;background:oklch(1 0 0 / 0.1);"></div>
             <div>
-              <div style="font-size:20px;font-weight:900;color:var(--gold-light);">Higher debtor satisfaction</div>
-              <div style="font-size:11px;color:var(--mist);margin-top:2px;">Profile-appropriate approaches improve debtor experience, leading to higher plan adherence and fewer Procon complaints.</div>
+              <div style="font-size:17px;font-weight:900;color:var(--gold-light);">Higher debtor satisfaction</div>
+              <div style="font-size:11px;color:var(--mist);margin-top:2px;">Profile-appropriate approaches improve experience, leading to higher plan adherence</div>
             </div>
           </div>
         </div>
 
         <div class="reveal reveal-delay-1 callout">
-          <p><strong>Immediate next step:</strong> Finalize the pilot profile x strategy matrix, run the first batch of simulations, and validate results against domain expert judgment before expanding to the full matrix.</p>
+          <p><strong>Immediate next step:</strong> Finalize the pilot profile x strategy matrix, run simulations, and validate results against domain expert judgment.</p>
         </div>
 
-        <div class="reveal reveal-delay-2" style="margin-top:16px;padding:16px 20px;border:1px solid var(--cloud);border-radius:2px;">
-          <div style="font-size:10px;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Success Criteria</div>
-          <div style="font-size:11px;color:var(--slate);line-height:1.6;">
-            <div style="margin-bottom:3px;">- Statistically significant strategy differentiation per profile</div>
-            <div style="margin-bottom:3px;">- Compliance scores >= 0.8 for all recommended strategies</div>
-            <div style="margin-bottom:3px;">- Domain expert validation of top-ranked strategies</div>
+        <div class="reveal reveal-delay-2" style="margin-top:8px;padding:12px 14px;border:1px solid var(--cloud);border-radius:2px;">
+          <div style="font-size:9px;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Success Criteria</div>
+          <div style="font-size:10px;color:var(--slate);line-height:1.5;">
+            <div style="margin-bottom:2px;">- Statistically significant strategy differentiation per profile</div>
+            <div style="margin-bottom:2px;">- Compliance scores >= 0.8 for all recommended strategies</div>
+            <div style="margin-bottom:2px;">- Domain expert validation of top-ranked strategies</div>
             <div>- Actionable playbook entries for all 14 profiles</div>
           </div>
         </div>
@@ -1192,22 +1239,22 @@ body {
   <div class="si">
     <div class="cover-grid"></div>
     <div style="position:relative;z-index:2;max-width:820px;">
-      <div class="reveal" style="font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);margin-bottom:28px;">The Ask</div>
-      <h2 class="reveal reveal-delay-1" style="font-size:38px;font-weight:900;color:var(--white);line-height:1.12;letter-spacing:-.025em;margin-bottom:20px;">Approve the focused pilot so we can validate expert-grade, profile-specific strategy recommendations before deployment</h2>
-      <p class="reveal reveal-delay-2" style="font-size:17px;color:var(--mist);line-height:1.55;margin-bottom:42px;">5 profiles. 4 strategies. 20 cells. Zero customer exposure. If the pilot validates, scale to the full 182-combination matrix and deliver the production playbook.</p>
-      <div style="width:48px;height:2px;background:var(--gold);margin:0 auto 48px;"></div>
-      <div class="reveal reveal-delay-3" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;text-align:left;">
-        <div style="padding:20px;background:oklch(0.30 0.045 255);border:1px solid oklch(1 0 0 / 0.07);border-radius:2px;">
-          <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:8px;">Decision Needed</div>
-          <div style="font-size:13px;color:var(--mist);line-height:1.5;">Approve pilot scope: 5 profiles x 4 core strategies with domain expert validation checkpoint</div>
+      <div class="reveal" style="font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);margin-bottom:22px;">The Ask</div>
+      <h2 class="reveal reveal-delay-1" style="font-size:34px;font-weight:900;color:var(--white);line-height:1.14;letter-spacing:-.025em;margin-bottom:14px;">Approve the focused pilot so we can validate expert-grade, profile-specific strategy recommendations before deployment</h2>
+      <p class="reveal reveal-delay-2" style="font-size:15px;color:var(--mist);line-height:1.5;margin-bottom:32px;">5 profiles. 4 strategies. 20 cells. Zero customer exposure. If the pilot validates, scale to the full 182-combination matrix and deliver the production playbook.</p>
+      <div style="width:40px;height:2px;background:var(--gold);margin:0 auto 32px;"></div>
+      <div class="reveal reveal-delay-3" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;text-align:left;">
+        <div style="padding:16px;background:oklch(0.30 0.045 255);border:1px solid oklch(1 0 0 / 0.07);border-radius:2px;">
+          <div style="font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:6px;">Decision Needed</div>
+          <div style="font-size:11px;color:var(--mist);line-height:1.45;">Approve pilot scope: 5 profiles x 4 core strategies with domain expert validation checkpoint</div>
         </div>
-        <div style="padding:20px;background:oklch(0.30 0.045 255);border:1px solid oklch(1 0 0 / 0.07);border-radius:2px;">
-          <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:8px;">Resources Required</div>
-          <div style="font-size:13px;color:var(--mist);line-height:1.5;">AI compute for simulation runs, domain expert availability for validation, and collection team access for training</div>
+        <div style="padding:16px;background:oklch(0.30 0.045 255);border:1px solid oklch(1 0 0 / 0.07);border-radius:2px;">
+          <div style="font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:6px;">Resources Required</div>
+          <div style="font-size:11px;color:var(--mist);line-height:1.45;">AI compute for simulation runs, domain expert availability for validation, and collection team access for training</div>
         </div>
-        <div style="padding:20px;background:oklch(0.30 0.045 255);border:1px solid oklch(1 0 0 / 0.07);border-radius:2px;">
-          <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:8px;">Risk of Inaction</div>
-          <div style="font-size:13px;color:var(--mist);line-height:1.5;">Continuing with untested, one-size-fits-all scripts exposes the liquidator to compliance violations and suboptimal recovery</div>
+        <div style="padding:16px;background:oklch(0.30 0.045 255);border:1px solid oklch(1 0 0 / 0.07);border-radius:2px;">
+          <div style="font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:6px;">Risk of Inaction</div>
+          <div style="font-size:11px;color:var(--mist);line-height:1.45;">Continuing with untested, one-size-fits-all scripts exposes the liquidator to compliance violations and suboptimal recovery</div>
         </div>
       </div>
     </div>
@@ -1276,7 +1323,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }]
       },
       options: {
-        responsive: true, maintainAspectRatio: true, cutout: '52%',
+        responsive: true, maintainAspectRatio: true, cutout: '48%',
         plugins: { legend: { display: false } }
       }
     });
